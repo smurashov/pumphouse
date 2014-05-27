@@ -24,7 +24,48 @@ existing cloud. This requires following steps:
 ### Install Fuel master node
 
 We install Fuel master node on one of the nodes reserved for Mirantis OpenStack.
-MIrantis OpenStack must be configured so it shares Private and Public L2 networks
+Mirantis OpenStack must be configured so it shares Private and Public L2 networks
 with the existing OpenStack cluster.
 
-![Pumphouse network diagram][pumphouse-network-diagram.png]
+![Pumphouse network diagram](pumphouse-network-diagram.png)
+
+### Workload moving cycle
+
+Moving workloads from source cloud to Mirantis OpenStack cloud is a sequence of
+moves of the individual resources executed in cycle. Operator must be able to
+select workload resources they want to move. Resource might be as granular as
+single VM, or it might be a whole tenant.
+
+To move stateless resource, one must move the virtual system image between
+Glance services of clouds. Then VM on the source side must be stopped, metadata
+from it (inlcuding IP addresses) must be copied to destination Mirantis
+OpenStack cloud, and new VM must be instantiated from corresponding image.
+
+This process should be repeated for all workloads that are being moved to
+Mirantis OpenStack cloud.
+
+### Transfer Compute nodes
+
+Once all virtual instances from a compute node are moved to Mirantis OpenStack
+cloud, that compute node should be decomissioned from source cloud and
+re-installed as compute node in Mirantis OpenStack cluster.
+
+Following steps should be performed:
+
+- disable the compute node in source OpenStack cloud
+- shutdown the node using IPMI interface
+- move node's port to Admin VLAN of Mirantis OpenStack
+- power up the node using IPMI interface
+- boot the node from Fuel master node via PXE
+- assign Compute role to the node via Fuel API
+- deploy the node as Compute node in Mirantis OpenStack cluster via Fuel
+
+### Decomission source cloud
+
+If the ultimate goal of the migration process is to completely replace existing
+OpenStack infrastructure with Mirantis OpenStack, then as a final step of the
+move controllers of the source cloud should be decomissioned and added to
+Mirantis OpenStack cluster.
+
+Steps for decomissioning the controller node are generally the same as steps to
+move compute node from source to destination cluster.
