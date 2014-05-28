@@ -73,3 +73,19 @@ Mirantis OpenStack cluster.
 
 Steps for decomissioning the controller node are generally the same as steps to
 move compute node from source to destination cluster.
+
+## Resources
+
+Pumphouse migrates certain cloud resources managed by corresponding services of
+OpenStack.
+
+Service | List of resources
+--- | ---
+Nova | - instances
+     | - keypairs
+     | - security groups
+Glance | - image files
+       | - images registry
+Keystone | - tenants
+         | - users
+         | - service catalog
