@@ -29,6 +29,10 @@ with the existing OpenStack cluster.
 
 ![Pumphouse network diagram](pumphouse-network-diagram.png)
 
+In this diagram, components of source clouds are in purple, components of
+Mirantis OpenStack cloud are in green, and shared Private and Public networks
+are golden.
+
 ### Workload moving cycle
 
 Moving workloads from source cloud to Mirantis OpenStack cloud is a sequence of
