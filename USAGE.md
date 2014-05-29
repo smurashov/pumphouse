@@ -13,7 +13,7 @@ OpenStack and re-installed as it`s Compute node.
 
 Pumphouse is a python application and can be installed as a pip package:
 
-```sh
+```ShellSession
 $ pip install pumphouse
 ```
 
@@ -48,9 +48,9 @@ You could configure multiple source and target clouds.
 Use standard OpenStack clients (installed as dependencies with `pumphouse`
 package) to find and identify resources you`d like to migrate.
 
-Use `pump-` commands to migrate different resources:
+Use `pump-*` commands to migrate different resources:
 
-```sh
+```ShellSession
 $ pump-tenants
 $ pump-roles
 $ pump-users [tenant]
@@ -67,6 +67,11 @@ Use `nova hypervisor-*` commands to identify which hosts are cleansed from all
 workload. To decomission host from the existing cloud and move it to Mirantis
 OpenStack, use `pump-host` command:
 
-```sh
+```ShellSession
 $ pump-host <hostname> [hostname ...]
 ```
+
+As a result, host `<hostname>` will be powered down, rewired to isolated Admin
+network and powered up. Then the host will boot via PXE from Fuel node, register
+in Fuel as a compute node. Finally, operating systeme and OpenStack services
+will be deployed on it.
