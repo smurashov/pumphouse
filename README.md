@@ -155,7 +155,7 @@ Following strategies are supported for migrating users:
 - *tenant* moves all users from the given tenant in the source cloud
 - *specific* moves users specified by name or ID
 
-# Migration path
+#### Migration path
 
 Users are moved via calls to Identity API. The only exception to this process
 is the Password attribute: it must be copied over directly between state 
