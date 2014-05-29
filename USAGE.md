@@ -58,8 +58,18 @@ $ pump-user-roles
 $ pump-instances <instance> [instance ...] | <host> | <tenant>
 $ pump-networks [tenant]
 $ pump-images [tenant]
-$ pump-quotas [nova | glance]
+$ pump-quotas [tenant]
+$ pump-flavors
+$ pump-keypairs [user]
+$ pump-secgroups
 ```
+
+- `<tenant>` tells the command to migrate only resources that belong to specific 
+  tenant. Could be name or ID of the tenant.
+- `instance` tells the command to move only specified instance. Could be name or
+  ID of the instance
+- `host` is a host name or IP address of hypervisor host. All resources from
+  that host will be moved to the target cloud
 
 ## Migrate hypervisors
 
