@@ -136,3 +136,60 @@ Three strategies allowed for migrating tenants:
 
 Tenants are moved via calls to Identity API. Metadata read from source cloud API
 and uploaded to destination cloud API.
+
+### Users
+
+#### Dependencies
+
+For migrating users from source cloud, destination cloud must have the same set
+of tenants available. So the list of dependencies is as follows:
+
+- tenants
+
+#### Migration strategy
+
+Following strategies are supported for migrating users:
+
+- *all* moves all users from all tenants available in the source cloud, given 
+  the dependencies are satisfied
+- *tenant* moves all users from the given tenant in the source cloud
+- *specific* moves users specified by name or ID
+
+# Migration path
+
+Users are moved via calls to Identity API. The only exception to this process
+is the Password attribute: it must be copied over directly between state 
+databases of source and destination clouds.
+
+### Roles
+
+#### Dependencies
+
+Role resource does not depend on resources of any other type being defined in
+the target cloud.
+
+#### Migration strategy
+
+Following strategies are supported for migrating roles:
+
+- *all* moves all role definitions from source to destination cloud
+
+#### Migration path
+
+Roles are moved via calls to Identity API.
+
+### User-role assignments
+
+#### Dependencies
+
+User-role assignments depend on the following resources:
+
+- tenants
+- users
+
+Note that mapping between resource IDs in source and destination clouds must be
+preserved for assignments to be correct.
+
+#### Migration strategy
+
+User-role assignments are moved via calls to Identity API.
