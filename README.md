@@ -85,11 +85,14 @@ Nova | - instances
      | - keypairs
      | - security groups
      | - quotas
+     | - fixed ips
+     | - floating ips
 Glance | - image files
        | - quotas
 Keystone | - tenants
          | - users
-         | - service catalog
+         | - roles
+         | - user-roles assignments
 
 #### Dependencies
 
