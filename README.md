@@ -85,10 +85,9 @@ Nova | - instances
      | - keypairs
      | - security groups
      | - quotas
-     | - fixed ips
-     | - floating ips
+     | - flavors
+     | - networks (fixed + floating ips)
 Glance | - image files
-       | - quotas
 Keystone | - tenants
          | - users
          | - roles
@@ -114,16 +113,43 @@ list of currently supported strategies.
 Different types of resources require different approach to the migration
 process. This section describes the algorithm for every type of resource.
 
-## Keystone
+### Glance
 
-### Tenants
+#### Images
 
-#### Dependencies
+##### Dependencies
+
+Every image, public or private, is owned by certain tenant. So, images depend on
+tenants to be moved to the target cloud.
+
+- tenants
+
+##### Migration strategy
+
+Images could be migrated by one of the following strategies:
+
+- *all* moves all images existing in the source cloud in a single batch,
+  requires all tenants be migrated in advance
+- *public* moves only public images, leaving private images intact
+- *tenant* moves only images owned by the particular tenant
+- *specific* moves an image(s) specified by ID
+
+##### Migration path
+
+Images are moved using Glance API calls. It's preferable to transfer images
+directly between Glance endpoints, if possible. See `glance-replicator` script
+for the reference implementation of this concept.
+
+### Keystone
+
+#### Tenants
+
+##### Dependencies
 
 Tenants don't have dependency on any other resource type to be moved to
 destination cloud.
 
-#### Migration strategy
+##### Migration strategy
 
 Three strategies allowed for migrating tenants:
 
@@ -132,21 +158,21 @@ Three strategies allowed for migrating tenants:
   users, instances or images)
 - *specific* to move only tenant(s) specified by name or ID
 
-#### Migration path
+##### Migration path
 
 Tenants are moved via calls to Identity API. Metadata read from source cloud API
 and uploaded to destination cloud API.
 
-### Users
+#### Users
 
-#### Dependencies
+##### Dependencies
 
 For migrating users from source cloud, destination cloud must have the same set
 of tenants available. So the list of dependencies is as follows:
 
 - tenants
 
-#### Migration strategy
+##### Migration strategy
 
 Following strategies are supported for migrating users:
 
@@ -155,32 +181,32 @@ Following strategies are supported for migrating users:
 - *tenant* moves all users from the given tenant in the source cloud
 - *specific* moves users specified by name or ID
 
-#### Migration path
+##### Migration path
 
 Users are moved via calls to Identity API. The only exception to this process
 is the Password attribute: it must be copied over directly between state 
 databases of source and destination clouds.
 
-### Roles
+#### Roles
 
-#### Dependencies
+##### Dependencies
 
 Role resource does not depend on resources of any other type being defined in
 the target cloud.
 
-#### Migration strategy
+##### Migration strategy
 
 Following strategies are supported for migrating roles:
 
 - *all* moves all role definitions from source to destination cloud
 
-#### Migration path
+##### Migration path
 
 Roles are moved via calls to Identity API.
 
-### User-role assignments
+#### User-role assignments
 
-#### Dependencies
+##### Dependencies
 
 User-role assignments depend on the following resources:
 
@@ -190,6 +216,47 @@ User-role assignments depend on the following resources:
 Note that mapping between resource IDs in source and destination clouds must be
 preserved for assignments to be correct.
 
-#### Migration strategy
+##### Migration strategy
 
 User-role assignments are moved via calls to Identity API.
+
+### Nova
+
+#### Flavors
+
+##### Dependencies
+
+Flavors don't depend on any onther resources to be migrated.
+
+#### Keypairs
+
+##### Dependencies
+
+- users
+
+#### Quotas
+
+##### Dependencies
+
+- tenants
+- users
+
+#### Security groupsa
+
+##### Dependencies
+
+Security groups themseleves don't depend on any resources.
+
+#### Networks
+
+#### Instances
+
+##### Dependencies
+
+- tenants
+- users
+- keypairs
+- networks
+- security groups
+- images
+- flavors
