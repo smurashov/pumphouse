@@ -84,8 +84,52 @@ Service | List of resources
 Nova | - instances
      | - keypairs
      | - security groups
+     | - quotas
 Glance | - image files
-       | - images registry
+       | - quotas
 Keystone | - tenants
          | - users
          | - service catalog
+
+#### Dependencies
+
+There are dependencies between different resources in terms of migration. For
+example, to migrate instances from a particular tenant, the corresponding tenant
+must be created first in the destination cloud. See below for the list of
+dependencies per resource type.
+
+#### Migration strategy
+
+There could be different migration strategies for different types of resources.
+For example, it could be reasonable to migrate all tenants from the source
+cloud, or only tenants that have resources. Instances could be migrated on
+per-tenant, per-host or per-application basis, or any others. See below for the
+list of currently supported strategies.
+
+#### Migration path
+
+Different types of resources require different approach to the migration
+process. This section describes the algorithm for every type of resource.
+
+## Keystone
+
+### Tenants
+
+#### Dependencies
+
+Tenants don't have dependency on any other resource type to be moved to
+destination cloud.
+
+#### Migration strategy
+
+Three strategies allowed for migrating tenants:
+
+- *all* to move all tenants created in source cloud in a single batch
+- *used* to move only those tenants that have resources belonging to them (i.e.
+  users, instances or images)
+- *specific* to move only tenant(s) specified by name or ID
+
+#### Migration path
+
+Tenants are moved via calls to Identity API. Metadata read from source cloud API
+and uploaded to destination cloud API.
