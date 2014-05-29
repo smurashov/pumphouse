@@ -36,6 +36,7 @@ Use configuration file pumphouse.yaml to configure source and target clouds:
     -
       name:     mira-os-1
       auth_url: http://api.endpoint.com:5000/v2.0/
+      fuel_url: http://127.0.0.1:8000/api/
       username: admin
       password: admin
 ```
@@ -54,8 +55,18 @@ $ pump-tenants
 $ pump-roles
 $ pump-users [tenant]
 $ pump-user-roles
-$ pump-instances [tenant [tenant ...] | instance [instance ...]]
+$ pump-instances <instance> [instance ...] | <host> | <tenant>
 $ pump-networks [tenant]
 $ pump-images [tenant]
 $ pump-quotas [nova | glance]
+```
+
+## Migrate hypervisors
+
+Use `nova hypervisor-*` commands to identify which hosts are cleansed from all
+workload. To decomission host from the existing cloud and move it to Mirantis
+OpenStack, use `pump-host` command:
+
+```sh
+$ pump-host <hostname> [hostname ...]
 ```
