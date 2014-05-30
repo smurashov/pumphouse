@@ -22,17 +22,15 @@ $ pip install pumphouse
 Use configuration file pumphouse.yaml to configure source and target clouds:
 
 ```yml
-  sources:
+  source:
     -
       name:     good_old_openstack
       auth_url: http://10.0.0.1:5000/v2.0/
       username: admin
       password: admin
-    -
-      name:     grizzly-cloud
-      auth_url: https://10.10.10.10:5000/v2.0/
+      tenant:   admin
       token:    UUID
-  targets:
+  target:
     -
       name:     mira-os-1
       auth_url: http://api.endpoint.com:5000/v2.0/
