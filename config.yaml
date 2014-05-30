@@ -1,0 +1,16 @@
+source:
+    endpoint:
+        auth_url: http://172.18.184.65/
+        username: admin
+        password: secrete
+        tenant: admin
+destination:
+    endpoint:
+        auth_url: http://172.18.184.36/
+        username: admin
+        password: secrete
+        tenant: admin
+plan:
+    # all, used, specific
+    tenants: all
+    images: all
