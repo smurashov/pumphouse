@@ -1,15 +1,15 @@
 source:
     endpoint:
-        auth_url: http://172.18.184.65/
+        auth_url: http://172.18.184.65:5000/
         username: admin
-        password: secrete
-        tenant: admin
+        password: passwd
+        tenant_name: admin
 destination:
     endpoint:
-        auth_url: http://172.18.184.36/
+        auth_url: http://172.18.184.36:5000/
         username: admin
-        password: secrete
-        tenant: admin
+        password: passwd
+        tenant_name: admin
 plan:
     # all, used, specific
     tenants: all
