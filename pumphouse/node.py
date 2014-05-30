@@ -27,3 +27,7 @@ class Node(pump.Resource):
         super(Node, self).__init__(uuid, name)
         self.host_ip = host_ip
         self.running_vms = running_vms
+
+    def __repr__(self):
+        return ("<Node(uuid={0}, name={1}, host_ip={2})>"
+                .format(self.uuid, self.name, self.host_ip))
