@@ -142,6 +142,16 @@ preserved for assignments to be correct.
 
 ##### Migration strategy
 
+Assignments could be migrated by one of the following strategies:
+
+- *all* recreates all assignments that exist in the source cloud, given all
+  users and roles are already recreated in the target cloud
+- *tenant* migrates role assignments for the specified tenant
+- *specified* strategy migrates only assignments explicitly specified by
+  operator
+
+##### Migration path
+
 User-role assignments are moved via calls to Identity API.
 
 ### Nova
@@ -152,11 +162,30 @@ User-role assignments are moved via calls to Identity API.
 
 Flavors don't depend on any onther resources to be migrated.
 
+##### Migration strategy
+
+There is a single strategy for migrating flavors: *all*.
+
+##### Migration path
+
+Flavors are read from source cloud and re-created in the destination cloud via
+Nova API calls.
+
 #### Keypairs
 
 ##### Dependencies
 
 - users
+
+##### Migration strategy
+
+Following startegies are possible to migrate keypairs:
+
+- *all*
+- *user* to move all keypairs owned by the specified user
+- *specific* moves only keypair(s) specified by name(s) or fingerprint(s)
+
+##### Migration path
 
 #### Quotas
 
@@ -165,13 +194,25 @@ Flavors don't depend on any onther resources to be migrated.
 - tenants
 - users
 
-#### Security groupsa
+##### Migration strategy
+
+##### Migration path
+
+#### Security groups
 
 ##### Dependencies
 
 Security groups themseleves don't depend on any resources.
 
+##### Migration strategy
+
+##### Migration path
+
 #### Networks
+
+##### Migration strategy
+
+##### Migration path
 
 #### Instances
 
@@ -184,3 +225,8 @@ Security groups themseleves don't depend on any resources.
 - security groups
 - images
 - flavors
+
+##### Migration strategy
+
+##### Migration path
+
