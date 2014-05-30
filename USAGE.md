@@ -48,7 +48,9 @@ You could configure multiple source and target clouds.
 Use standard OpenStack clients (installed as dependencies with `pumphouse`
 package) to find and identify resources you`d like to migrate.
 
-Use `pump-*` commands to migrate different resources:
+Use `pump-*` commands to migrate different resources (we refrain from using
+`pump <subcommand>` format as `pump` command already used in
+[distcc](https://code.google.com/p/distcc/)):
 
 ```ShellSession
 $ pump-tenants
