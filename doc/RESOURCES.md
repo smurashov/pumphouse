@@ -187,6 +187,9 @@ Following startegies are possible to migrate keypairs:
 
 ##### Migration path
 
+Retrieval of keypair via API os possible only on per-user basis. Another option
+is to migrate keypairs on the database level.
+
 #### Quotas
 
 ##### Dependencies
@@ -196,7 +199,19 @@ Following startegies are possible to migrate keypairs:
 
 ##### Migration strategy
 
+Per-tenant quotas could be migrated via 2 strategies:
+
+- *all*
+- *tenant*
+
+Default quotas cannot be updated via API and must be configured at the
+configuration stage of deloyment of Mirantis OpenStack cloud.
+
 ##### Migration path
+
+Migration of per-tenant quotas could be performed via Compute API calls.
+Default quotas must be set upfront at the time of deployment of the destination
+cloud.
 
 #### Security groups
 
@@ -206,13 +221,43 @@ Security groups themseleves don't depend on any resources.
 
 ##### Migration strategy
 
+Following strategies could be used to migrate security groups:
+
+- *all*
+- *specific*
+
 ##### Migration path
+
+Security groups are read from the source cloud via Compute API.
+Security groups are recreated in the destination cloud via Compute API.
 
 #### Networks
 
+##### Dependencies
+
+- tenants
+
 ##### Migration strategy
 
+Following strategies supported for migrating networks:
+
+- *all*
+- *tenant*
+
 ##### Migration path
+
+Moving networks from one cloud to another has a number of implications which
+depend on requirements. If it is required that instances can communicate to each
+other during the migration process, it is necessary that:
+
+- both clouds use the same network manager
+- both clouds share L2 segment(s) used for **private** networks
+- `fixed_ip_range` parameters are the same for both clouds
+- both clouds share L2 segment(s) for **public** network
+- `floating-ip-range` is the same for both clouds
+
+Then migration could be performed via Networking API or using `nova-manage`
+command (if network manager is `nova-network`)
 
 #### Instances
 
