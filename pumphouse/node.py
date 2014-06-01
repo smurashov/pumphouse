@@ -1,15 +1,19 @@
-import pump
+# FIXME(akscram): The version of client of Nova is hardcoded.
+from novaclient.v1_1 import client as nova_client
 
-class NodeDiscovery(pump.Discovery):
+from pumphouse import base
+
+
+class NodeDiscovery(base.Discovery):
 
     def __init__(self):
         super(NodeDiscovery, self).__init__()
         service_type = 'compute'
-        self.nova = client.Client(self.username,
-                                  self.password,
-                                  self.tenant,
-                                  self.auth_url,
-                                  service_type)
+        self.nova = nova_client.Client(self.username,
+                                       self.password,
+                                       self.tenant,
+                                       self.auth_url,
+                                       service_type)
 
     def discover(self):
         discovery = []
@@ -21,7 +25,7 @@ class NodeDiscovery(pump.Discovery):
         return discovery
 
 
-class Node(pump.Resource):
+class Node(base.Resource):
 
     def __init__(self, uuid, name, host_ip, running_vms):
         super(Node, self).__init__(uuid, name)
