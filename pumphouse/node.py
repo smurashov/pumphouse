@@ -16,10 +16,10 @@ class NodeDiscovery(pump.Discovery):
         nodes = nova_client.hypervisors.list()
         for node in nodes:
             discovery = discovery.append(
-                             Node(node.id, node.hypervisor_hostname, 
+                             Node(node.id, node.hypervisor_hostname,
                                   node.host_ip, node.running_vms))
         return discovery
-    
+
 
 class Node(pump.Resource):
 
