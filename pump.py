@@ -2,6 +2,13 @@ import argparse
 import yaml
 
 
+# TODO(akscram): A proper feature with auto-discovering API version
+#                should be used here.
+#from keystoneclient import client as keystone_client
+from keystoneclient.v2_0 import client as keystone_client
+from novaclient.v1_1 import client as nova_client
+
+
 def safe_load_yaml(filename):
     with open(filename) as f:
         return yaml.safe_load(f.read())
@@ -23,13 +30,16 @@ def read_configuration(stream):
 
 
 class Cloud(object):
-    def __init__(self, services):
-        self.services = services
+    def __init__(self, services=None):
+        self.services = services or []
 
-    def add_service(self, service):
-        pass
+    @classmethod
+    def discover(cls, endpoint):
+        discover = DiscoveryServices(endpoint)
+        services = list(dicovery.discover())
+        return cls(services=services)
 
-
+# TODO(akscram): To avoid merge conflics.
 class Discovery(object):
     def __init__(self, config):
         self.username = config['username']
@@ -38,9 +48,36 @@ class Discovery(object):
         self.tenant = config['tenant']
 
 
-class ServiceDiscovery(Discovery):
-    pass
+class DiscoveryServices(object):
+    def __init__(self, endpoint):
+        self.endpoint = endpoint
+        self.keystone = keystone_client.Client(**endpoint)
 
+    def discover(self):
+        known_services = Service.defined_services()
+        catalog = self.keystone.services.list()
+        for service_ref in catalog:
+            Service = known_services.get(service_ref.type)
+            if Service is not None:
+                yield Service.discover(self.endpoint)
+
+
+class DiscoveryNovaResources(object):
+    def __init__(self, endpoint):
+        self.nova = nova_client.Client(endpoint["username"],
+                                       endpoint["password"],
+                                       endpoint["tenant_name"],
+                                       endpoint["auth_url"])
+
+
+class DiscoveryServers(DiscoveryNovaResources):
+    def discover(self):
+        pass
+
+
+class DiscoveryFlavors(DiscoveryNovaResources):
+    def discover(self):
+        pass
 
 
 class Pump(object):
@@ -49,15 +86,36 @@ class Pump(object):
 
 
 class Service(object):
-    name = None
+    type = None
+
+    @classmethod
+    def defined_services(cls):
+        return dict(
+            (sub.type, sub)
+            for sub in cls.__subclasses__()
+            if sub.type is not None
+        )
 
 
 class Nova(Service):
-    name = "nova"
+    type = "compute"
+
+    def __init__(self, servers=None, flavors=None):
+        self.servers = servers or []
+        self.flavors = flavors or []
+
+    def discover(self, endpoint):
+        flavor_d = DiscoveryFlavors(endpoint)
 
 
 class Glance(Service):
-    name = "glance"
+    type = "image"
+
+    def __init__(self, images=None):
+        self.images = images or []
+
+    def discovery(self, keystone):
+        pass
 
 
 class Resource(object):
