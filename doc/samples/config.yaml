@@ -1,17 +1,15 @@
 source:
-  -
-    name:       good_old_openstack
-    auth_url:   http://10.0.0.1:5000/v2.0/
-    username:   admin
-    password:   admin
-    tenant:     admin
-    token:      UUID
+  name:    good_old_openstack
+  endpoint:
+    auth_url:       http://10.0.0.1:5000/v2.0/
+    username:       admin
+    password:       admin
+    tenant_name:    admin
 target:
-  -
-    name:       mira-os-1
-    auth_url:   http://api.endpoint.com:5000/v2.0/
-    fuel_url:   http://127.0.0.1:8000/api/
-    username:   admin
-    password:   admin
-    tenant:     admin
-    token:      UUID
+  name:    mira-os-1
+  endpoint:
+    auth_url:       http://api.endpoint.com:5000/v2.0/
+    fuel_url:       http://127.0.0.1:8000/api/
+    username:       admin
+    password:       admin
+    tenant_name:    admin
