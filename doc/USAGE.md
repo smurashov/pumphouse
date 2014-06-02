@@ -123,17 +123,17 @@ Use `pump-*` commands to migrate different resources (we refrain from using
 [distcc](https://code.google.com/p/distcc/)):
 
 ```ShellSession
-$ pump-tenants
-$ pump-roles
-$ pump-users [tenant]
-$ pump-user-roles
-$ pump-instances <instance> [instance ...] | <host> | <tenant>
-$ pump-networks [tenant]
-$ pump-images [tenant]
-$ pump-quotas [tenant]
-$ pump-flavors
-$ pump-keypairs [user]
-$ pump-secgroups
+$ pump-keystone tenants
+$ pump-keystone roles
+$ pump-keystone users [tenant]
+$ pump-keystone user-roles
+$ pump-nova instances <instance> [instance ...] | <host> | <tenant>
+$ pump-nova networks [tenant]
+$ pump-nova quotas [tenant]
+$ pump-nova flavors
+$ pump-nova keypairs [user]
+$ pump-nova secgroups
+$ pump-glance images [tenant]
 ```
 
 - `<tenant>` tells the command to migrate only resources that belong to specific 
@@ -159,12 +159,12 @@ Following steps should be performed:
 - assign Compute role to the node via Fuel API
 - deploy the node as Compute node in Mirantis OpenStack cluster via Fuel
 
-Use `nova hypervisor-*` commands to identify which hosts are cleansed from all
-workload. To decomission host from the existing cloud and move it to Mirantis
-OpenStack, use `pump-host` command:
+Use `nova hypervisor-list`, `nova hypervisor-show` commands to identify which
+hosts are cleansed from all workload. To decomission host from the existing
+cloud and move it to Mirantis OpenStack, use `pump-host` command:
 
 ```ShellSession
-$ pump-host <hostname> [hostname ...]
+$ pump-nova host <hostname> [hostname ...]
 ```
 
 As a result, host `<hostname>` will be powered down, rewired to isolated Admin
