@@ -4,10 +4,10 @@ from novaclient.v1_1 import client as nova_client
 from pumphouse import base
 
 
-class NodeDiscovery(base.Discovery):
+class DiscoveryNode(base.Discovery):
 
     def __init__(self):
-        super(NodeDiscovery, self).__init__()
+        super(DiscoveryNode, self).__init__()
         service_type = 'compute'
         self.nova = nova_client.Client(self.username,
                                        self.password,
@@ -26,6 +26,7 @@ class NodeDiscovery(base.Discovery):
 
 
 class Node(base.Resource):
+    service = Nova
 
     def __init__(self, uuid, name, host_ip, running_vms):
         super(Node, self).__init__(uuid, name)
