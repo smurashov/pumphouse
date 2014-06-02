@@ -1,6 +1,3 @@
-# FIXME(akscram): The version of client of Nova is hardcoded.
-from novaclient.v1_1 import client as nova_client
-
 from pumphouse import base
 
 
@@ -8,16 +5,13 @@ class DiscoveryNode(base.Discovery):
 
     def __init__(self):
         super(DiscoveryNode, self).__init__()
-        service_type = 'compute'
-        self.nova = nova_client.Client(self.username,
-                                       self.password,
-                                       self.tenant,
-                                       self.auth_url,
-                                       service_type)
 
     def discover(self):
         discovery = []
-        nodes = nova_client.hypervisors.list()
+        # TODO(ogelbukh): pass the client from base.Discovery based on the
+        # service_type
+        nova = self.client
+        nodes = nova.hypervisors.list()
         for node in nodes:
             discovery = discovery.append(
                              Node(node.id, node.hypervisor_hostname,
