@@ -35,3 +35,10 @@ class Node(base.Resource):
     def __repr__(self):
         return ("<Node(uuid={0}, name={1}, host_ip={2})>"
                 .format(self.uuid, self.name, self.host_ip))
+
+    def migrate(self):
+        if self.running_vms > 0:
+           raise ValueError("Hypervisor runs {1} VMs, cannot migrate"
+                            .format(self.running_vms))
+
+        raise NotImplemented
