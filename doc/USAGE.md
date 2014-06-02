@@ -64,12 +64,46 @@ Use configuration file pumphouse.yaml to configure source and target clouds:
 
 You could configure multiple source and target clouds.
 
-### Workload moving cycle
+## Discover cloud
+
+Given the auth URL and credentials, we could learn basic information about the
+source and the destination clouds. Basic information includes the list of
+services available in those clouds and URLs to API endpoints of those services.
+
+We also could determine the list of resources in the source clouds, with their
+parameters like UUIDs, names and resource type-specific attributes. We call this
+process a discovery of resource.
+
+Discovery of resource builds a dependency tree for this resource. This tree
+includes all resources that must be present in the destination cloud before the
+specified resource could be moved about.
+
+
+## Workload moving cycle
 
 Moving workloads from source cloud to Mirantis OpenStack cloud is a sequence of
 moves of the individual resources executed in cycle. Operator must be able to
 select workload resources they want to move. Resource might be as granular as
 single VM, or it might be a whole tenant.
+
+To migrate resources and nodes from the source cloud to Mirantis OpenStack, you
+need to define what exactly you want to migrate. There are several possible
+approaches to it:
+
+- Define migration policy for every type of resource and then start migration
+  process. The migration logic must recognize dependencies between resource
+  types and move resources about accordingly. It also needs come error handling
+  logic in case something goes wrong. This approach is only viable when you
+  don't really care about the order of moving particular resources (beyond
+  explicit dependencies between resource types).
+- Manually inspect the cloud with standard tools like OpenStack dashboard or cli
+  clients, determine which resources you want to move at this time and run
+  migration scripts for that resources. Repeat that until you have all your
+  resources in the new cloud. This approach allows you to precisely control the
+  order of migration and the flow of migration itself (for example, handle
+  non-standard errors). This is also useful when you only want to migrate the
+  certain type of workloads (i.e. only a subset of all VMs in your source
+  cloud).
 
 To move stateless resource, one must move the virtual system image between
 Glance services of clouds. Then VM on the source side must be stopped, metadata
