@@ -23,6 +23,6 @@ class CloudDiscovery(object):
         known_services = services.Service.defined_services()
         catalog = self.keystone.services.list()
         for service_ref in catalog:
-            if service_ref.type in known_services:
+            if service_ref.type in known_services.keys():
                 Service = known_services[service_ref.type]
                 yield Service.discover(self.endpoint)
