@@ -26,14 +26,14 @@ class Flavor(base.Resource):
         self.extra_specs = kwargs['extra_specs'] or []
 
     def __repr__(self):
-        return("<Flavor(uuid={0}, name={2}, ram={3}, disk={4}, vcpus={5}, "
-               "is_public={6})>"
+        return("<Flavor(uuid={0}, name={1}, ram={2}, disk={3}, vcpus={4}, "
+               "is_public={5})>"
                .format(self.uuid, self.name, self.ram, self.disk, self.vcpus,
                        self.is_public))
 
     def discover(self):
         nova = self.service.client
-        fl = nova.flavors.get(self.id)
+        fl = nova.flavors.get(self.uuid)
         self.ram = fl.ram
         self.disk = fl.disk
         self.vcpus = fl.vcpus
@@ -46,6 +46,6 @@ class Flavor(base.Resource):
                                    self.ram,
                                    self.vcpus,
                                    self.disk,
-                                   self.id,
+                                   self.uuid,
                                    None, None, None,
                                    self.is_public)
