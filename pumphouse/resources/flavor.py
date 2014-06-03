@@ -33,7 +33,7 @@ class Flavor(base.Resource):
 
     def discover(self):
         nova = self.service.client
-        fl = nova.flavor.get(self.id)
+        fl = nova.flavors.get(self.id)
         self.ram = fl.ram
         self.disk = fl.disk
         self.vcpus = fl.vcpus
@@ -41,4 +41,11 @@ class Flavor(base.Resource):
         self.extra_specs = fl.get_keys()
 
     def migrate(self):
-        raise NotImplemented
+        nova = self.service.client
+        return nova.flavors.create(self.name,
+                                   self.ram,
+                                   self.vcpus,
+                                   self.disk,
+                                   self.id,
+                                   None, None, None,
+                                   self.is_public)
