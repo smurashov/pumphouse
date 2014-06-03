@@ -19,3 +19,11 @@ class Resource(object):
 
     def __repr__(self):
         return "<Resource(uuid={0}, name={1})>".format(self.uuid, self.name)
+
+
+class Collection(object):
+
+    service = None
+
+    def __init__(self):
+        self.elements = []
