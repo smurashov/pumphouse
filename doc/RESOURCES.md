@@ -217,7 +217,9 @@ cloud.
 
 ##### Dependencies
 
-Security groups themseleves don't depend on any resources.
+Security groups depend on tenants they belong to:
+
+- tenants
 
 ##### Migration strategy
 
