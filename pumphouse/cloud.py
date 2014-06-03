@@ -12,6 +12,26 @@ class Cloud(object):
         services = list(dicovery.discover())
         return cls(services=services)
 
+    @classmethod
+    def migrate(cls, resource):
+        src = resource
+        resource_type = src.__class__.__name__
+        dst = cls._discover_resource(resource_type,
+                             src.id,
+                             src.name)
+        if src == dst:
+            return dst
+        elif not dst:
+            dst = copy.deepcopy(src)
+            dst.service = cls.services(src.service.type)
+            dst.migrate()
+        else:
+            raise Exception('Duplicate resources exist in src and dst clouds')
+
+    def _discover_resource(self, resource_class, resource_id, resource_name):
+        resource = 
+        return resource.discover()
+
 
 class CloudDiscovery(object):
 
