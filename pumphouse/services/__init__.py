@@ -1,7 +1,3 @@
-from .glance import Glance
-from .nova import Nova
-
-
 __all___ = ["Service", "Glance", "Nova"]
 
 

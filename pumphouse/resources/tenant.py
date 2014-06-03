@@ -1,7 +1,8 @@
-from . import base
+from pumphouse.resources import base
+from pumphouse.services import keystone
 
 class Tenant(base.Resource):
-    service = Keystone
+    service = keystone.Keystone
 
     def __init__(self, uuid, name):
         super(Tenant, self).__init__(uuid, name)

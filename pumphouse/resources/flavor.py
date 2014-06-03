@@ -1,7 +1,8 @@
-from . import base
+from pumphouse.resources import base
+from pumphouse.services import nova
 
 class FlavorsCollection(base.Collection):
-    service = Nova
+    service = nova.Nova
 
     def discover(self):
         nova = self.service.client
@@ -13,7 +14,7 @@ class FlavorsCollection(base.Collection):
         raise NotImplemented
 
 class Flavor(base.Resource):
-    service = Nova
+    service = nova.Nova
 
     def __init__(self, uuid, name, **kwargs):
         super(Flavor, self).__init__(uuid, name)
