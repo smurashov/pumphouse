@@ -15,8 +15,7 @@ class Cloud(object):
         if resource_class in resource_classes:
             service_name = resource_classes[resource_class].service.__name__
             if service_name.lower() in self.services:
-                service = self.services[service_name.lower()]
-                client = service.client
+                client = self.services[service_name.lower()]
                 resource = resource_classes[resource_class].discover(client, resource_id)
                 return resource
             else:

@@ -19,7 +19,7 @@ def main():
 
     resource = source.discover(args.resource_class, args.resource_id)
 #    destination.migrate(args.resource)
-    print resource
+    print resource.name
 
 if __name__ == "__main__":
     main()

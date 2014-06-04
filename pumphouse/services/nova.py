@@ -6,9 +6,6 @@ class Nova(base.Service):
 
     type = "compute"
 
-    def __init__(self, servers=None, flavors=None):
-        self.client = self.get_client(self.cloud.endpoint)
-
     @classmethod
     def get_client(cls, endpoint):
         c = client.Client(endpoint['username'],

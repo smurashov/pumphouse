@@ -18,6 +18,7 @@ class Flavor(base.Resource):
 
     def __init__(self, uuid, name, **kwargs):
         super(Flavor, self).__init__(uuid, name)
+        self.name = name
         self.ram = None
         self.disk = None
         self.vcpus = None
@@ -39,6 +40,7 @@ class Flavor(base.Resource):
             print("Exception while discovering resource {0}: {1}"
                   .format(str(cls), exc.message))
             return None
+        cls.name = fl.name
         cls.ram = fl.ram
         cls.disk = fl.disk
         cls.vcpus = fl.vcpus
