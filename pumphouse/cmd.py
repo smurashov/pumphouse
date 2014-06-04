@@ -1,5 +1,8 @@
 import argparse
 import yaml
+from pumphouse import cloud
+from pumphouse.services import base
+from pumphouse.resources import base
 
 
 def safe_load_yaml(filename):
@@ -14,6 +17,10 @@ def get_parser():
                         type=safe_load_yaml,
                         help="Configuration of cloud endpoints and a "
                              "strategy.")
+    parser.add_argument("resource_class",
+                        help="Class name of resource to migrate")
+    parser.add_argument("resource_id",
+                        help="ID of migrating resourcre")
     return parser
 
 
@@ -27,9 +34,12 @@ def main():
     args = parser.parse_args()
 
 # TODO(akscram): The first stage is a discovering of clouds.
-#    source = discovery(args.config["source"]["endpoint"])
-#    destination = discovery(args.config["destination"]["endpoint"])
+    source = cloud.Cloud(args.config["source"]["endpoint"])
+    destination = cloud.Cloud(args.config["destination"]["endpoint"])
 
+    resource = source.discover(args.resource_class, args.resource_id)
+#    destination.migrate(args.resource)
+    print resource
 
 if __name__ == "__main__":
     main()

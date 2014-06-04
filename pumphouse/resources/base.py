@@ -1,18 +1,9 @@
-class Discovery(object):
-    def __init__(self, config):
-        self.username = config['username']
-        self.password = config['password']
-        self.auth_url = config['auth_url']
-        self.tenant = config['tenant']
-
-
 class Resource(object):
 
     service = None
 
-    def __init__(self, uuid, name):
+    def __init__(self, resource_class, uuid):
         self.uuid = uuid
-        self.name = name
 
     def __eq__(self, other):
         return self.uuid == other.uuid and self.name == other.name
@@ -20,6 +11,16 @@ class Resource(object):
     def __repr__(self):
         return "<Resource(uuid={0}, name={1})>".format(self.uuid, self.name)
 
+    @classmethod
+    def defined_resources(cls):
+        return dict(
+            (sub.__name__, sub)
+            for sub in cls.__subclasses__()
+            if sub.__name__ is not 'Resource')
+
+    @classmethod
+    def discover(cls, client, uuid):
+        raise NotImplemented
 
 class Collection(object):
 

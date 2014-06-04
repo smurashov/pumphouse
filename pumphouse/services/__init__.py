@@ -1,13 +1,4 @@
-__all___ = ["Service", "Glance", "Nova"]
-
-
-class Service(object):
-    type = None
-
-    @classmethod
-    def defined_services(cls):
-        return dict(
-            (sub.type, sub)
-            for sub in cls.__subclasses__()
-            if sub.type is not None
-        )
+from pumphouse.services.base import Service
+from pumphouse.services.nova import Nova
+from pumphouse.services.keystone import Keystone
+from pumphouse.services.glance import Glance

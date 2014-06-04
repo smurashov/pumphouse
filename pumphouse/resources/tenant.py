@@ -13,6 +13,7 @@ class Tenant(base.Resource):
         return("<Tenant(uuid={0}, name={1}, description={2}, enabled={3})>"
                .format(self.uuid, self.name, self.description, self.enabled))
 
+    @classmethod
     def discover(self):
         keystone = self.service.client
         tt = keystone.tenant.get(self.uuid)

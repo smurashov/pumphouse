@@ -1,13 +1,19 @@
-from pumphouse import services
+from pumphouse.services import base
+from novaclient.v1_1 import client
 
 
-class Nova(services.Service):
+class Nova(base.Service):
 
     type = "compute"
 
     def __init__(self, servers=None, flavors=None):
-        self.servers = servers or []
-        self.flavors = flavors or []
+        self.client = self.get_client(self.cloud.endpoint)
 
-    def discover(self, endpoint):
-        flavor_d = DiscoveryFlavors(endpoint)
+    @classmethod
+    def get_client(cls, endpoint):
+        c = client.Client(endpoint['username'],
+                          endpoint['password'],
+                          endpoint['tenant_name'],
+                          endpoint['auth_url'])
+        print c
+        return c

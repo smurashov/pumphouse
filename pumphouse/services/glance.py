@@ -1,12 +1,14 @@
-from pumphouse import services
+from pumphouse.services import base
+from glanceclient.v1 import client
 
 
-class Glance(services.Service):
+class Glance(base.Service):
 
     type = "image"
 
     def __init__(self, images=None):
         self.images = images or []
 
-    def discovery(self, keystone):
+    @classmethod
+    def get_client(cls, endpoint):
         pass

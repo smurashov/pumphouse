@@ -1,48 +1,41 @@
-from pumphouse import services
+import copy
+
+from pumphouse.services.base import Service
+from pumphouse.resources.base import Resource
 
 
 class Cloud(object):
 
-    def __init__(self, services=None):
-        self.services = services or []
+    def __init__(self, endpoint, services=None, resources=None):
+        self.endpoint = endpoint
+        self.services = services or dict(Service.discover(self.endpoint))
 
-    @classmethod
-    def discover(cls, endpoint):
-        discover = DiscoveryServices(endpoint)
-        services = list(dicovery.discover())
-        return cls(services=services)
+    def discover(self, resource_class, resource_id):
+        resource_classes = Resource.defined_resources()
+        if resource_class in resource_classes:
+            service_name = resource_classes[resource_class].service.__name__
+            if service_name.lower() in self.services:
+                service = self.services[service_name.lower()]
+                client = service.client
+                resource = resource_classes[resource_class].discover(client, resource_id)
+                return resource
+            else:
+                return None
 
+    def _convert(self, resource):
+        nresource = copy.deepcopy(resource)
+        nresource.service = self.services(resource.service.type)
+        return nresource
+    
     @classmethod
     def migrate(cls, resource):
         src = resource
-        resource_type = src.__class__.__name__
-        dst = cls._discover_resource(resource_type,
-                             src.id,
-                             src.name)
+        dst = cls._convert(src)
+        dst = cls.discover(dst)
         if src == dst:
             return dst
         elif not dst:
-            dst = copy.deepcopy(src)
-            dst.service = cls.services(src.service.type)
             dst.migrate()
         else:
+            
             raise Exception('Duplicate resources exist in src and dst clouds')
-
-    def _discover_resource(self, resource_class, resource_id, resource_name):
-        resource = 
-        return resource.discover()
-
-
-class CloudDiscovery(object):
-
-    def __init__(self, endpoint):
-        self.endpoint = endpoint
-        self.keystone = keystone_client.Client(**endpoint)
-
-    def discover(self):
-        known_services = services.Service.defined_services()
-        catalog = self.keystone.services.list()
-        for service_ref in catalog:
-            if service_ref.type in known_services.keys():
-                Service = known_services[service_ref.type]
-                yield Service.discover(self.endpoint)

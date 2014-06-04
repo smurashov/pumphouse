@@ -18,13 +18,11 @@ class Flavor(base.Resource):
 
     def __init__(self, uuid, name, **kwargs):
         super(Flavor, self).__init__(uuid, name)
-        self.id = uuid
-        self.name = name
-        self.ram = kwargs['ram'] or None
-        self.disk = kwargs['disk'] or None
-        self.vcpus = kwargs['vcpus'] or None
-        self.is_public = kwargs['os-flavor-access:is_public'] or True
-        self.extra_specs = kwargs['extra_specs'] or []
+        self.ram = None
+        self.disk = None
+        self.vcpus = None
+        self.is_public = True
+        self.extra_spec = ''
 
     def __repr__(self):
         return("<Flavor(uuid={0}, name={1}, ram={2}, disk={3}, vcpus={4}, "
@@ -32,14 +30,21 @@ class Flavor(base.Resource):
                .format(self.uuid, self.name, self.ram, self.disk, self.vcpus,
                        self.is_public))
 
-    def discover(self):
-        nova = self.service.client
-        fl = nova.flavors.get(self.uuid)
-        self.ram = fl.ram
-        self.disk = fl.disk
-        self.vcpus = fl.vcpus
-        self.is_public = fl.is_public
-        self.extra_specs = fl.get_keys()
+    @classmethod
+    def discover(cls, client, uuid):
+        print client
+        try:
+            fl = client.flavors.get(uuid)
+        except Exception as exc:
+            print("Exception while discovering resource {0}: {1}"
+                  .format(str(cls), exc.message))
+            return None
+        cls.ram = fl.ram
+        cls.disk = fl.disk
+        cls.vcpus = fl.vcpus
+        cls.is_public = fl.is_public
+        cls.extra_specs = fl.get_keys()
+        return cls
 
     def migrate(self):
         nova = self.service.client

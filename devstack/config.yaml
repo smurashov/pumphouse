@@ -1,8 +1,8 @@
 source:
     endpoint:
-        auth_url: http://172.18.184.65:5000/v2.0
+        auth_url: http://localhost:5000/v2.0
         username: admin
-        password: passwd
+        password: e1e40a6094d8d076193d
         tenant_name: admin
 destination:
     endpoint:
