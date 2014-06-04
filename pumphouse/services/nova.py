@@ -12,5 +12,4 @@ class Nova(base.Service):
                           endpoint['password'],
                           endpoint['tenant_name'],
                           endpoint['auth_url'])
-        print c
         return c

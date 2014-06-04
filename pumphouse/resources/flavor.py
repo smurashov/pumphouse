@@ -33,7 +33,6 @@ class Flavor(base.Resource):
 
     @classmethod
     def discover(cls, client, uuid):
-        print client
         try:
             fl = client.flavors.get(uuid)
         except Exception as exc:
