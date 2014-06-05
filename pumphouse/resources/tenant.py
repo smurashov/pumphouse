@@ -4,6 +4,12 @@ from pumphouse.services import keystone
 class Tenant(base.Resource):
     service = keystone.Keystone
 
+    def __init__(self, uuid, name, description='', enabled=True):
+        self.uuid = uuid
+        self.name = name
+        self.description = description
+        self.enabled = enabled
+
     def __repr__(self):
         return("<Tenant(uuid={0}, name={1}, description={2}, enabled={3})>"
                .format(self.uuid, self.name, self.description, self.enabled))
@@ -16,11 +22,7 @@ class Tenant(base.Resource):
             print("Exception while discovering resource {0}: {1}"
                   .format(str(cls), exc.message))
             return None
-        cls.uuid = tt.id
-        cls.name = tt.name
-        cls.description = tt.description
-        cls.enabled = tt.enabled
-        return cls
+        return cls(tt.id, tt.name, tt.description, tt.enabled)
 
     def migrate(self):
         keystone = self.service.client
