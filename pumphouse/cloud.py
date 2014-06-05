@@ -6,8 +6,7 @@ from pumphouse.resources.base import Resource
 
 class Cloud(object):
 
-    """
-    Describes a cloud involved in migration process.
+    """Describes a cloud involved in migration process.
 
     Both source and destination clouds are instances of this class.
 
@@ -25,21 +24,26 @@ class Cloud(object):
         self.services = services or dict(Service.discover(self.endpoint))
 
     def discover(self, resource_class, resource_id):
-    """Get resource by it's type and ID.
+    
+        """Get resource by it's type and ID.
 
-    :param resource_class: the type of resource to be returned, e.g. Flavor or Tenant.
-    :type resource_class: str.
-    :param resource_id: the UUID or ID of resource to be returned.
-    :type resource_id: str.
-    :returns: resource instance - resource discovered according to parameters.
+        :param resource_class: the type of resource to be returned, e.g. Flavor or Tenant.
+        :type resource_class: str.
+        :param resource_id: the UUID or ID of resource to be returned.
+        :type resource_id: str.
+        :returns: resource instance - resource discovered according to parameters.
 
-    """
+        """
+
         resource_classes = Resource.defined_resources()
+        print resource_classes
         if resource_class in resource_classes:
             service_name = resource_classes[resource_class].service.__name__
             if service_name.lower() in self.services:
                 client = self.services[service_name.lower()]
+                print client
                 resource = resource_classes[resource_class].discover(client, resource_id)
+                print resource
                 return resource
             else:
                 return None
@@ -51,13 +55,15 @@ class Cloud(object):
     
     @classmethod
     def migrate(cls, resource):
-    """Migrates resource from source cloud to destination cloud.
+    
+        """Migrates resource from source cloud to destination cloud.
 
-    Must be called from the destination Cloud instance.
-    :param resource: the instance of resource in the source cloud to be moved.
-    :type resource: object.
+        Must be called from the destination Cloud instance.
+        :param resource: the instance of resource in the source cloud to be moved.
+        :type resource: object.
 
-    """
+        """
+
         src = resource
         dst = cls._convert(src)
         dst = cls.discover(dst)
