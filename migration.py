@@ -142,7 +142,7 @@ def migrate_tenant(src, dst, id):
                                          enabled=t0.enabled)
         LOG.info("Created: %s", t1._info)
     else:
-    LOG.warn("Already exist: %s", t1._info)
+        LOG.warn("Already exist: %s", t1._info)
     return t1
 
 
@@ -172,7 +172,6 @@ def main():
     dst = Cloud(args.config["destination"]["endpoint"])
 
     migrate_servers(mapping, src, dst)
-
 
     LOG.info("Migration mapping: %r", mapping)
 
