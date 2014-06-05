@@ -99,7 +99,7 @@ def migrate_image(mapping, src, dst, id):
     else:
         i1 = imgs1.get(i0.checksum)
         LOG.info("Already present: %s", i1)
-        mapping[i0.id] = i1.id
+    mapping[i0.id] = i1.id
     return i1
 
 
@@ -129,6 +129,10 @@ def migrate_server(mapping, src, dst, id):
     mapping[s0.id] = s1.id
     LOG.info("Created: %s", s1._info)
     return s1
+
+
+def migrate_network(src, dst, id):
+    pass
 
 
 def migrate_servers(mapping, src, dst):
