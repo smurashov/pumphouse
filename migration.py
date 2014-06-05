@@ -124,6 +124,11 @@ def migrate_server(mapping, src, dst, id):
     return s1
 
 
+def migrate_servers(mapping, src, dst):
+    for server in src.nova.servers.list():
+        migrate_server(mapping, src, dst, server.id)
+
+
 class Cloud(object):
     def __init__(self, endpoint):
         self.nova = nova_client.Client(endpoint["username"],
@@ -149,8 +154,8 @@ def main():
     src = Cloud(args.config["source"]["endpoint"])
     dst = Cloud(args.config["destination"]["endpoint"])
 
-    for server in src.nova.servers.list():
-        migrate_server(mapping, src, dst, server.id)
+    migrate_servers(mapping, src, dst)
+
 
     LOG.info("Migration mapping: %r", mapping)
 
