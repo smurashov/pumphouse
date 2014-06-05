@@ -24,8 +24,12 @@ def get_parser():
                                                  "OpenStack clouds.")
     parser.add_argument("config",
                         type=safe_load_yaml,
-                        help="Configuration of cloud endpoints and a "
-                             "strategy.")
+                        help="A filename of a configuration of clouds "
+                             "endpoints and a strategy.")
+    parser.add_argument("action",
+                        choices=("migrate",),
+                        help="Perform a migration of resources from a source "
+                             "cloud to a distination.")
     return parser
 
 
@@ -159,6 +163,16 @@ class Cloud(object):
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
 
+def migrate(config):
+    mapping = {}
+
+    src = Cloud(config["source"]["endpoint"])
+    dst = Cloud(config["destination"]["endpoint"])
+
+    migrate_servers(mapping, src, dst)
+
+    LOG.info("Migration mapping: %r", mapping)
+
 
 def main():
     parser = get_parser()
@@ -166,15 +180,8 @@ def main():
 
     logging.basicConfig(level=logging.INFO)
 
-    mapping = {}
-
-    src = Cloud(args.config["source"]["endpoint"])
-    dst = Cloud(args.config["destination"]["endpoint"])
-
-    migrate_servers(mapping, src, dst)
-
-    LOG.info("Migration mapping: %r", mapping)
-
+    if args.action == "migrate":
+        migrate(args.config)
 
 
 if __name__ == "__main__":
