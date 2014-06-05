@@ -53,11 +53,10 @@ def migrate_flavor(mapping, src, dst, id):
     return f1
 
 
-def migrate_image(src, dst, id):
+def migrate_image(mapping, src, dst, id):
     def upload(src_image, dst_image):
         data = src.glance.images.data(src_image.id)
-        dst.glance.images.upload(dst_image.id, data,
-                                 image_size=src_image.size)
+        dst.glance.images.upload(dst_image.id, data._resp)
         LOG.info("Uploaded image: %s -> %s", src_image, dst_image)
 
     def create(image, **kwargs):
@@ -76,7 +75,9 @@ def migrate_image(src, dst, id):
     if i0.id in mapping:
         LOG.warn("Skipped because mapping: %s", i0._info)
         return dst.glance.images.get(mapping[i0.id])
-    imgs1 = dict([(i.checksum, i) for i in dst.glance.images.list()])
+    imgs1 = dict([(i.checksum, i)
+                  for i in dst.glance.images.list()
+                  if hasattr(i, "checksum")])
     if i0.checksum not in imgs1:
         params = {}
         if hasattr(i0, "kernel_id"):
@@ -87,7 +88,7 @@ def migrate_image(src, dst, id):
             LOG.info("Fround ramdisk image: %s", i0.ramdisk_id)
             ir0 = migrate_image(mapping, src, dst, i0.ramdisk_id)
             params["ramdisk_id"] = ir0["id"]
-        i1 = create(dst, i0, **params)
+        i1 = create(i0, **params)
         upload(i0, i1)
     else:
         i1 = imgs1.get(i0.checksum)
