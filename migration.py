@@ -162,7 +162,7 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.WARNING)
+    logging.basicConfig(level=logging.INFO)
 
     mapping = {}
 
