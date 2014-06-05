@@ -27,7 +27,7 @@ def get_parser():
                         help="A filename of a configuration of clouds "
                              "endpoints and a strategy.")
     parser.add_argument("action",
-                        choices=("migrate",),
+                        choices=("migrate", "cleanup"),
                         help="Perform a migration of resources from a source "
                              "cloud to a distination.")
     return parser
@@ -178,6 +178,19 @@ def migrate(config):
     LOG.info("Migration mapping: %r", mapping)
 
 
+def cleanup(config):
+    dst = Cloud(config["destination"]["endpoint"])
+    for server in dst.nova.servers.list():
+        dst.nova.servers.delete(server)
+        LOG.info("Deleted server: %s", server._info)
+    for flavor in dst.nova.flavors.list():
+        dst.nova.flavors.delete(flavor)
+        LOG.info("Deleted flavor: %s", flavor._info)
+    for image in dst.glance.images.list():
+        dst.glance.images.delete(image.id)
+        LOG.info("Deleted image: %s", dict(image))
+
+
 def main():
     parser = get_parser()
     args = parser.parse_args()
@@ -186,6 +199,8 @@ def main():
 
     if args.action == "migrate":
         migrate(args.config)
+    elif args.action == "cleanup":
+        cleanup(args.config)
 
 
 if __name__ == "__main__":
