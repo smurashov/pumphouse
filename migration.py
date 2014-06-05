@@ -6,6 +6,7 @@ from novaclient.v1_1 import client as nova_client
 from novaclient import exceptions as nova_excs
 
 from keystoneclient.v2_0 import client as keystone_client
+from keystoneclient import exceptions as keystone_excs
 
 from glanceclient import client as glance
 
@@ -127,6 +128,20 @@ def migrate_server(mapping, src, dst, id):
 def migrate_servers(mapping, src, dst):
     for server in src.nova.servers.list():
         migrate_server(mapping, src, dst, server.id)
+
+
+def migrate_tenant(src, dst, id):
+    t0 = src.keystone.tenants.get(id)
+    try:
+        t1 = dst.keystone.tenants.find(name=t0.name)
+    except keystone_excs.NotFound:
+        t1 = dst.keystone.tenants.create(t0.name,
+                                         description=t0.description,
+                                         enabled=t0.enabled)
+        LOG.info("Created: %s", t1._info)
+    else:
+    LOG.warn("Already exist: %s", t1._info)
+    return t1
 
 
 class Cloud(object):
