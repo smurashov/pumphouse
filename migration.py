@@ -51,6 +51,7 @@ def migrate_flavor(mapping, src, dst, id):
         LOG.info("Created: %s", f1._info)
     else:
         LOG.warn("Already exists: %s", f1._info)
+        mapping[f0.id] = f1.id
     return f1
 
 
@@ -94,6 +95,7 @@ def migrate_image(mapping, src, dst, id):
     else:
         i1 = imgs1.get(i0.checksum)
         LOG.info("Already present: %s", i1)
+        mapping[i0.id] = i1.id
     return i1
 
 
