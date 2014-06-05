@@ -50,48 +50,6 @@ def migrate_flavor(src, dst, id):
     return f1
 
 
-def migrate_image0(src, dst, id):
-    def upload(src_image, dst_image):
-        data = src.glance.images.data(src_image.id)
-        dst.glance.images.upload(dst_image.id, data,
-                                 image_size=src_image.size)
-        LOG.info("Uploaded image: %s -> %s", src_image, dst_image)
-
-    def create(image, **kwargs):
-        new = dst.glance.images.create(disk_format=image.disk_format,
-                                       container_format=image.container_format,
-                                       visibility=image.visibility,
-                                       min_ram=image.min_ram,
-                                       min_disk=image.min_disk,
-                                       name=image.name,
-                                       protected=image.protected,
-                                       **kwargs)
-        LOG.info("Create image: %s", new)
-        return new
-
-    i0 = src.glance.images.get(id)
-    if i0.id in mapping:
-        LOG.warn("Skipped because mapping: %s", i0._info)
-        return dst.glance.images.get(mapping[i0.id])
-    imgs1 = dict([(i.checksum, i) for i in dst.glance.images.list()])
-    if i0.checksum not in imgs1:
-        params = {}
-        if hasattr(i0, "kernel_id"):
-            LOG.debug("Fround kernel image: %s", ik0)
-            ik1 = migrate_image(mapping, src, dst, i0.kernel_id)
-            params["kernel_id"] = ik1["id"]
-        if "ramdisk_id" in i0:
-            LOG.debug("Fround ramdisk image: %s", ir0)
-            ir0 = migrate_image(mapping, src, dst, i0.ramdisk_id)
-            params["ramdisk_id"] = ir0["id"]
-        i1 = create(dst, i0, **params)
-        upload(i0, i1)
-    else:
-        i1 = imgs1.get(i0.checksum)
-        LOG.info("Already present: %s", i1)
-    return i1
-
-
 def migrate_image(src, dst, id):
     def upload(src_image, dst_image):
         data = src.glance.images.data(src_image.id)
@@ -119,7 +77,7 @@ def migrate_image(src, dst, id):
     if i0.checksum not in imgs1:
         params = {}
         if hasattr(i0, "kernel_id"):
-            LOG.debug("Fround kernel image: %s", ik0)
+            LOG.debug("Found kernel image: %s", ik0)
             ik1 = migrate_image(mapping, src, dst, i0.kernel_id)
             params["kernel_id"] = ik1["id"]
         if "ramdisk_id" in i0:
