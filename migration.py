@@ -77,11 +77,11 @@ def migrate_image(src, dst, id):
     if i0.checksum not in imgs1:
         params = {}
         if hasattr(i0, "kernel_id"):
-            LOG.debug("Found kernel image: %s", ik0)
+            LOG.info("Found kernel image: %s", i0.kernel_id)
             ik1 = migrate_image(mapping, src, dst, i0.kernel_id)
             params["kernel_id"] = ik1["id"]
         if "ramdisk_id" in i0:
-            LOG.debug("Fround ramdisk image: %s", ir0)
+            LOG.info("Fround ramdisk image: %s", i0.ramdisk_id)
             ir0 = migrate_image(mapping, src, dst, i0.ramdisk_id)
             params["ramdisk_id"] = ir0["id"]
         i1 = create(dst, i0, **params)
@@ -102,7 +102,7 @@ def migrate_server(mapping, src, dst, id):
     i1 = migrate_image(mapping, src, dst, s0.image["id"])
     try:
         src.nova.servers.suspend(s0)
-        LOG.debug("Suspended: %s", s0)
+        LOG.info("Suspended: %s", s0)
         try:
             s1 = dst.nova.servers.create(s0.name, i1, f1)
         except:
@@ -110,7 +110,7 @@ def migrate_server(mapping, src, dst, id):
             raise
         else:
             src.nova.servers.delete(s0)
-            LOG.debug("Deleted: %s", s0)
+            LOG.info("Deleted: %s", s0)
     except:
         LOG.exception("Error occured in migration: %s", s0)
         src.nova.servers.resume(s0)
@@ -138,7 +138,7 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
 
-    logging.basicConfig()
+    logging.basicConfig(level=logging.WARNING)
 
     mapping = {}
 
@@ -148,7 +148,7 @@ def main():
     for server in src.nova.servers.list():
         migrate_server(mapping, src, dst, server.id)
 
-    LOG.debug("Migration mapping: %r", mapping)
+    LOG.info("Migration mapping: %r", mapping)
 
 
 
