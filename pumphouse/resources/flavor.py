@@ -16,15 +16,6 @@ class FlavorsCollection(base.Collection):
 class Flavor(base.Resource):
     service = nova.Nova
 
-    def __init__(self, uuid, name, **kwargs):
-        super(Flavor, self).__init__(uuid, name)
-        self.name = name
-        self.ram = None
-        self.disk = None
-        self.vcpus = None
-        self.is_public = True
-        self.extra_spec = ''
-
     def __repr__(self):
         return("<Flavor(uuid={0}, name={1}, ram={2}, disk={3}, vcpus={4}, "
                "is_public={5})>"
@@ -39,6 +30,7 @@ class Flavor(base.Resource):
             print("Exception while discovering resource {0}: {1}"
                   .format(str(cls), exc.message))
             return None
+        cls.uuid = fl.id
         cls.name = fl.name
         cls.ram = fl.ram
         cls.disk = fl.disk
