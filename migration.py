@@ -142,7 +142,21 @@ def migrate_server(mapping, src, dst, id):
         return dst.nova.servers.get(mapping[s0.id])
     f1 = migrate_flavor(mapping, src, dst, s0.flavor["id"])
     i1 = migrate_image(mapping, src, dst, s0.image["id"])
-    s1 = dst.nova.servers.create(s0.name, i1, f1)
+    try:
+        src.nova.servers.suspend(s0)
+        LOG.debug("Suspended: %s", s0)
+        try:
+            s1 = dst.nova.servers.create(s0.name, i1, f1)
+        except:
+            LOG.exception("Failed to create server: %s", s0)
+            raise
+        else:
+            src.nova.servers.delete(s0)
+            LOG.debug("Deleted: %s", s0)
+    except:
+        LOG.exception("Error occured in migration: %s", s0)
+        src.nova.servers.resume(s0)
+        raise
     mapping[s0.id] = s1.id
     LOG.info("Created: %s", s1._info)
     return s1
