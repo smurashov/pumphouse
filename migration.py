@@ -33,8 +33,11 @@ def read_configuration(stream):
         return yaml.safe_load(f.read())
 
 
-def migrate_flavor(src, dst, id):
+def migrate_flavor(mapping, src, dst, id):
     f0 = src.nova.flavors.get(id)
+    if f0.id in mapping:
+        LOG.warn("Skipped because mapping: %s", f0._info)
+        return dst.nova.flavors.get(mapping[f0.id])
     try:
         f1 = dst.nova.flavors.get(f0)
     except nova_excs.NotFound:
