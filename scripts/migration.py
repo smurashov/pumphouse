@@ -214,22 +214,15 @@ class Cloud(object):
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
 
-
-def migrate(config):
+def migrate(src, dst):
     mapping = {}
-
-    src = Cloud(config["source"]["endpoint"])
-    dst = Cloud(config["destination"]["endpoint"])
-
     migrate_servers(mapping, src, dst)
-
     LOG.info("Migration mapping: %r", mapping)
 
 
-def cleanup(config):
-    dst = Cloud(config["destination"]["endpoint"])
-    for server in dst.nova.servers.list():
-        dst.nova.servers.delete(server)
+def cleanup(cloud):
+    for server in cloud.nova.servers.list():
+        cloud.nova.servers.delete(server)
         LOG.info("Deleted server: %s", server._info)
     for image in dst.glance.images.list():
         dst.glance.images.delete(image.id)
@@ -250,7 +243,9 @@ def main():
 
     logging.basicConfig(level=logging.INFO)
 
+    dst = Cloud(config["destination"]["endpoint"])
     if args.action == "migrate":
+        src = Cloud(config["source"]["endpoint"])
         migrate(args.config)
     elif args.action == "cleanup":
         cleanup(args.config)
