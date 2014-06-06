@@ -30,6 +30,11 @@ def get_parser():
                         choices=("migrate", "cleanup"),
                         help="Perform a migration of resources from a source "
                              "cloud to a distination.")
+    parser.add_argument("--resource",
+                        choices=("tenant", "security_group", "server",
+                                 "image", "flavor"),
+                        help="Specify a type of resources to migrate to the "
+                        "destination cloud")
     return parser
 
 
@@ -84,7 +89,7 @@ def migrate_image(mapping, src, dst, id):
     imgs1 = dict([(i.checksum, i)
                   for i in dst.glance.images.list()
                   if hasattr(i, "checksum")])
-    if i0.checksum not in imgs1:
+    if not hasattr(i0, "checksum") or i0.checksum not in imgs1:
         params = {}
         if hasattr(i0, "kernel_id"):
             LOG.info("Found kernel image: %s", i0.kernel_id)
@@ -110,20 +115,24 @@ def migrate_server(mapping, src, dst, id):
         LOG.warn("Skipped because mapping: %s", s0._info)
         return dst.nova.servers.get(mapping[s0.id])
     f1 = migrate_flavor(mapping, src, dst, s0.flavor["id"])
+    print f1.id
+    for secgroup in s0.security_groups:
+        sg0 = src.nova.security_groups.find(name=secgroup['name'])
+        sg1 = migrate_secgroup(mapping, src, dst, sg0.id)
     i1 = migrate_image(mapping, src, dst, s0.image["id"])
     try:
         src.nova.servers.suspend(s0)
-        LOG.info("Suspended: %s", s0)
+        LOG.info("Suspended: %s", s0._info)
         try:
             s1 = dst.nova.servers.create(s0.name, i1, f1)
         except:
-            LOG.exception("Failed to create server: %s", s0)
+            LOG.exception("Failed to create server: %s", s0._info)
             raise
         else:
             src.nova.servers.delete(s0)
             LOG.info("Deleted: %s", s0)
     except:
-        LOG.exception("Error occured in migration: %s", s0)
+        LOG.exception("Error occured in migration: %s", s0._info)
         src.nova.servers.resume(s0)
         raise
     mapping[s0.id] = s1.id
@@ -131,7 +140,7 @@ def migrate_server(mapping, src, dst, id):
     return s1
 
 
-def migrate_network(src, dst, id):
+def migrate_network(mapping, src, dst, id):
     pass
 
 
@@ -150,8 +159,46 @@ def migrate_tenant(src, dst, id):
                                          enabled=t0.enabled)
         LOG.info("Created: %s", t1._info)
     else:
-        LOG.warn("Already exist: %s", t1._info)
+        LOG.warn("Already exists: %s", t1._info)
     return t1
+
+
+def migrate_secgroup(mapping, src, dst, id):
+    sg0 = src.nova.security_groups.get(id)
+    t0 = src.keystone.tenants.find(id=sg0.tenant_id)
+    t1 = migrate_tenant(src, dst, t0.id)
+    try:
+        sg1 = dst.nova.security_groups.find(name=sg0.name)
+    except nova_excs.NotFound:
+        sg1 = dst.nova.security_groups.create(sg0.name,
+                                              sg0.description)
+        LOG.info("Created: %s", sg1._info)
+    LOG.warn("Already exists: %s", sg1._info)
+    for rule in sg0.rules:
+        migrate_secgroup_rule(mapping, src, dst, rule, sg1.id)
+    return sg1
+
+
+def migrate_secgroup_rule(mapping, src, dst, src_rule, id):
+    r0 = src_rule
+    try:
+        r1 = dst.nova.security_group_rules.create(
+                                id,
+                                ip_protocol=r0['ip_protocol'],
+                                from_port=r0['from_port'],
+                                to_port=r0['to_port'],
+                                cidr=r0['ip_range']['cidr'])
+        LOG.info("Created: %s",r1._info)
+    except nova_excs.BadRequest:
+        LOG.warn("Duplicated rule: %s", r0)
+    except nova_excs.NotFound:
+        LOG.exception("Rule create attempted for non-existent security group: %s", r0)
+        raise
+
+
+def migrate_secgroups(mapping, src, dst):
+    for sg in src.nova.security_groups.list():
+        migrate_secgroup(mapping, src, dst, sg.id)
 
 
 class Cloud(object):
@@ -178,17 +225,23 @@ def migrate(config):
     LOG.info("Migration mapping: %r", mapping)
 
 
+
 def cleanup(config):
     dst = Cloud(config["destination"]["endpoint"])
     for server in dst.nova.servers.list():
         dst.nova.servers.delete(server)
         LOG.info("Deleted server: %s", server._info)
-    for flavor in dst.nova.flavors.list():
-        dst.nova.flavors.delete(flavor)
-        LOG.info("Deleted flavor: %s", flavor._info)
     for image in dst.glance.images.list():
         dst.glance.images.delete(image.id)
         LOG.info("Deleted image: %s", dict(image))
+    for secgroup in dst.nova.security_groups.list():
+        if secgroup.name == 'default':
+            for rule in secgroup.rules:
+                dst.nova.security_group_rules.delete(rule['id'])
+                LOG.info("Deleted rule from default secgroup: %s", rule)
+        else:
+            dst.nova.security_groups.delete(secgroup.id)
+            LOG.info("Deleted secgroup: %s", secgroup._info)
 
 
 def main():
