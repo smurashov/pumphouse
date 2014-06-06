@@ -12,7 +12,8 @@ from glanceclient import client as glance
 
 
 LOG = logging.getLogger(__name__)
-
+RO_SECURITY_GROUPS = ['default']
+SERVICE_TENANT_NAME = 'services'
 
 def safe_load_yaml(filename):
     with open(filename) as f:
@@ -96,7 +97,7 @@ def migrate_image(mapping, src, dst, id):
             ik1 = migrate_image(mapping, src, dst, i0.kernel_id)
             params["kernel_id"] = ik1["id"]
         if "ramdisk_id" in i0:
-            LOG.info("Fround ramdisk image: %s", i0.ramdisk_id)
+            LOG.info("Found ramdisk image: %s", i0.ramdisk_id)
             ir0 = migrate_image(mapping, src, dst, i0.ramdisk_id)
             params["ramdisk_id"] = ir0["id"]
         i1 = create(i0, **params)
@@ -214,6 +215,7 @@ class Cloud(object):
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
 
+
 def migrate(config):
     mapping = {}
 
@@ -225,7 +227,6 @@ def migrate(config):
     LOG.info("Migration mapping: %r", mapping)
 
 
-
 def cleanup(config):
     dst = Cloud(config["destination"]["endpoint"])
     for server in dst.nova.servers.list():
@@ -235,7 +236,7 @@ def cleanup(config):
         dst.glance.images.delete(image.id)
         LOG.info("Deleted image: %s", dict(image))
     for secgroup in dst.nova.security_groups.list():
-        if secgroup.name == 'default':
+        if secgroup.name in RO_SECURITY_GROUPS:
             for rule in secgroup.rules:
                 dst.nova.security_group_rules.delete(rule['id'])
                 LOG.info("Deleted rule from default secgroup: %s", rule)
