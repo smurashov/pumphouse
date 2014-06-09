@@ -95,6 +95,11 @@ def migrate_flavor(mapping, src, dst, id):
     return f1
 
 
+def migrate_flavors(mapping, src, dst, id):
+    for flavor in src.nova.flavors.list():
+        migrate_flavor(mapping, src, dst, flavor)
+
+
 def migrate_image(mapping, src, dst, id):
     def upload(src_image, dst_image):
         data = src.glance.images.data(src_image.id)
@@ -361,6 +366,7 @@ RESOURCES_MIGRATIONS = collections.OrderedDict([
     ("tenants", migrate_tenants),
     ("users", migrate_users),
     ("images", migrate_images),
+    ("flavors", migrate_flavors),
     ("servers", migrate_servers),
     ("security_groups", migrate_secgroups),
 ])
