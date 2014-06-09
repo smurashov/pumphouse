@@ -1,7 +1,8 @@
 import argparse
-import yaml
+import collections
 import logging
 import time
+import yaml
 
 from novaclient.v1_1 import client as nova_client
 from novaclient import exceptions as nova_excs
@@ -46,8 +47,10 @@ def get_parser():
                         choices=("migrate", "cleanup"),
                         help="Perform a migration of resources from a source "
                              "cloud to a distination.")
-    parser.add_argument("--resource",
-                        choices=("users",),
+    parser.add_argument("resource",
+                        nargs="?",
+                        choices=RESOURCES_MIGRATIONS.keys(),
+                        default="all",
                         help="Specify a type of resources to migrate to the "
                         "destination cloud")
     return parser
@@ -90,6 +93,11 @@ def migrate_flavor(mapping, src, dst, id):
         LOG.warn("Already exists: %s", f1._info)
         mapping[f0.id] = f1.id
     return f1
+
+
+def migrate_flavors(mapping, src, dst, id):
+    for flavor in src.nova.flavors.list():
+        migrate_flavor(mapping, src, dst, flavor)
 
 
 def migrate_image(mapping, src, dst, id):
@@ -137,6 +145,10 @@ def migrate_image(mapping, src, dst, id):
     mapping[i0.id] = i1.id
     return i1
 
+
+def migrate_images(mapping, src, dst, id):
+    for image in src.glances.images.list():
+        migrate_image(mapping, src, dst, image.id)
 
 
 def migrate_server(mapping, src, dst, id):
@@ -209,7 +221,8 @@ def migrate_servers(mapping, src, dst):
         migrate_server(mapping, src, dst, server.id)
 
 
-def migrate_tenant(src, dst, id):
+# TODO(akscram): We should to check that it's worked.
+def migrate_tenant(mapping, src, dst, id):
     t0 = src.keystone.tenants.get(id)
     if t0.name == SERVICE_TENANT_NAME:
         LOG.exception("Will NOT migrate service tenant: %s",
@@ -227,10 +240,15 @@ def migrate_tenant(src, dst, id):
     return t1
 
 
+def migrate_tenants(mapping, src, dst, id):
+    for tenant in src.keystone.tenants.list():
+        migrate_tenant(mapping, src, dst, tenant)
+
+
 def migrate_secgroup(mapping, src, dst, id):
     sg0 = src.nova.security_groups.get(id)
     t0 = src.keystone.tenants.find(id=sg0.tenant_id)
-    t1 = migrate_tenant(src, dst, t0.id)
+    t1 = migrate_tenant(mapping, src, dst, t0.id)
     try:
         sg1 = dst.nova.security_groups.find(name=sg0.name)
     except nova_excs.NotFound:
@@ -290,7 +308,7 @@ def migrate_user(mapping, src, dst, id):
             LOG.exception("Will NOT migrate service user: %s",
                           u0._info)
             raise
-        t1 = migrate_tenant(src, dst, t0.id)
+        t1 = migrate_tenant(mapping, src, dst, t0.id)
         user_dict['tenant_id'] = t1.id
     if hasattr(u0, "email"):
         user_dict['email'] = u0.email
@@ -308,17 +326,15 @@ def migrate_user(mapping, src, dst, id):
     return u1
 
 
-def migrate_users(src, dst):
+def migrate_users(mapping, src, dst):
     mapping = {}
     for user in src.keystone.users.list():
         migrate_user(mapping, src, dst, user.id)
     LOG.info("Migration mapping: %r", mapping)
 
 
-def migrate(src, dst):
-    mapping = {}
+def migrate(mapping, src, dst):
     migrate_servers(mapping, src, dst)
-    LOG.info("Migration mapping: %r", mapping)
 
 
 def cleanup(cloud):
@@ -343,6 +359,17 @@ def cleanup(cloud):
         LOG.info("Deleted network: %s", network._info)
 
 
+RESOURCES_MIGRATIONS = collections.OrderedDict([
+    ("all", migrate),
+    ("tenants", migrate_tenants),
+    ("users", migrate_users),
+    ("images", migrate_images),
+    ("flavors", migrate_flavors),
+    ("servers", migrate_servers),
+    ("security_groups", migrate_secgroups),
+])
+
+
 def main():
     parser = get_parser()
     args = parser.parse_args()
@@ -351,11 +378,11 @@ def main():
 
     dst = Cloud(args.config["destination"]["endpoint"])
     if args.action == "migrate":
+        mapping = {}
         src = Cloud(args.config["source"]["endpoint"])
-        if args.resource == "users":
-            migrate_users(src, dst)
-        else:
-            migrate(src, dst)
+        migrate_resources = RESOURCES_MIGRATIONS[args.resource]
+        migrate_resources(mapping, src, dst)
+        LOG.info("Migration mapping: %r", mapping)
     elif args.action == "cleanup":
         cleanup(dst)
 
