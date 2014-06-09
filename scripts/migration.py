@@ -1,19 +1,34 @@
 import argparse
 import yaml
 import logging
+import time
 
 from novaclient.v1_1 import client as nova_client
 from novaclient import exceptions as nova_excs
 
 from keystoneclient.v2_0 import client as keystone_client
-from keystoneclient import exceptions as keystone_excs
+from keystoneclient.openstack.common.apiclient import exceptions as keystone_excs
 
 from glanceclient import client as glance
+from glanceclient import exc as glance_excs
 
 
 LOG = logging.getLogger(__name__)
 RO_SECURITY_GROUPS = ['default']
 SERVICE_TENANT_NAME = 'services'
+
+
+class Error(Exception):
+    pass
+
+
+class NotFound(Error):
+    pass
+
+
+class TimeoutException(Error):
+    pass
+
 
 def safe_load_yaml(filename):
     with open(filename) as f:
@@ -42,6 +57,19 @@ def get_parser():
 def read_configuration(stream):
     with stream as f:
         return yaml.safe_load(f.read())
+
+
+def wait_for_delete(resource, update_resource, timeout=60,
+                    check_interval=1, exceptions=(NotFound,)):
+    start = time.time()
+    while True:
+        try:
+            resource = update_resource(resource)
+        except exceptions:
+            break
+        time.sleep(check_interval)
+        if time.time() - start > timeout:
+            raise TimeoutException()
 
 
 def migrate_flavor(mapping, src, dst, id):
@@ -242,6 +270,8 @@ def migrate(src, dst):
 def cleanup(cloud):
     for server in cloud.nova.servers.list():
         cloud.nova.servers.delete(server)
+        wait_for_delete(server, cloud.nova.servers.get,
+                        exceptions=(nova_excs.NotFound,))
         LOG.info("Deleted server: %s", server._info)
     for image in cloud.glance.images.list():
         cloud.glance.images.delete(image.id)
