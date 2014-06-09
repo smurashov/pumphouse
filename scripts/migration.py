@@ -1,7 +1,8 @@
 import argparse
-import yaml
+import collections
 import logging
 import time
+import yaml
 
 from novaclient.v1_1 import client as nova_client
 from novaclient import exceptions as nova_excs
@@ -46,8 +47,10 @@ def get_parser():
                         choices=("migrate", "cleanup"),
                         help="Perform a migration of resources from a source "
                              "cloud to a distination.")
-    parser.add_argument("--resource",
-                        choices=("users",),
+    parser.add_argument("resource",
+                        nargs="?",
+                        choices=RESOURCES_MIGRATIONS.keys(),
+                        default="all",
                         help="Specify a type of resources to migrate to the "
                         "destination cloud")
     return parser
@@ -343,6 +346,13 @@ def cleanup(cloud):
         LOG.info("Deleted network: %s", network._info)
 
 
+RESOURCES_MIGRATIONS = collections.OrderedDict([
+    ("all", migrate),
+    ("servers", migrate_servers),
+    ("security_groups", migrate_secgroups),
+])
+
+
 def main():
     parser = get_parser()
     args = parser.parse_args()
@@ -352,10 +362,8 @@ def main():
     dst = Cloud(args.config["destination"]["endpoint"])
     if args.action == "migrate":
         src = Cloud(args.config["source"]["endpoint"])
-        if args.resource == "users":
-            migrate_users(src, dst)
-        else:
-            migrate(src, dst)
+        migrate_resources = RESOURCES_MIGRATIONS[args.resource]
+        migrate_resources(src, dst)
     elif args.action == "cleanup":
         cleanup(dst)
 
