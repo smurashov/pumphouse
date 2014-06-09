@@ -147,8 +147,18 @@ def migrate_server(mapping, src, dst, id):
     for secgroup in s0.security_groups:
         sg0 = src.nova.security_groups.find(name=secgroup['name'])
         sg1 = migrate_secgroup(mapping, src, dst, sg0.id)
+        # TODO(akscram): Security groups migrated but never assigned
+        #                for a new server.
+    nics = []
     i1 = migrate_image(mapping, src, dst, s0.image["id"])
     addresses = s0.addresses
+    for n_label, n_params in addresses.iteritems():
+        n1 = migrate_network(mapping, src, dst, n_label)
+        for n_param in n_params:
+            nics.append({
+                "net-id": n1.id,
+                "v4-fixed-ip": n_param["addr"],
+            })
     try:
         src.nova.servers.suspend(s0)
         LOG.info("Suspended: %s", s0._info)
@@ -189,6 +199,7 @@ def migrate_network(mapping, src, dst, name):
                                   vlan_start=n0.vlan,
                                   vpn_start=n0.vpn_private_address)
     mapping[n0.id] = n1
+    return n1
 
 
 def migrate_servers(mapping, src, dst):
@@ -284,6 +295,9 @@ def cleanup(cloud):
         else:
             cloud.nova.security_groups.delete(secgroup.id)
             LOG.info("Deleted secgroup: %s", secgroup._info)
+    for network in cloud.nova.networks.list():
+        cloud.nova.networks.delete(network)
+        LOG.info("Deleted network: %s", network._info)
 
 
 def main():
