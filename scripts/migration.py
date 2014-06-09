@@ -224,6 +224,9 @@ def migrate_servers(mapping, src, dst):
 # TODO(akscram): We should to check that it's worked.
 def migrate_tenant(mapping, src, dst, id):
     t0 = src.keystone.tenants.get(id)
+    if t0.id in mapping:
+        LOG.warn("Skipped because mapping: %s", t0._info)
+        return dst.keystone.tenants.get(mapping[t0.id])
     if t0.name == SERVICE_TENANT_NAME:
         LOG.exception("Will NOT migrate service tenant: %s",
                       t0._info)
@@ -296,6 +299,7 @@ class Cloud(object):
         self.glance = glance.Client("2",
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
+
 
 def migrate_user(mapping, src, dst, id):
     u0 = src.keystone.users.get(id)
