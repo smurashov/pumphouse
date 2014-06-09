@@ -47,8 +47,7 @@ def get_parser():
                         help="Perform a migration of resources from a source "
                              "cloud to a distination.")
     parser.add_argument("--resource",
-                        choices=("tenant", "security_group", "server",
-                                 "image", "flavor"),
+                        choices=("users",),
                         help="Specify a type of resources to migrate to the "
                         "destination cloud")
     return parser
@@ -110,7 +109,6 @@ def migrate_image(mapping, src, dst, id):
                                        **kwargs)
         LOG.info("Create image: %s", new)
         return new
-
     i0 = src.glance.images.get(id)
     if i0.id in mapping:
         LOG.warn("Skipped because mapping: %s", dict(i0))
@@ -118,7 +116,10 @@ def migrate_image(mapping, src, dst, id):
     imgs1 = dict([(i.checksum, i)
                   for i in dst.glance.images.list()
                   if hasattr(i, "checksum")])
-    if not hasattr(i0, "checksum") or i0.checksum not in imgs1:
+    if not hasattr(i0, checksum):
+        LOG.exception("Image has no checksum: %s", i0._info)
+        raise
+    elif i0.checksum not in imgs1:
         params = {}
         if hasattr(i0, "kernel_id"):
             LOG.info("Found kernel image: %s", i0.kernel_id)
@@ -135,6 +136,7 @@ def migrate_image(mapping, src, dst, id):
         LOG.info("Already present: %s", i1)
     mapping[i0.id] = i1.id
     return i1
+
 
 
 def migrate_server(mapping, src, dst, id):
@@ -209,6 +211,10 @@ def migrate_servers(mapping, src, dst):
 
 def migrate_tenant(src, dst, id):
     t0 = src.keystone.tenants.get(id)
+    if t0.name == SERVICE_TENANT_NAME:
+        LOG.exception("Will NOT migrate service tenant: %s",
+                      t0._info)
+        raise
     try:
         t1 = dst.keystone.tenants.find(name=t0.name)
     except keystone_excs.NotFound:
@@ -231,7 +237,8 @@ def migrate_secgroup(mapping, src, dst, id):
         sg1 = dst.nova.security_groups.create(sg0.name,
                                               sg0.description)
         LOG.info("Created: %s", sg1._info)
-    LOG.warn("Already exists: %s", sg1._info)
+    else:
+        LOG.warn("Already exists: %s", sg1._info)
     for rule in sg0.rules:
         migrate_secgroup_rule(mapping, src, dst, rule, sg1.id)
     return sg1
@@ -272,6 +279,42 @@ class Cloud(object):
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
 
+def migrate_user(mapping, src, dst, id):
+    u0 = src.keystone.users.get(id)
+    user_dict = dict(name=u0.name,
+                 password='default',
+                 enabled=u0.enabled)
+    if hasattr(u0, "tenantId"):
+        t0 = src.keystone.tenants.get(u0.tenantId)
+        if t0.name == SERVICE_TENANT_NAME:
+            LOG.exception("Will NOT migrate service user: %s",
+                          u0._info)
+            raise
+        t1 = migrate_tenant(src, dst, t0.id)
+        user_dict['tenant_id'] = t1.id
+    if hasattr(u0, "email"):
+        user_dict['email'] = u0.email
+    try:
+        LOG.debug("Looking up user in dst by username: %s", u0.username)
+        u1 = dst.keystone.users.find(name=u0.name)
+    except keystone_excs.NotFound:
+        u1 = dst.keystone.users.create(**user_dict)
+        LOG.info("Created: %s", u1._info)
+        LOG.warn("Password for %s doesn't match the original user!", u1.name)
+        # TODO(ogelbukh): Add password synchronization logic here
+    else:
+        LOG.warn("Already exists: %s", u1._info)
+    mapping[u0.id] = u1.id
+    return u1
+
+
+def migrate_users(src, dst):
+    mapping = {}
+    for user in src.keystone.users.list():
+        migrate_user(mapping, src, dst, user.id)
+    LOG.info("Migration mapping: %r", mapping)
+
+
 def migrate(src, dst):
     mapping = {}
     migrate_servers(mapping, src, dst)
@@ -309,7 +352,10 @@ def main():
     dst = Cloud(args.config["destination"]["endpoint"])
     if args.action == "migrate":
         src = Cloud(args.config["source"]["endpoint"])
-        migrate(src, dst)
+        if args.resource == "users":
+            migrate_users(src, dst)
+        else:
+            migrate(src, dst)
     elif args.action == "cleanup":
         cleanup(dst)
 
