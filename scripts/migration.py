@@ -284,6 +284,10 @@ def migrate_user(mapping, src, dst, id):
                  enabled=u0.enabled)
     if hasattr(u0, "tenantId"):
         t0 = src.keystone.tenants.get(u0.tenantId)
+        if t0.name == SERVICE_TENANT_NAME:
+            LOG.exception("Will NOT migrate service user: %s",
+                          u0._info)
+            raise
         t1 = migrate_tenant(src, dst, t0.id)
         user_dict['tenant_id'] = t1.id
     try:
