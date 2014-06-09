@@ -116,7 +116,7 @@ def migrate_image(mapping, src, dst, id):
     imgs1 = dict([(i.checksum, i)
                   for i in dst.glance.images.list()
                   if hasattr(i, "checksum")])
-    if not hasattr(i0, checksum):
+    if not hasattr(i0, "checksum"):
         LOG.exception("Image has no checksum: %s", i0._info)
         raise
     elif i0.checksum not in imgs1:
