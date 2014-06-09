@@ -212,7 +212,8 @@ def migrate_servers(mapping, src, dst):
         migrate_server(mapping, src, dst, server.id)
 
 
-def migrate_tenant(src, dst, id):
+# TODO(akscram): We should to check that it's worked.
+def migrate_tenant(mapping, src, dst, id):
     t0 = src.keystone.tenants.get(id)
     if t0.name == SERVICE_TENANT_NAME:
         LOG.exception("Will NOT migrate service tenant: %s",
@@ -228,6 +229,11 @@ def migrate_tenant(src, dst, id):
     else:
         LOG.warn("Already exists: %s", t1._info)
     return t1
+
+
+def migrate_tenants(mapping, src, dst, id):
+    for tenant in src.keystone.tenants.list():
+        migrate_tenant(mapping, src, dst, tenant)
 
 
 def migrate_secgroup(mapping, src, dst, id):
@@ -348,6 +354,8 @@ def cleanup(cloud):
 
 RESOURCES_MIGRATIONS = collections.OrderedDict([
     ("all", migrate),
+    ("tenants", migrate_tenants),
+    ("users", migrate_users),
     ("servers", migrate_servers),
     ("security_groups", migrate_secgroups),
 ])
