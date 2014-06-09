@@ -163,7 +163,7 @@ def migrate_server(mapping, src, dst, id):
         src.nova.servers.suspend(s0)
         LOG.info("Suspended: %s", s0._info)
         try:
-            s1 = dst.nova.servers.create(s0.name, i1, f1)
+            s1 = dst.nova.servers.create(s0.name, i1, f1, nics=nics)
         except:
             LOG.exception("Failed to create server: %s", s0._info)
             raise
