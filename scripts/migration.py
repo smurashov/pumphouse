@@ -1,19 +1,34 @@
 import argparse
 import yaml
 import logging
+import time
 
 from novaclient.v1_1 import client as nova_client
 from novaclient import exceptions as nova_excs
 
 from keystoneclient.v2_0 import client as keystone_client
-from keystoneclient import exceptions as keystone_excs
+from keystoneclient.openstack.common.apiclient import exceptions as keystone_excs
 
 from glanceclient import client as glance
+from glanceclient import exc as glance_excs
 
 
 LOG = logging.getLogger(__name__)
 RO_SECURITY_GROUPS = ['default']
 SERVICE_TENANT_NAME = 'services'
+
+
+class Error(Exception):
+    pass
+
+
+class NotFound(Error):
+    pass
+
+
+class TimeoutException(Error):
+    pass
+
 
 def safe_load_yaml(filename):
     with open(filename) as f:
@@ -42,6 +57,19 @@ def get_parser():
 def read_configuration(stream):
     with stream as f:
         return yaml.safe_load(f.read())
+
+
+def wait_for_delete(resource, update_resource, timeout=60,
+                    check_interval=1, exceptions=(NotFound,)):
+    start = time.time()
+    while True:
+        try:
+            resource = update_resource(resource)
+        except exceptions:
+            break
+        time.sleep(check_interval)
+        if time.time() - start > timeout:
+            raise TimeoutException()
 
 
 def migrate_flavor(mapping, src, dst, id):
@@ -85,7 +113,7 @@ def migrate_image(mapping, src, dst, id):
 
     i0 = src.glance.images.get(id)
     if i0.id in mapping:
-        LOG.warn("Skipped because mapping: %s", i0._info)
+        LOG.warn("Skipped because mapping: %s", dict(i0))
         return dst.glance.images.get(mapping[i0.id])
     imgs1 = dict([(i.checksum, i)
                   for i in dst.glance.images.list()
@@ -119,12 +147,23 @@ def migrate_server(mapping, src, dst, id):
     for secgroup in s0.security_groups:
         sg0 = src.nova.security_groups.find(name=secgroup['name'])
         sg1 = migrate_secgroup(mapping, src, dst, sg0.id)
+        # TODO(akscram): Security groups migrated but never assigned
+        #                for a new server.
+    nics = []
     i1 = migrate_image(mapping, src, dst, s0.image["id"])
+    addresses = s0.addresses
+    for n_label, n_params in addresses.iteritems():
+        n1 = migrate_network(mapping, src, dst, n_label)
+        for n_param in n_params:
+            nics.append({
+                "net-id": n1.id,
+                "v4-fixed-ip": n_param["addr"],
+            })
     try:
         src.nova.servers.suspend(s0)
         LOG.info("Suspended: %s", s0._info)
         try:
-            s1 = dst.nova.servers.create(s0.name, i1, f1)
+            s1 = dst.nova.servers.create(s0.name, i1, f1, nics=nics)
         except:
             LOG.exception("Failed to create server: %s", s0._info)
             raise
@@ -140,8 +179,27 @@ def migrate_server(mapping, src, dst, id):
     return s1
 
 
-def migrate_network(mapping, src, dst, id):
-    pass
+def migrate_network(mapping, src, dst, name):
+    nets0 = dict((n.label, n) for n in src.nova.networks.list())
+    nets1 = dict((n.label, n) for n in dst.nova.networks.list())
+    n0 = nets0[name]
+    if n0.id in mapping:
+        LOG.warn("Skipped because mapping: %s", n0._info)
+        return dst.nova.networks.get(mapping[n0.id])
+    n1 = dst.nova.networks.create(label=n0.label,
+                                  cidr=n0.cidr,
+                                  cidr_v6=n0.cidr_v6,
+                                  dns1=n0.dns1,
+                                  dns2=n0.dns2,
+                                  gateway=n0.gateway,
+                                  gateway_v6=n0.gateway_v6,
+                                  multi_host=n0.multi_host,
+                                  priority=n0.priority,
+                                  project_id=n0.project_id,
+                                  vlan_start=n0.vlan,
+                                  vpn_start=n0.vpn_private_address)
+    mapping[n0.id] = n1
+    return n1
 
 
 def migrate_servers(mapping, src, dst):
@@ -223,6 +281,8 @@ def migrate(src, dst):
 def cleanup(cloud):
     for server in cloud.nova.servers.list():
         cloud.nova.servers.delete(server)
+        wait_for_delete(server, cloud.nova.servers.get,
+                        exceptions=(nova_excs.NotFound,))
         LOG.info("Deleted server: %s", server._info)
     for image in cloud.glance.images.list():
         cloud.glance.images.delete(image.id)
@@ -235,6 +295,9 @@ def cleanup(cloud):
         else:
             cloud.nova.security_groups.delete(secgroup.id)
             LOG.info("Deleted secgroup: %s", secgroup._info)
+    for network in cloud.nova.networks.list():
+        cloud.nova.networks.delete(network)
+        LOG.info("Deleted network: %s", network._info)
 
 
 def main():
