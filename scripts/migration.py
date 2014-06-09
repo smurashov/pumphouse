@@ -141,6 +141,10 @@ def migrate_image(mapping, src, dst, id):
     return i1
 
 
+def migrate_images(mapping, src, dst, id):
+    for image in src.glances.images.list():
+        migrate_image(mapping, src, dst, image.id)
+
 
 def migrate_server(mapping, src, dst, id):
     s0 = src.nova.servers.get(id)
@@ -356,6 +360,7 @@ RESOURCES_MIGRATIONS = collections.OrderedDict([
     ("all", migrate),
     ("tenants", migrate_tenants),
     ("users", migrate_users),
+    ("images", migrate_images),
     ("servers", migrate_servers),
     ("security_groups", migrate_secgroups),
 ])
