@@ -248,7 +248,7 @@ def migrate_tenants(mapping, src, dst, id):
 def migrate_secgroup(mapping, src, dst, id):
     sg0 = src.nova.security_groups.get(id)
     t0 = src.keystone.tenants.find(id=sg0.tenant_id)
-    t1 = migrate_tenant(src, dst, t0.id)
+    t1 = migrate_tenant(mapping, src, dst, t0.id)
     try:
         sg1 = dst.nova.security_groups.find(name=sg0.name)
     except nova_excs.NotFound:
@@ -308,7 +308,7 @@ def migrate_user(mapping, src, dst, id):
             LOG.exception("Will NOT migrate service user: %s",
                           u0._info)
             raise
-        t1 = migrate_tenant(src, dst, t0.id)
+        t1 = migrate_tenant(mapping, src, dst, t0.id)
         user_dict['tenant_id'] = t1.id
     if hasattr(u0, "email"):
         user_dict['email'] = u0.email
@@ -326,17 +326,15 @@ def migrate_user(mapping, src, dst, id):
     return u1
 
 
-def migrate_users(src, dst):
+def migrate_users(mapping, src, dst):
     mapping = {}
     for user in src.keystone.users.list():
         migrate_user(mapping, src, dst, user.id)
     LOG.info("Migration mapping: %r", mapping)
 
 
-def migrate(src, dst):
-    mapping = {}
+def migrate(mapping, src, dst):
     migrate_servers(mapping, src, dst)
-    LOG.info("Migration mapping: %r", mapping)
 
 
 def cleanup(cloud):
@@ -380,9 +378,11 @@ def main():
 
     dst = Cloud(args.config["destination"]["endpoint"])
     if args.action == "migrate":
+        mapping = {}
         src = Cloud(args.config["source"]["endpoint"])
         migrate_resources = RESOURCES_MIGRATIONS[args.resource]
-        migrate_resources(src, dst)
+        migrate_resources(mapping, src, dst)
+        LOG.info("Migration mapping: %r", mapping)
     elif args.action == "cleanup":
         cleanup(dst)
 
