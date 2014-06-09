@@ -116,7 +116,6 @@ def migrate_server(mapping, src, dst, id):
         LOG.warn("Skipped because mapping: %s", s0._info)
         return dst.nova.servers.get(mapping[s0.id])
     f1 = migrate_flavor(mapping, src, dst, s0.flavor["id"])
-    print f1.id
     for secgroup in s0.security_groups:
         sg0 = src.nova.security_groups.find(name=secgroup['name'])
         sg1 = migrate_secgroup(mapping, src, dst, sg0.id)
