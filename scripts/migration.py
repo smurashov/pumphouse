@@ -285,7 +285,7 @@ def migrate_user(mapping, src, dst, id):
     if hasattr(u0, "tenantId"):
         t0 = src.keystone.tenants.get(u0.tenantId)
         t1 = migrate_tenant(src, dst, t0.id)
-        user_dict['tenant_name'] = t1.id
+        user_dict['tenant_id'] = t1.id
     try:
         u1 = dst.keystone.users.find(u0.name)
     except keystone_excs.NotFound:
