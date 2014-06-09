@@ -120,6 +120,7 @@ def migrate_server(mapping, src, dst, id):
         sg0 = src.nova.security_groups.find(name=secgroup['name'])
         sg1 = migrate_secgroup(mapping, src, dst, sg0.id)
     i1 = migrate_image(mapping, src, dst, s0.image["id"])
+    addresses = s0.addresses
     try:
         src.nova.servers.suspend(s0)
         LOG.info("Suspended: %s", s0._info)
@@ -140,8 +141,26 @@ def migrate_server(mapping, src, dst, id):
     return s1
 
 
-def migrate_network(mapping, src, dst, id):
-    pass
+def migrate_network(mapping, src, dst, name):
+    nets0 = dict((n.label, n) for n in src.nova.networks.list())
+    nets1 = dict((n.label, n) for n in dst.nova.networks.list())
+    n0 = nets0[name]
+    if n0.id in mapping:
+        LOG.warn("Skipped because mapping: %s", n0._info)
+        return dst.nova.networks.get(mapping[n0.id])
+    n1 = dst.nova.networks.create(label=n0.label,
+                                  cidr=n0.cidr,
+                                  cidr_v6=n0.cidr_v6,
+                                  dns1=n0.dns1,
+                                  dns2=n0.dns2,
+                                  gateway=n0.gateway,
+                                  gateway_v6=n0.gateway_v6,
+                                  multi_host=n0.multi_host,
+                                  priority=n0.priority,
+                                  project_id=n0.project_id,
+                                  vlan_start=n0.vlan,
+                                  vpn_start=n0.vpn_private_address)
+    mapping[n0.id] = n1
 
 
 def migrate_servers(mapping, src, dst):
