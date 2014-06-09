@@ -113,7 +113,7 @@ def migrate_image(mapping, src, dst, id):
 
     i0 = src.glance.images.get(id)
     if i0.id in mapping:
-        LOG.warn("Skipped because mapping: %s", i0._info)
+        LOG.warn("Skipped because mapping: %s", dict(i0))
         return dst.glance.images.get(mapping[i0.id])
     imgs1 = dict([(i.checksum, i)
                   for i in dst.glance.images.list()
