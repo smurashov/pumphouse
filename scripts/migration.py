@@ -47,8 +47,7 @@ def get_parser():
                         help="Perform a migration of resources from a source "
                              "cloud to a distination.")
     parser.add_argument("--resource",
-                        choices=("tenant", "security_group", "server",
-                                 "image", "flavor"),
+                        choices=("users",),
                         help="Specify a type of resources to migrate to the "
                         "destination cloud")
     return parser
@@ -282,9 +281,8 @@ class Cloud(object):
 
 def migrate_user(mapping, src, dst, id):
     u0 = src.keystone.users.get(id)
-    user_dict = (name=u0.name,
+    user_dict = dict(name=u0.name,
                  password='default',
-                 email=u0.email,
                  enabled=u0.enabled)
     if hasattr(u0, "tenantId"):
         t0 = src.keystone.tenants.get(u0.tenantId)
@@ -294,8 +292,11 @@ def migrate_user(mapping, src, dst, id):
             raise
         t1 = migrate_tenant(src, dst, t0.id)
         user_dict['tenant_id'] = t1.id
+    if hasattr(u0, "email"):
+        user_dict['email'] = u0.email
     try:
-        u1 = dst.keystone.users.find(u0.name)
+        LOG.debug("Looking up user in dst by username: %s", u0.username)
+        u1 = dst.keystone.users.find(name=u0.name)
     except keystone_excs.NotFound:
         u1 = dst.keystone.users.create(**user_dict)
         LOG.info("Created: %s", u1._info)
@@ -351,9 +352,10 @@ def main():
     dst = Cloud(args.config["destination"]["endpoint"])
     if args.action == "migrate":
         src = Cloud(args.config["source"]["endpoint"])
-        if resource == "users":
+        if args.resource == "users":
             migrate_users(src, dst)
-        migrate(src, dst)
+        else:
+            migrate(src, dst)
     elif args.action == "cleanup":
         cleanup(dst)
 
