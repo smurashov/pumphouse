@@ -307,6 +307,13 @@ def migrate_user(mapping, src, dst, id):
     return u1
 
 
+def migrate_users(src, dst):
+    mapping = {}
+    for user in src.keystone.users.list():
+        migrate_user(mapping, src, dst, user.id)
+    LOG.info("Migration mapping: %r", mapping)
+
+
 def migrate(src, dst):
     mapping = {}
     migrate_servers(mapping, src, dst)
@@ -344,6 +351,8 @@ def main():
     dst = Cloud(args.config["destination"]["endpoint"])
     if args.action == "migrate":
         src = Cloud(args.config["source"]["endpoint"])
+        if resource == "users":
+            migrate_users(src, dst)
         migrate(src, dst)
     elif args.action == "cleanup":
         cleanup(dst)
