@@ -212,6 +212,10 @@ def migrate_servers(mapping, src, dst):
 
 def migrate_tenant(src, dst, id):
     t0 = src.keystone.tenants.get(id)
+    if t0.name == SERVICE_TENANT_NAME:
+        LOG.exception("Will NOT migrate service tenant: %s",
+                      t0._info)
+        raise
     try:
         t1 = dst.keystone.tenants.find(name=t0.name)
     except keystone_excs.NotFound:
