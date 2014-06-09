@@ -110,7 +110,6 @@ def migrate_image(mapping, src, dst, id):
                                        **kwargs)
         LOG.info("Create image: %s", new)
         return new
-
     i0 = src.glance.images.get(id)
     if i0.id in mapping:
         LOG.warn("Skipped because mapping: %s", dict(i0))
@@ -118,7 +117,10 @@ def migrate_image(mapping, src, dst, id):
     imgs1 = dict([(i.checksum, i)
                   for i in dst.glance.images.list()
                   if hasattr(i, "checksum")])
-    if not hasattr(i0, "checksum") or i0.checksum not in imgs1:
+    if not hasattr(i0, checksum):
+        LOG.exception("Image has no checksum: %s", i0._info)
+        raise
+    elif i0.checksum not in imgs1:
         params = {}
         if hasattr(i0, "kernel_id"):
             LOG.info("Found kernel image: %s", i0.kernel_id)
@@ -135,6 +137,7 @@ def migrate_image(mapping, src, dst, id):
         LOG.info("Already present: %s", i1)
     mapping[i0.id] = i1.id
     return i1
+
 
 
 def migrate_server(mapping, src, dst, id):
@@ -231,7 +234,8 @@ def migrate_secgroup(mapping, src, dst, id):
         sg1 = dst.nova.security_groups.create(sg0.name,
                                               sg0.description)
         LOG.info("Created: %s", sg1._info)
-    LOG.warn("Already exists: %s", sg1._info)
+    else:
+        LOG.warn("Already exists: %s", sg1._info)
     for rule in sg0.rules:
         migrate_secgroup_rule(mapping, src, dst, rule, sg1.id)
     return sg1
