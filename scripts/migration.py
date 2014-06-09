@@ -272,6 +272,29 @@ class Cloud(object):
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
 
+def migrate_user(mapping, src, dst, id):
+    u0 = src.keystone.users.get(id)
+    user_dict = (name=u0.name,
+                 password='default',
+                 email=u0.email,
+                 enabled=u0.enabled)
+    if hasattr(u0, "tenantId"):
+        t0 = src.keystone.tenants.get(u0.tenantId)
+        t1 = migrate_tenant(src, dst, t0.id)
+        user_dict['tenant_name'] = t1.id
+    try:
+        u1 = dst.keystone.users.find(u0.name)
+    except keystone_excs.NotFound:
+        u1 = dst.keystone.users.create(**user_dict)
+        LOG.info("Created: %s", u1._info)
+        LOG.warn("Password for %s doesn't match the original user!", u1.name)
+        # TODO(ogelbukh): Add password synchronization logic here
+    else:
+        LOG.warn("Already exists: %s", u1._info)
+    mapping[u0.id] = u1.id
+    return u1
+
+
 def migrate(src, dst):
     mapping = {}
     migrate_servers(mapping, src, dst)
