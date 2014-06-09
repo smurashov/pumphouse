@@ -224,16 +224,16 @@ def cleanup(cloud):
     for server in cloud.nova.servers.list():
         cloud.nova.servers.delete(server)
         LOG.info("Deleted server: %s", server._info)
-    for image in dst.glance.images.list():
-        dst.glance.images.delete(image.id)
+    for image in cloud.glance.images.list():
+        cloud.glance.images.delete(image.id)
         LOG.info("Deleted image: %s", dict(image))
-    for secgroup in dst.nova.security_groups.list():
+    for secgroup in cloud.nova.security_groups.list():
         if secgroup.name in RO_SECURITY_GROUPS:
             for rule in secgroup.rules:
-                dst.nova.security_group_rules.delete(rule['id'])
+                cloud.nova.security_group_rules.delete(rule['id'])
                 LOG.info("Deleted rule from default secgroup: %s", rule)
         else:
-            dst.nova.security_groups.delete(secgroup.id)
+            cloud.nova.security_groups.delete(secgroup.id)
             LOG.info("Deleted secgroup: %s", secgroup._info)
 
 
@@ -243,12 +243,12 @@ def main():
 
     logging.basicConfig(level=logging.INFO)
 
-    dst = Cloud(config["destination"]["endpoint"])
+    dst = Cloud(args.config["destination"]["endpoint"])
     if args.action == "migrate":
-        src = Cloud(config["source"]["endpoint"])
-        migrate(args.config)
+        src = Cloud(args.config["source"]["endpoint"])
+        migrate(src, dst)
     elif args.action == "cleanup":
-        cleanup(args.config)
+        cleanup(dst)
 
 
 if __name__ == "__main__":
