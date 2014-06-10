@@ -34,7 +34,7 @@ We install Fuel master node on one of the nodes reserved for Mirantis OpenStack.
 Mirantis OpenStack must be configured so it shares Private and Public L2 networks
 with the existing OpenStack cluster.
 
-![Pumphouse network diagram](doc/pumphouse-network-diagram.png)
+![Pumphouse network diagram](pumphouse-network-diagram.png)
 
 In this diagram, components of source clouds are in purple, components of
 Mirantis OpenStack cloud are in green, and shared Private and Public networks
