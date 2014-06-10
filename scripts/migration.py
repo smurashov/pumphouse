@@ -435,6 +435,7 @@ def cleanup(cloud):
 def setup(endpoint):
     prefix = TEST_RESOURCE_PREFIX
     if not os.path.isfile(TEST_IMAGE_FILE):
+        LOG.info("Caching test image: %s", TEST_IMAGE_FILE)
         urllib.urlretrieve(TEST_IMAGE_URL, TEST_IMAGE_FILE)
     test_tenants = {}
     test_images = {}
@@ -451,23 +452,27 @@ def setup(endpoint):
                            str(random.randint(1,0x7fffffff))),
                    '1','1','2',is_public='True')
         test_flavors[flavor.id] = flavor
+        LOG.info("Created: %s", flavor._info)
         tenant = cloud.keystone.tenants.create(
                     "{0}-tenant-{1}"
                     .format(prefix,
                             str(random.randint(1, 0x7fffffff))),
                     description="pumphouse test tenant")
         test_tenants[tenant.id] = tenant
+        LOG.info("Created: %s", tenant._info)
         user = cloud.keystone.users.create(
                     name="{0}-user-{1}"
                     .format(prefix, str(random.randint(1, 0x7fffffff))),
                     password="default",
                     tenant_id=tenant.id)
         test_users[tenant.id] = user
+        LOG.info("Created: %s", user._info)
         net = cloud.nova.networks.create(
                     label="{0}-pumphouse-{1}".format(prefix, i),
                     cidr="10.10.{0}.0/24".format(i),
                     project_id=tenant.id)
         test_nets[tenant.id] = net
+        LOG.info("Created: %s", net._info)
         endpoint["tenant_name"] = tenant.name
         endpoint["username"] = user.name
         endpoint["password"] = "default"
@@ -482,6 +487,7 @@ def setup(endpoint):
                             random.randint(1,0x7fffffff)))
         cloud.glance.images.upload(image.id, open(TEST_IMAGE_FILE, "rb"))
         test_images[image.id] = image
+        LOG.info("Created: %s", dict(image))
         (net, _, addr) = test_nets[tenant_ref].dhcp_start.rpartition('.')
         ip = ".".join( (net, str(int(addr)+len(test_servers))) )
         nics = [{
@@ -495,6 +501,7 @@ def setup(endpoint):
                     flavor.id,
                     nics=nics)
         test_servers[server.id] = server
+        LOG.info("Created: %s", server._info)
 
 
 RESOURCES_MIGRATIONS = collections.OrderedDict([
