@@ -406,6 +406,26 @@ def migrate_users(mapping, src, dst):
     LOG.info("Migration mapping: %r", mapping)
 
 
+def migrate_role(mapping, src, dst, id):
+    r0 = src.keystone.roles.get(id)
+    if r0.name in ('_member_', 'service', 'admin'):
+        LOG.warn("Will NOT migrate special role: %s", r0.name)
+        return
+    try:
+        r1 = dst.keystone.role.find(name=r0.name)
+    except keystone_excs.NotFound:
+        r1 = dst.keystone.role.create(r0.name)
+        LOG.info("Created: %s", r1._info)
+    else:
+        LOG.warn("Already exists: %s", r1._info)
+    return r1
+
+
+def migrate_roles(mapping, src, dst):
+    for role in src.keystone.roles.list():
+        migrate_role(mapping, src, dst, role.id)
+
+
 def migrate(mapping, src, dst):
     migrate_servers(mapping, src, dst)
 
@@ -512,6 +532,7 @@ RESOURCES_MIGRATIONS = collections.OrderedDict([
     ("flavors", migrate_flavors),
     ("servers", migrate_servers),
     ("security_groups", migrate_secgroups),
+    ("roles", migrate_roles),
 ])
 
 
