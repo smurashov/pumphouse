@@ -1,7 +1,10 @@
 import argparse
 import collections
 import logging
+import os
+import random
 import time
+import urllib
 import yaml
 
 from novaclient.v1_1 import client as nova_client
@@ -17,6 +20,9 @@ from glanceclient import exc as glance_excs
 LOG = logging.getLogger(__name__)
 RO_SECURITY_GROUPS = ['default']
 SERVICE_TENANT_NAME = 'services'
+TEST_IMAGE_URL = 'http://download.cirros-cloud.net/0.3.2/cirros-0.3.2-x86_64-disk.img'
+TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
+TEST_RESOURCE_PREFIX = "pumphouse-test"
 
 
 class Error(Exception):
@@ -44,7 +50,7 @@ def get_parser():
                         help="A filename of a configuration of clouds "
                              "endpoints and a strategy.")
     parser.add_argument("action",
-                        choices=("migrate", "cleanup"),
+                        choices=("migrate", "cleanup", "setup"),
                         help="Perform a migration of resources from a source "
                              "cloud to a distination.")
     parser.add_argument("resource",
@@ -426,6 +432,78 @@ def cleanup(cloud):
         LOG.info("Deleted network: %s", network._info)
 
 
+def setup(endpoint):
+    prefix = TEST_RESOURCE_PREFIX
+    if not os.path.isfile(TEST_IMAGE_FILE):
+        LOG.info("Caching test image: %s", TEST_IMAGE_FILE)
+        urllib.urlretrieve(TEST_IMAGE_URL, TEST_IMAGE_FILE)
+    test_tenants = {}
+    test_images = {}
+    test_flavors = {}
+    test_users = {}
+    test_nets = {}
+    test_servers = {}
+    test_clouds = {}
+    cloud = Cloud.from_dict(endpoint)
+    for i in range(2):
+        flavor = cloud.nova.flavors.create(
+                    "{0}-flavor-{1}"
+                   .format(prefix,
+                           str(random.randint(1,0x7fffffff))),
+                   '1','1','2',is_public='True')
+        test_flavors[flavor.id] = flavor
+        LOG.info("Created: %s", flavor._info)
+        tenant = cloud.keystone.tenants.create(
+                    "{0}-tenant-{1}"
+                    .format(prefix,
+                            str(random.randint(1, 0x7fffffff))),
+                    description="pumphouse test tenant")
+        test_tenants[tenant.id] = tenant
+        LOG.info("Created: %s", tenant._info)
+        user = cloud.keystone.users.create(
+                    name="{0}-user-{1}"
+                    .format(prefix, str(random.randint(1, 0x7fffffff))),
+                    password="default",
+                    tenant_id=tenant.id)
+        test_users[tenant.id] = user
+        LOG.info("Created: %s", user._info)
+        net = cloud.nova.networks.create(
+                    label="{0}-pumphouse-{1}".format(prefix, i),
+                    cidr="10.10.{0}.0/24".format(i),
+                    project_id=tenant.id)
+        test_nets[tenant.id] = net
+        LOG.info("Created: %s", net._info)
+        endpoint["tenant_name"] = tenant.name
+        endpoint["username"] = user.name
+        endpoint["password"] = "default"
+        test_clouds[tenant.id] = Cloud.from_dict(endpoint)
+    for tenant_ref in test_tenants:
+        cloud = test_clouds[tenant_ref]
+        image = cloud.glance.images.create(
+                    disk_format='qcow2',
+                    container_format='bare',
+                    name="{0}-image-{1}"
+                    .format(prefix,
+                            random.randint(1,0x7fffffff)))
+        cloud.glance.images.upload(image.id, open(TEST_IMAGE_FILE, "rb"))
+        test_images[image.id] = image
+        LOG.info("Created: %s", dict(image))
+        (net, _, addr) = test_nets[tenant_ref].dhcp_start.rpartition('.')
+        ip = ".".join( (net, str(int(addr)+len(test_servers))) )
+        nics = [{
+                            "net-id": test_nets[tenant_ref].id,
+                            "v4-fixed-ip": ip,
+        }]
+        server = cloud.nova.servers.create(
+                    "{0}-{1}".format(prefix,
+                                     str(random.randint(1, 0x7fffffff))),
+                    image.id,
+                    flavor.id,
+                    nics=nics)
+        test_servers[server.id] = server
+        LOG.info("Created: %s", server._info)
+
+
 RESOURCES_MIGRATIONS = collections.OrderedDict([
     ("all", migrate),
     ("tenants", migrate_tenants),
@@ -452,6 +530,8 @@ def main():
         LOG.info("Migration mapping: %r", mapping)
     elif args.action == "cleanup":
         cleanup(dst)
+    elif args.action == "setup":
+        setup(args.config["source"]["endpoint"])
 
 
 if __name__ == "__main__":
