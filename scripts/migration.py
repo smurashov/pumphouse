@@ -20,6 +20,8 @@ from glanceclient import exc as glance_excs
 LOG = logging.getLogger(__name__)
 RO_SECURITY_GROUPS = ['default']
 SERVICE_TENANT_NAME = 'services'
+BUILTIN_ROLES = ('service', 'admin', '_member_')
+
 TEST_IMAGE_URL = 'http://download.cirros-cloud.net/0.3.2/cirros-0.3.2-x86_64-disk.img'
 TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
 TEST_RESOURCE_PREFIX = "pumphouse-test"
