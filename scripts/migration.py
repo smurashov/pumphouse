@@ -398,6 +398,24 @@ def migrate_user(mapping, src, dst, id):
     else:
         LOG.warn("Already exists: %s", u1._info)
     mapping[u0.id] = u1.id
+    for tenant in src.keystone.tenants.list():
+        for user_role in src.keystone.roles.roles_for_user(u0.id,
+                                                           tenant=tenant.id):
+            r1 = migrate_role(mapping, src, dst, user_role.id)            
+            try:
+                a1 = dst.keystone.roles.add_user_role(u1.id,
+                                                      r1.id,
+                                                      tenant=mapping[tenant.id])
+            except keystone_excs.Conflict:
+                LOG.warn("Role %s already assigned to user %s in tenant %s",
+                         u1.name,
+                         r1.name,
+                         tenant.name)
+            else:
+                LOG.info("Created role %s assignment for user %s in tenant %s",
+                         u1.name,
+                         r1.name,
+                         tenant.name)
     return u1
 
 
@@ -420,6 +438,7 @@ def migrate_role(mapping, src, dst, id):
         LOG.info("Created: %s", r1._info)
     else:
         LOG.warn("Already exists: %s", r1._info)
+    mapping[r0.id] = r1.id
     return r1
 
 
