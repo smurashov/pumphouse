@@ -10,7 +10,3 @@ destination:
         username: admin
         password: passwd
         tenant_name: admin
-plan:
-    # all, used, specific
-    tenants: all
-    images: all
