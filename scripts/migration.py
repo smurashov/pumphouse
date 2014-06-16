@@ -473,7 +473,7 @@ def cleanup(cloud):
         LOG.info("Deleted network: %s", network._info)
 
 
-def setup(endpoint):
+def setup(cloud):
     prefix = TEST_RESOURCE_PREFIX
     if not os.path.isfile(TEST_IMAGE_FILE):
         LOG.info("Caching test image: %s", TEST_IMAGE_FILE)
@@ -486,7 +486,6 @@ def setup(endpoint):
     test_servers = {}
     test_clouds = {}
     test_roles = {}
-    cloud = Cloud.from_dict(endpoint)
     for i in range(2):
         flavor = cloud.nova.flavors.create(
                     "{0}-flavor-{1}"
@@ -526,10 +525,10 @@ def setup(endpoint):
                     project_id=tenant.id)
         test_nets[tenant.id] = net
         LOG.info("Created: %s", net._info)
-        endpoint["tenant_name"] = tenant.name
-        endpoint["username"] = user.name
-        endpoint["password"] = "default"
-        test_clouds[tenant.id] = Cloud.from_dict(endpoint)
+        user_ns = Namespace(username=user.name,
+                            password="default",
+                            tenant_name=tenant.name)
+        test_clouds[tenant.id] = cloud.restrict(user_ns)
     for tenant_ref in test_tenants:
         cloud = test_clouds[tenant_ref]
         image = cloud.glance.images.create(
@@ -575,17 +574,19 @@ def main():
 
     logging.basicConfig(level=logging.INFO)
 
-    dst = Cloud.from_dict(args.config["destination"]["endpoint"])
     if args.action == "migrate":
         mapping = {}
         src = Cloud.from_dict(args.config["source"]["endpoint"])
+        dst = Cloud.from_dict(args.config["destination"]["endpoint"])
         migrate_resources = RESOURCES_MIGRATIONS[args.resource]
         migrate_resources(mapping, src, dst)
         LOG.info("Migration mapping: %r", mapping)
     elif args.action == "cleanup":
+        dst = Cloud.from_dict(args.config["destination"]["endpoint"])
         cleanup(dst)
     elif args.action == "setup":
-        setup(args.config["source"]["endpoint"])
+        src = Cloud.from_dict(args.config["source"]["endpoint"])
+        setup(src)
 
 
 if __name__ == "__main__":
