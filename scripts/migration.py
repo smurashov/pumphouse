@@ -7,6 +7,8 @@ import time
 import urllib
 import yaml
 
+import sqlalchemy as sqla
+
 from novaclient.v1_1 import client as nova_client
 from novaclient import exceptions as nova_excs
 
@@ -295,8 +297,51 @@ def migrate_secgroups(mapping, src, dst):
         migrate_secgroup(mapping, src, dst, sg.id)
 
 
+class Identity(collections.Mapping):
+    select_query = sqla.text("SELECT id, password FROM user "
+                             "WHERE id = :user_id")
+    update_query = sqla.text("UPDATE user SET password = :password "
+                             "WHERE id = :user_id")
+
+    def __init__(self, connection):
+        self.engine = sqla.create_engine(connection)
+        self.hashes = {}
+
+    def fetch(self, user_id):
+        """Fetch a hash of user's password."""
+        users = self.engine.execute(self.select_query, user_id=user_id)
+        for _, password in users:
+            self.hashes[user_id] = password
+            return password
+
+    def push(self):
+        """Push hashes of users' passwords."""
+        with self.engine.begin() as conn:
+            for user_id, password in self.hashes.iteritems():
+                conn.execute(self.update_query,
+                             user_id=user_id, password=password)
+
+    def __len__(self):
+        return len(self.hashes)
+
+    def __iter__(self):
+        return iter(self.hashes)
+
+    def __getitem__(self, user_id):
+        if user_id not in self.hashes:
+            password = self.fetch(user_id)
+            self.hashes[user_id] = password
+        else:
+            password = self.hashes[user_id]
+        return password
+
+    def update(self, iterable):
+        for user_id, password in iterable:
+            self.hashes[user_id] = password
+
+
 class Cloud(object):
-    def __init__(self, cloud_ns, user_ns):
+    def __init__(self, cloud_ns, user_ns, identity):
         self.cloud_ns = cloud_ns
         self.user_ns = user_ns
         self.access_ns = cloud_ns.restrict(user_ns)
@@ -310,19 +355,23 @@ class Cloud(object):
         self.glance = glance.Client("2",
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
+        if isinstance(identity, Identity):
+            self.identity = identity
+        else:
+            self.identity = Identity(**identity)
 
     def restrict(self, user_ns):
-        return Cloud(self.cloud_ns, user_ns)
+        return Cloud(self.cloud_ns, user_ns, self.identity)
 
     @classmethod
-    def from_dict(cls, endpoint):
+    def from_dict(cls, endpoint, identity):
         cloud_ns = Namespace(auth_url=endpoint["auth_url"])
         user_ns = Namespace(
             username=endpoint["username"],
             password=endpoint["password"],
             tenant_name=endpoint["tenant_name"],
         )
-        return cls(cloud_ns, user_ns)
+        return cls(cloud_ns, user_ns, identity)
 
     def __repr__(self):
         return "<Cloud(namespace={!r})>".format(self.access_ns)
@@ -391,6 +440,7 @@ def migrate_user(mapping, src, dst, id):
         LOG.debug("Looking up user in dst by username: %s", u0.username)
         u1 = dst.keystone.users.find(name=u0.name)
     except keystone_excs.NotFound:
+        src.identity.fetch(u0.id)
         u1 = dst.keystone.users.create(**user_dict)
         LOG.info("Created: %s", u1._info)
         LOG.warn("Password for %s doesn't match the original user!", u1.name)
@@ -417,6 +467,15 @@ def migrate_user(mapping, src, dst, id):
                          r1.name,
                          tenant.name)
     return u1
+
+
+def update_users_passwords(mapping, src, dst):
+    def with_mapping(identity):
+        for user_id, password in identity.iteritems():
+            yield mapping[user_id], password
+
+    dst.identity.update(with_mapping(src.identity))
+    dst.identity.push()
 
 
 def migrate_users(mapping, src, dst):
@@ -448,7 +507,9 @@ def migrate_roles(mapping, src, dst):
 
 
 def migrate(mapping, src, dst):
+    migrate_users(mapping, src, dst)
     migrate_servers(mapping, src, dst)
+    update_users_passwords(mapping, src, dst)
 
 
 def cleanup(cloud):
@@ -576,16 +637,16 @@ def main():
 
     if args.action == "migrate":
         mapping = {}
-        src = Cloud.from_dict(args.config["source"]["endpoint"])
-        dst = Cloud.from_dict(args.config["destination"]["endpoint"])
+        src = Cloud.from_dict(**args.config["source"])
+        dst = Cloud.from_dict(**args.config["destination"])
         migrate_resources = RESOURCES_MIGRATIONS[args.resource]
         migrate_resources(mapping, src, dst)
         LOG.info("Migration mapping: %r", mapping)
     elif args.action == "cleanup":
-        dst = Cloud.from_dict(args.config["destination"]["endpoint"])
+        dst = Cloud.from_dict(**args.config["destination"])
         cleanup(dst)
     elif args.action == "setup":
-        src = Cloud.from_dict(args.config["source"]["endpoint"])
+        src = Cloud.from_dict(**args.config["source"])
         setup(src)
 
 
