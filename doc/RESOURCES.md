@@ -3,19 +3,20 @@
 Pumphouse migrates certain cloud resources managed by corresponding services of
 OpenStack.
 
-Service | List of resources
---- | ---
-Nova | - instances
-     | - keypairs
-     | - security groups
-     | - quotas
-     | - flavors
-     | - networks (fixed + floating ips)
-Glance | - image files
-Keystone | - tenants
-         | - users
-         | - roles
-         | - user-roles assignments
+Service | List of resources | Status
+--- | ---| ---
+Nova | - instances | + |
+     | - keypairs | - |
+     | - security groups | + |
+     | - quotas | - |
+     | - flavors | + |
+     | - networks (fixed ips) | + |
+     | - networks (floating ips) | - |
+Glance | - image files | + |
+Keystone | - tenants | + |
+         | - users | + |
+         | - roles | + |
+         | - user-roles assignments | + |
 
 #### Dependencies
 
