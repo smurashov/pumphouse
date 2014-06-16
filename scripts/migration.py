@@ -432,9 +432,9 @@ def migrate_role(mapping, src, dst, id):
         LOG.warn("Will NOT migrate special role: %s", r0.name)
         return
     try:
-        r1 = dst.keystone.role.find(name=r0.name)
+        r1 = dst.keystone.roles.find(name=r0.name)
     except keystone_excs.NotFound:
-        r1 = dst.keystone.role.create(r0.name)
+        r1 = dst.keystone.roles.create(r0.name)
         LOG.info("Created: %s", r1._info)
     else:
         LOG.warn("Already exists: %s", r1._info)
@@ -485,6 +485,7 @@ def setup(endpoint):
     test_nets = {}
     test_servers = {}
     test_clouds = {}
+    test_roles = {}
     cloud = Cloud.from_dict(endpoint)
     for i in range(2):
         flavor = cloud.nova.flavors.create(
@@ -501,6 +502,12 @@ def setup(endpoint):
                     description="pumphouse test tenant")
         test_tenants[tenant.id] = tenant
         LOG.info("Created: %s", tenant._info)
+        role = cloud.keystone.roles.create(
+                    "{0}-role-{1}"
+                    .format(prefix,
+                            str(random.randint(1, 0x7fffffff))))
+        test_roles[role.id] = role
+        LOG.info("Created: %s", role._info)
         user = cloud.keystone.users.create(
                     name="{0}-user-{1}"
                     .format(prefix, str(random.randint(1, 0x7fffffff))),
@@ -508,6 +515,11 @@ def setup(endpoint):
                     tenant_id=tenant.id)
         test_users[tenant.id] = user
         LOG.info("Created: %s", user._info)
+        user_role = cloud.keystone.roles.add_user_role(
+                    user,
+                    role,
+                    tenant=tenant.id)
+        LOG.info("Assigned %s: %s", user._info, role._info)
         net = cloud.nova.networks.create(
                     label="{0}-pumphouse-{1}".format(prefix, i),
                     cidr="10.10.{0}.0/24".format(i),
