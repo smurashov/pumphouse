@@ -8,3 +8,4 @@ pyipmi==0.11.0
 flake8==2.2.1
 Flask==0.10.1
 Flask-SocketIO==0.3.8
+taskflow==0.3.21
