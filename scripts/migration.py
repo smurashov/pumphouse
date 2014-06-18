@@ -479,7 +479,6 @@ def update_users_passwords(mapping, src, dst):
 
 
 def migrate_users(mapping, src, dst):
-    mapping = {}
     for user in src.keystone.users.list():
         migrate_user(mapping, src, dst, user.id)
     LOG.info("Migration mapping: %r", mapping)
