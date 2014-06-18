@@ -530,6 +530,7 @@ def cleanup(cloud):
             cloud.nova.security_groups.delete(secgroup.id)
             LOG.info("Deleted secgroup: %s", secgroup._info)
     for network in cloud.nova.networks.list():
+        cloud.nova.networks.disassociate(network)
         cloud.nova.networks.delete(network)
         LOG.info("Deleted network: %s", network._info)
 
