@@ -487,14 +487,17 @@ def migrate_users(mapping, src, dst):
 
 def migrate_role(mapping, src, dst, id):
     r0 = src.keystone.roles.get(id)
-    if r0.name in ('_member_', 'service', 'admin'):
-        LOG.warn("Will NOT migrate special role: %s", r0.name)
-        return
+    if r0.id in mapping:
+        LOG.warn("Skipped because mapping: %s", r0._info)
+        return dst.keystone.roles.get(mapping[r0.id])
     try:
         r1 = dst.keystone.roles.find(name=r0.name)
     except keystone_excs.NotFound:
-        r1 = dst.keystone.roles.create(r0.name)
-        LOG.info("Created: %s", r1._info)
+        if r0.name not in BUILTIN_ROLES:
+            r1 = dst.keystone.roles.create(r0.name)
+            LOG.info("Created: %s", r1._info)
+        else:
+            LOG.warn("Will NOT migrate special role: %s", r0.name)
     else:
         LOG.warn("Already exists: %s", r1._info)
     mapping[r0.id] = r1.id
