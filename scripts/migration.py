@@ -535,6 +535,20 @@ def cleanup(cloud):
         cloud.nova.networks.disassociate(network)
         cloud.nova.networks.delete(network)
         LOG.info("Deleted network: %s", network._info)
+    def is_prefixed(string):
+        return string.startswith(TEST_RESOURCE_PREFIX)
+    for user in cloud.keystone.users.list():
+        if is_prefixed(user.name):
+            cloud.keystone.users.delete(user)
+            LOG.info("Deleted user: %s", user._info)
+    for role in cloud.keystone.roles.list():
+        if is_prefixed(role.name):
+            cloud.keystone.roles.delete(role)
+            LOG.info("Deleted role: %s", role._info)
+    for tenant in cloud.keystone.tenants.list():
+        if is_prefixed(tenant.name):
+            cloud.keystone.tenants.delete(tenant)
+            LOG.info("Deleted role: %s", tenant._info)
 
 
 def setup(cloud):
