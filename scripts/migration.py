@@ -449,13 +449,12 @@ def migrate_user(mapping, src, dst, id):
         LOG.warn("Already exists: %s", u1._info)
     mapping[u0.id] = u1.id
     for tenant in src.keystone.tenants.list():
-        for user_role in src.keystone.roles.roles_for_user(u0.id,
-                                                           tenant=tenant.id):
-            r1 = migrate_role(mapping, src, dst, user_role.id)            
+        t1 = migrate_tenant(mapping, src, dst, tenant.id)
+        user_roles = src.keystone.roles.roles_for_user(u0.id, tenant=tenant.id)
+        for user_role in user_roles:
+            r1 = migrate_role(mapping, src, dst, user_role.id)
             try:
-                a1 = dst.keystone.roles.add_user_role(u1.id,
-                                                      r1.id,
-                                                      tenant=mapping[tenant.id])
+                dst.keystone.roles.add_user_role(u1.id, r1.id, t1)
             except keystone_excs.Conflict:
                 LOG.warn("Role %s already assigned to user %s in tenant %s",
                          u1.name,
