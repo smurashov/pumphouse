@@ -53,16 +53,26 @@ def get_parser():
                         type=safe_load_yaml,
                         help="A filename of a configuration of clouds "
                              "endpoints and a strategy.")
-    parser.add_argument("action",
-                        choices=("migrate", "cleanup", "setup"),
-                        help="Perform a migration of resources from a source "
-                             "cloud to a distination.")
-    parser.add_argument("resource",
-                        nargs="?",
-                        choices=RESOURCES_MIGRATIONS.keys(),
-                        default="all",
-                        help="Specify a type of resources to migrate to the "
-                        "destination cloud")
+    subparsers = parser.add_subparsers()
+    migrate_parser = subparsers.add_parser("migrate",
+                                           help="Perform a migration of "
+                                                "resources from a source "
+                                                "cloud to a distination.")
+    migrate_parser.set_defaults(action="migrate")
+    migrate_parser.add_argument("resource",
+                                nargs="?",
+                                choices=RESOURCES_MIGRATIONS.keys(),
+                                default="all",
+                                help="Specify a type of resources to migrate "
+                                     "to the destination cloud.")
+    cleanup_parser = subparsers.add_parser("cleanup",
+                                           help="Remove resources from a "
+                                                "destination cloud.")
+    cleanup_parser.set_defaults(action="cleanup")
+    setup_parser = subparsers.add_parser("setup",
+                                         help="Create resource in a source "
+                                              "cloud for the test purposes.")
+    setup_parser.set_defaults(action="setup")
     return parser
 
 
