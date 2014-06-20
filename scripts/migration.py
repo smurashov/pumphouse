@@ -60,11 +60,21 @@ def get_parser():
                                                 "cloud to a distination.")
     migrate_parser.set_defaults(action="migrate")
     migrate_parser.add_argument("resource",
-                                nargs="?",
                                 choices=RESOURCES_MIGRATIONS.keys(),
+                                nargs="?",
                                 default="all",
                                 help="Specify a type of resources to migrate "
                                      "to the destination cloud.")
+    migrate_filter = migrate_parser.add_mutually_exclusive_group(required=True)
+    migrate_filter.add_argument("-i", "--ids",
+                                nargs="*",
+                                help="A list of IDs of resource to migrate to "
+                                     "the destination cloud.")
+    migrate_filter.add_argument("-t", "--tenant",
+                                default=None,
+                                help="Specify ID of a tenant which should be "
+                                     "moved to destination cloud with all it's "
+                                     "resources")
     cleanup_parser = subparsers.add_parser("cleanup",
                                            help="Remove resources from a "
                                                 "destination cloud.")
@@ -121,9 +131,10 @@ def migrate_flavor(mapping, src, dst, id):
     return f1
 
 
-def migrate_flavors(mapping, src, dst, id):
+def migrate_flavors(mapping, src, dst, ids):
     for flavor in src.nova.flavors.list():
-        migrate_flavor(mapping, src, dst, flavor)
+        if flavor.id in ids:
+            migrate_flavor(mapping, src, dst, flavor)
 
 
 def migrate_image(mapping, src, dst, id):
@@ -172,9 +183,10 @@ def migrate_image(mapping, src, dst, id):
     return i1
 
 
-def migrate_images(mapping, src, dst, id):
-    for image in src.glances.images.list():
-        migrate_image(mapping, src, dst, image.id)
+def migrate_images(mapping, src, dst, ids):
+    for image in src.glance.images.list():
+        if image.id in ids:
+            migrate_image(mapping, src, dst, image.id)
 
 
 def migrate_server(mapping, src, dst, id):
@@ -242,10 +254,11 @@ def migrate_network(mapping, src, dst, name):
     return n1
 
 
-def migrate_servers(mapping, src, dst):
+def migrate_servers(mapping, src, dst, ids):
     search_opts = {"all_tenants": 1}
     for server in src.nova.servers.list(search_opts=search_opts):
-        migrate_server(mapping, src, dst, server.id)
+        if server.id in ids:
+            migrate_server(mapping, src, dst, server.id)
 
 
 # TODO(akscram): We should to check that it's worked.
@@ -270,9 +283,10 @@ def migrate_tenant(mapping, src, dst, id):
     return t1
 
 
-def migrate_tenants(mapping, src, dst, id):
+def migrate_tenants(mapping, src, dst, ids):
     for tenant in src.keystone.tenants.list():
-        migrate_tenant(mapping, src, dst, tenant)
+        if tenant.id in ids:
+            migrate_tenant(mapping, src, dst, tenant)
 
 
 def migrate_secgroup(mapping, src, dst, id):
@@ -309,9 +323,10 @@ def migrate_secgroup_rule(mapping, src, dst, src_rule, id):
         raise
 
 
-def migrate_secgroups(mapping, src, dst):
+def migrate_secgroups(mapping, src, dst, ids):
     for sg in src.nova.security_groups.list():
-        migrate_secgroup(mapping, src, dst, sg.id)
+        if sg.id in ids:
+            migrate_secgroup(mapping, src, dst, sg.id)
 
 
 class Identity(collections.Mapping):
@@ -494,9 +509,11 @@ def update_users_passwords(mapping, src, dst):
     dst.identity.push()
 
 
-def migrate_users(mapping, src, dst):
+def migrate_users(mapping, src, dst, ids):
     for user in src.keystone.users.list():
-        migrate_user(mapping, src, dst, user.id)
+        if user.id in ids:
+            migrate_user(mapping, src, dst, user.id)
+    LOG.info("Migration mapping: %r", mapping)
 
 
 def migrate_role(mapping, src, dst, id):
@@ -518,9 +535,10 @@ def migrate_role(mapping, src, dst, id):
     return r1
 
 
-def migrate_roles(mapping, src, dst):
+def migrate_roles(mapping, src, dst, ids):
     for role in src.keystone.roles.list():
-        migrate_role(mapping, src, dst, role.id)
+        if role.id in ids:
+            migrate_role(mapping, src, dst, role.id)
 
 
 def migrate(mapping, src, dst):
@@ -684,6 +702,33 @@ def setup(cloud):
         LOG.info("Created: %s", server._info)
 
 
+def get_ids_by_tenant(cloud, resource_type, tenant_id):
+    ids = []
+    if resource_type == 'users':
+        users = cloud.keystone.users.list(tenant_id=tenant_id)
+        for user in users:
+            ids.append(user.id)
+    elif resource_type == 'images':
+        images = cloud.glance.images.list(filters={'owner': tenant_id})
+        for image in images:
+            ids.append(image.id)
+    elif resource_type == 'servers':
+        servers = cloud.nova.servers.list(search_opts={'all_tenants': 1,
+                                                       'tenant': tenant_id})
+        for server in servers:
+            ids.append(server.id)
+    else:
+        LOG.warn("Cannot group %s by tenant", resource_type)
+    return ids
+
+
+# TODO(ogelbukh): implement this function to support migration of all resources
+# of the given type if possible (migration strategy 'all')
+def get_all_resource_ids(cloud, resource_type):
+    ids = []
+    return ids
+
+
 RESOURCES_MIGRATIONS = collections.OrderedDict([
     ("all", migrate),
     ("tenants", migrate_tenants),
@@ -707,7 +752,13 @@ def main():
         src = Cloud.from_dict(**args.config["source"])
         dst = Cloud.from_dict(**args.config["destination"])
         migrate_resources = RESOURCES_MIGRATIONS[args.resource]
-        migrate_resources(mapping, src, dst)
+        if args.ids > 0:
+            ids = args.ids
+        elif args.tenant:
+            ids = get_ids_by_tenant(src, args.resource, args.tenant)
+        else:
+            ids = get_all_resource_ids(src, args.resource)
+        migrate_resources(mapping, src, dst, ids)
         LOG.info("Migration mapping: %r", mapping)
     elif args.action == "cleanup":
         cloud = Cloud.from_dict(**args.config[args.target])
