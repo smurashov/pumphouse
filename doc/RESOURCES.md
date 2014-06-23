@@ -33,6 +33,28 @@ cloud, or only tenants that have resources. Instances could be migrated on
 per-tenant, per-host or per-application basis, or any others. See below for the
 list of currently supported strategies.
 
+Pumphouse supports the following strategies for all resources:
+
+- **all** moves all resources of this type to the target cloud, if it is allowed
+  by the target capacity. Implementation of this strategy should support
+  in-advance verification of target capacity and warn the user if it is
+  insufficient for the full migration.
+- **tenant** strategy is needed to limit the area of effect of potential
+  downtime due to migration. It migrates all resources that belong to specified
+  tenant. Technically it means that the list of resources in source cloud must
+  be filtered by tenant prior to the migration.
+- **specific** resources startegy is underlying for all other strategies: it
+  allows for migration of explicitly listed resources (usually specified by
+  their respective IDs).
+- **public** strategy allows to filter resources that could be shared among
+  tenants from resources that are only visible to the owner tenant (usually
+  images and flavors)
+- **used** strategy filters resources that are somehow used to create dependent
+  resoucres. For example, image is used if there is a running instance or
+  multiple instances based on it, etc.
+- **host** strategy filters resources that are associated with particular
+  hypervisor hosts (usually virtual servers).
+
 #### Migration path
 
 Different types of resources require different approach to the migration
