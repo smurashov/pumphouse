@@ -43,7 +43,7 @@ class TimeoutException(Error):
 
 def safe_load_yaml(filename):
     with open(filename) as f:
-        return yaml.safe_load(f.read())
+        return yaml.safe_load(f)
 
 
 def get_parser():
@@ -79,11 +79,6 @@ def get_parser():
                                               "cloud for the test purposes.")
     setup_parser.set_defaults(action="setup")
     return parser
-
-
-def read_configuration(stream):
-    with stream as f:
-        return yaml.safe_load(f.read())
 
 
 def wait_for_delete(resource, update_resource, timeout=60,
