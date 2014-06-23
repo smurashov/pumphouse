@@ -490,7 +490,6 @@ def update_users_passwords(mapping, src, dst):
 def migrate_users(mapping, src, dst):
     for user in src.keystone.users.list():
         migrate_user(mapping, src, dst, user.id)
-    LOG.info("Migration mapping: %r", mapping)
 
 
 def migrate_role(mapping, src, dst, id):
@@ -524,15 +523,24 @@ def migrate(mapping, src, dst):
 
 
 def cleanup(cloud):
-    for server in cloud.nova.servers.list():
+    def is_prefixed(string):
+        return string.startswith(TEST_RESOURCE_PREFIX)
+    search_opts = {"all_tenants": 1}
+    for server in cloud.nova.servers.list(search_opts=search_opts):
+        if not is_prefixed(server.name):
+            continue
         cloud.nova.servers.delete(server)
         wait_for_delete(server, cloud.nova.servers.get,
                         exceptions=(nova_excs.NotFound,))
         LOG.info("Deleted server: %s", server._info)
     for image in cloud.glance.images.list():
+        if not is_prefixed(image.name):
+            continue
         cloud.glance.images.delete(image.id)
         LOG.info("Deleted image: %s", dict(image))
     for secgroup in cloud.nova.security_groups.list():
+        if not is_prefixed(secgroup.name):
+            continue
         if secgroup.name in RO_SECURITY_GROUPS:
             for rule in secgroup.rules:
                 cloud.nova.security_group_rules.delete(rule['id'])
@@ -541,11 +549,11 @@ def cleanup(cloud):
             cloud.nova.security_groups.delete(secgroup.id)
             LOG.info("Deleted secgroup: %s", secgroup._info)
     for network in cloud.nova.networks.list():
+        if not is_prefixed(network.label):
+            continue
         cloud.nova.networks.disassociate(network)
         cloud.nova.networks.delete(network)
         LOG.info("Deleted network: %s", network._info)
-    def is_prefixed(string):
-        return string.startswith(TEST_RESOURCE_PREFIX)
     for user in cloud.keystone.users.list():
         if is_prefixed(user.name):
             cloud.keystone.users.delete(user)
