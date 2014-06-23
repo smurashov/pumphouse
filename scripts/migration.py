@@ -69,6 +69,11 @@ def get_parser():
                                            help="Remove resources from a "
                                                 "destination cloud.")
     cleanup_parser.set_defaults(action="cleanup")
+    cleanup_parser.add_argument("target",
+                                nargs="?",
+                                choices=("source", "destination"),
+                                default="destination",
+                                help="Choose a cloud to clean up.")
     setup_parser = subparsers.add_parser("setup",
                                          help="Create resource in a source "
                                               "cloud for the test purposes.")
@@ -677,8 +682,8 @@ def main():
         migrate_resources(mapping, src, dst)
         LOG.info("Migration mapping: %r", mapping)
     elif args.action == "cleanup":
-        dst = Cloud.from_dict(**args.config["destination"])
-        cleanup(dst)
+        cloud = Cloud.from_dict(**args.config[args.target])
+        cleanup(cloud)
     elif args.action == "setup":
         src = Cloud.from_dict(**args.config["source"])
         setup(src)
