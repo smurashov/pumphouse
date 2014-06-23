@@ -242,7 +242,8 @@ def migrate_network(mapping, src, dst, name):
 
 
 def migrate_servers(mapping, src, dst):
-    for server in src.nova.servers.list():
+    search_opts = {"all_tenants": 1}
+    for server in src.nova.servers.list(search_opts=search_opts):
         migrate_server(mapping, src, dst, server.id)
 
 
