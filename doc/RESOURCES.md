@@ -276,5 +276,33 @@ command (if network manager is `nova-network`)
 
 ##### Migration strategy
 
+For our use case we should support the following strategies of migration of
+virtual server instances:
+
+- *tenant* moves all (or portion of all) virtual servers that belong to the
+  given tenant to the target cloud.
+- *host* moves all virtual servers from the given host to the target cloud
+- *specific* moves only listed servers from the source to the target cloud.
+
+Combination of *tenant* and *host* strategies should also be possible to allow
+for the following goals:
+
+- only move a single tenant at the moment to reduce the effect of
+  maintenance window;
+- don't exhaust capacity of the target cloud, but gradually move nodes to
+  it as more virtual resources are  relocated.
+
 ##### Migration path
 
+Migration path for virtual servers in our case is relatively simple:
+
+- **suspend** the instance in source cloud;
+- **create** corresponding instance with dependency resoucres in target cloud;
+- **verify** that new instance is up and runnning properly, and
+- **shutdown** the instance in source cloud.
+
+Note that in this scenario we do not retain any data stored on the ephemeral
+storage of the original instance. It is possible to do by snapshotting it after
+suspension, and move the snapshot to the target cloud to create the new instance
+off that snapshot. However, this approach will significantly affect the
+performance of migration, while being not necessary for stateless workloads.
