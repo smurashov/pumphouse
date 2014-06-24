@@ -36,3 +36,21 @@ command:
 ```sh
 $ python scripts/migration.py config.yaml cleanup
 ```
+
+## `migrate_host.py` - Host upgrade to Mirantis OpenStack
+
+This script upgrades a hypervisor node from the source cloud to Mirantis
+OpenStack Compute node and attaches it to the target MOS cluster.
+
+Script command format is as follows:
+```sh
+$ migrate_host.py [-h] [-i INVENTORY] [-e ENV_ID] hostname
+```
+
+`INVENTORY` is a YaML formatted file with the inventory of hardware present in
+the environment and some additional configuration information. See `samples/`
+for the example of inventory file. Defaults to `./inventory.yaml`.
+`ENV_ID` is an identifier number of the target Mirantis OpenStack cluster in
+Fuel. Defaults to `1`.
+`hostname` is a reference to host configuration in `'hosts'` section of the
+inventory YaML.
