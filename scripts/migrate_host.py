@@ -122,6 +122,7 @@ class Fuel(object):
         :param node:        Fuel Node object to assign role to
         :param role:        role to assign to the node, defaults to 'compute'
         '''
+
         node.update()
         if node.data['status'] == 'discover':
             self.env.assign((node,), (role,))
@@ -132,20 +133,25 @@ class Fuel(object):
         else:
             LOG.warn("Node already added: %s", node.data)
 
-    def get_next_id(self):
-        next_id = sorted(self.env.get_all_nodes(), key=attrgetter('id'))[-1].id + 1
-        return next_id
-
-    def wait_for_node(self, status, node_id, timeout=300):
+    def wait_for_node(self, status='discover', node_id=0, timeout=300):
         from fuelclient.objects.node import Node
         node = Node(node_id)
         start_time = time.clock()
         while time.clock() < (start_time + timeout):
+            if not node_id:
+                node = sorted(node.get_all(),
+                              key=attrgetter('id'),
+                              reverse=True)[0]
+                if not node.data['cluster']:
+                    return node
+                else:
+                    continue
             try:
                 node.update()
             except urllib2.HTTPError as exc:
                 if exc.code == 404:
-                    sleep(5)
+                    LOG.info("Waiting for node discovery: %s". node_id)
+                    time.sleep(5)
                 else:
                     LOG.exception("Exception while waiting for node: %s",
                                   exc.message)
@@ -154,7 +160,7 @@ class Fuel(object):
                 if node.data['status'] == status:
                     LOG.info("Node in %s status: %s", status, node.data)
                     return node
-                elif node.data['status'] == 'error'
+                elif node.data['status'] == 'error':
                     LOG.exception("Node in 'error' status: %s", node.data)
                     raise Error
         else:
@@ -183,16 +189,15 @@ def main():
         raise Error
 
     fuel = Fuel(fuel_endpoint, env_id)
-    node_id = fuel.get_next_id()
     force_pxeboot(inventory_host)
-    node = fuel.wait_for_node('discover', node_id)
+    node = fuel.wait_for_node('discover')
     fuel.assign_role(node)
     try:
         task = fuel.env.deploy_changes()
     except urllib2.HTTPError as exc:
         LOG.exception("Cannot deploy changes: %s", exc.code)
         raise Error
-    node = fuel.wait_for_node('ready', node_id, 3600)
+    node = fuel.wait_for_node('ready', node.id, 3600)
     LOG.info("Node deployed: %s", node.data)
 
 
