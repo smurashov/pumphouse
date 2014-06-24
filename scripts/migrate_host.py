@@ -114,9 +114,11 @@ class Fuel(object):
         '''
         node.update()
         if node.data['status'] == 'discover':
-            self.env.assign([node], [role])
+            self.env.assign((node,), (role,))
+            LOG.info("Assigned role: %s", node.data)
         elif node.data['status'] == 'error':
-            LOG.err("Node in 'error' status: %s", node.data)
+            LOG.exception("Node in 'error' status: %s", node.data)
+            raise Error
         else:
             LOG.warn("Node already added: %s", node.data)
 
@@ -133,18 +135,22 @@ class Fuel(object):
                 node.update()
             except urllib2.HTTPError as exc:
                 if exc.code == 404:
-                    pass
+                    sleep(5)
                 else:
                     LOG.exception("Exception while waiting for node: %s",
                                   exc.message)
                     raise exc
             else:
-                break
+                if node.data['status'] == status:
+                    LOG.info("Node in %s status: %s", status, node.data)
+                    return node
+                elif node.data['status'] == 'error'
+                    LOG.exception("Node in 'error' status: %s", node.data)
+                    raise Error
         else:
-            LOG.err("Timed out while waiting for node: %s",
+            LOG.exception("Timed out while waiting for node: %s",
                     node_id)
-            return False
-        return node
+            raise TimeoutException
 
 
 def main():
