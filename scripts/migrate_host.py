@@ -177,14 +177,21 @@ def main():
     inventory_host = inventory['hosts'][hostname]
 
     if SOURCE_CLOUD_TAG not in inventory_host['notes']:
-        fuel = Fuel(fuel_endpoint, env_id)
-        node_id = fuel.get_next_id()
-        force_pxeboot(inventory_host)
-        node = fuel.wait_for_node('discover', node_id)
-        if node:
-            fuel.assign_role(node)
-    else:
-        LOG.error("Host is not in source cloud: %s", hostname)
+        LOG.exception("Host not in source cloud: %s", inventory_host)
+        raise Error
+
+    fuel = Fuel(fuel_endpoint, env_id)
+    node_id = fuel.get_next_id()
+    force_pxeboot(inventory_host)
+    node = fuel.wait_for_node('discover', node_id)
+    fuel.assign_role(node)
+    try:
+        task = fuel.env.deploy_changes()
+    except urllib2.HTTPError as exc:
+        LOG.exception("Cannot deploy changes: %s", exc.code)
+        raise Error
+    node = fuel.wait_for_node('ready', node_id, 3600)
+    LOG.info("Node deployed: %s", node.data)
 
 
 if __name__ == "__main__":
