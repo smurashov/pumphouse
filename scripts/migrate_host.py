@@ -46,8 +46,10 @@ def get_parser():
                              "hardware")
     parser.add_argument("-e", "--env-id",
                         default=1,
+                        type=int,
                         help="An ID of target Mirantis OpenStack cloud in Fuel")
     parser.add_argument("hostname",
+                        type=str,
                         help="A host reference of server to migrate as appears "
                         "in the 'hosts' section in INVENTORY file")
     return parser
