@@ -96,6 +96,14 @@ def get_fuel_endpoint(config):
 
 
 class Fuel(object):
+
+    '''Fuel interface class
+
+    :param endpoint:    IP address of Fuel master node
+    :param env_id:      ID of environment for target Mirantis OpenStack cluster
+    :type env_id:       int
+    '''
+
     def __init__(self, endpoint, env_id):
         os.environ['LISTEN_ADDRESS'] = endpoint
         from fuelclient.objects.environment import Environment
