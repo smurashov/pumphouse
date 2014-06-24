@@ -44,7 +44,7 @@ OpenStack Compute node and attaches it to the target MOS cluster.
 
 Script command format is as follows:
 ```sh
-$ migrate_host.py [-h] [-i INVENTORY] [-e ENV_ID] hostname
+$ python scripts/migrate_host.py [-h] [-i INVENTORY] [-e ENV_ID] hostname
 ```
 
 `INVENTORY` is a YaML formatted file with the inventory of hardware present in

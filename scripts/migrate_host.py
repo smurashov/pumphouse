@@ -48,8 +48,8 @@ def get_parser():
                         default=1,
                         help="An ID of target Mirantis OpenStack cloud in Fuel")
     parser.add_argument("hostname",
-                        default=None,
-                        help="A hypervisor hostname of server to migrate")
+                        help="A host reference of server to migrate as appears "
+                        "in the 'hosts' section in INVENTORY file")
     return parser
 
 
