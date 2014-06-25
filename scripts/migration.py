@@ -726,6 +726,22 @@ def get_ids_by_tenant(cloud, resource_type, tenant_id):
 # of the given type if possible (migration strategy 'all')
 def get_all_resource_ids(cloud, resource_type):
     ids = []
+    if resource_type == 'tenants':
+        ids = [tenant.id for tenant in cloud.keystone.tenants.list()]
+    elif resource_type == 'roles':
+        ids = [role.id for role in cloud.keystone.roles.list()]
+    elif resource_type == 'users':
+        ids = [user.id for user in 
+               cloud.keystone.users.list()]
+    elif resource_type == 'images':
+        ids = [image.id for image in cloud.glance.images.list()]
+    elif resource_type == 'servers':
+        ids = [server.id for image in
+               cloud.nova.list(search_opts={'all-tenants': 1})]
+    elif resource_type == 'flavors':
+        ids = [flavor.id for flavor in cloud.nova.flavors.list()]
+    elif resource_type == 'security_groups':
+        ids = [secgroup.id for secgroup in cloud.nova.security_groups.list()]
     return ids
 
 
