@@ -78,6 +78,12 @@ def get_parser():
                                          help="Create resource in a source "
                                               "cloud for the test purposes.")
     setup_parser.set_defaults(action="setup")
+    evacuate_parser = subparsers.add_parser("evacuate",
+                                            help="Evacuate instances from "
+                                                 "the given host.")
+    evacuate_parser.set_defaults(action="evacuate")
+    evacuate_parser.add_argument("host",
+                                 help="The source host of the evacuation")
     return parser
 
 
@@ -523,6 +529,32 @@ def migrate(mapping, src, dst):
     update_users_passwords(mapping, src, dst)
 
 
+def evacuate(cloud, host):
+    binary = "nova-compute"
+    try:
+        hypervs = cloud.nova.hypervisors.search(host, servers=True)
+    except nova_excs.NotFound:
+        LOG.exception("Could not find hypervisors at the host %r.", host)
+    else:
+        if len(hypervs) > 1:
+            LOG.warning("More than one hypervisor found at the host: %s",
+                        host)
+        import pdb; pdb.set_trace()
+        for hyperv in hypervs:
+            details = cloud.nova.hypervisors.get(hyperv.id)
+            host = details.service["host"]
+            cloud.nova.services.disable(host, binary)
+            try:
+                for server in hyperv.servers:
+                    cloud.nova.servers.live_migrate(server["uuid"], None,
+                                                    True, False)
+            except Exception:
+                LOG.exception("An error occured during evacuation servers "
+                              "from the host %r", host)
+                cloud.nova.services.enable(host, binary)
+
+
+
 def cleanup(cloud):
     def is_prefixed(string):
         return string.startswith(TEST_RESOURCE_PREFIX)
@@ -683,6 +715,9 @@ def main():
     elif args.action == "setup":
         src = Cloud.from_dict(**args.config["source"])
         setup(src)
+    elif args.action == "evacuate":
+        cloud = Cloud.from_dict(**args.config["source"])
+        evacuate(cloud, args.host)
 
 
 if __name__ == "__main__":
