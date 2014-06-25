@@ -733,8 +733,6 @@ def get_ids_by_tenant(cloud, resource_type, tenant_id):
     return ids
 
 
-# TODO(ogelbukh): implement this function to support migration of all resources
-# of the given type if possible (migration strategy 'all')
 def get_all_resource_ids(cloud, resource_type):
 
     '''This function implements migration strategy 'all'
