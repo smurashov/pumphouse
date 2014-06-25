@@ -752,7 +752,7 @@ def main():
         src = Cloud.from_dict(**args.config["source"])
         dst = Cloud.from_dict(**args.config["destination"])
         migrate_resources = RESOURCES_MIGRATIONS[args.resource]
-        if args.ids > 0:
+        if args.ids:
             ids = args.ids
         elif args.tenant:
             ids = get_ids_by_tenant(src, args.resource, args.tenant)
