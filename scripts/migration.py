@@ -703,6 +703,17 @@ def setup(cloud):
 
 
 def get_ids_by_tenant(cloud, resource_type, tenant_id):
+
+    '''This function implements migration strategy 'tenant'
+
+    For those types of resources that support grouping by tenant, this function
+    returns a list of IDs of resources owned by the given tenant.
+
+    :param cloud:           a collection of clients to talk to cloud services
+    :param resource_type:   a type of resources designated for migration
+    :param tenant_id:       an identifier of tenant that resources belong to
+    '''
+
     ids = []
     if resource_type == 'users':
         users = cloud.keystone.users.list(tenant_id=tenant_id)
@@ -725,6 +736,16 @@ def get_ids_by_tenant(cloud, resource_type, tenant_id):
 # TODO(ogelbukh): implement this function to support migration of all resources
 # of the given type if possible (migration strategy 'all')
 def get_all_resource_ids(cloud, resource_type):
+
+    '''This function implements migration strategy 'all'
+
+    It rerurns a list of IDs of all resources of the given type in source
+    cloud.
+
+    :param cloud:            a collection of clients to talk to cloud services
+    :param resource_type:    a type of resources designated for migration
+    '''
+
     ids = []
     if resource_type == 'tenants':
         ids = [tenant.id for tenant in cloud.keystone.tenants.list()]
