@@ -33,7 +33,7 @@ cloud, or only tenants that have resources. Instances could be migrated on
 per-tenant, per-host or per-application basis, or any others. See below for the
 list of currently supported strategies.
 
-Pumphouse supports the following strategies for all resources:
+On the low level, Pumphouse provides following strategies:
 
 - **all** moves all resources of this type to the target cloud, if it is allowed
   by the target capacity. Implementation of this strategy should support
@@ -54,6 +54,25 @@ Pumphouse supports the following strategies for all resources:
   multiple instances based on it, etc.
 - **host** strategy filters resources that are associated with particular
   hypervisor hosts (usually virtual servers).
+
+#### Resource categories
+
+On a higher level, all resources could be categorized into two major categories:
+
+* **workload resources** are directly added to workload and explicitly grouped
+  by the workload. Servers that execute user processes and volumes that store
+  user data are workload resources.
+* **supplementary resources** provide facilities needed for workload resources. All
+  other resources are supplementary, including images, flavors, networks etc.
+
+This distinction makes sense primarily for the user interface of Pumphouse
+application. From the standpoint of migration of workloads from one cloud to
+another, it is usually doesn't make sense to migrate supplementary resources
+individually (although we provide this function in our application). Normally,
+one chooses from 2 strategies for supplementary resources:
+
+* replicate **all** supplementary resources from source cloud to target;
+* only move resources that migrated workload resources **depend** on.
 
 #### Migration path
 
