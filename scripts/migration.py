@@ -78,7 +78,7 @@ def get_parser():
     migrate_filter.add_argument("--host",
                                 default=None,
                                 help="Specify hypervisor hostname to filter "
-                                     "servers designated for migration."
+                                     "servers designated for migration.")
     cleanup_parser = subparsers.add_parser("cleanup",
                                            help="Remove resources from a "
                                                 "destination cloud.")
