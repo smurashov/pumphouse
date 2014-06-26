@@ -812,6 +812,8 @@ def main():
             ids = args.ids
         elif args.tenant:
             ids = get_ids_by_tenant(src, args.resource, args.tenant)
+        elif args.host:
+            ids = get_ids_by_host(src, args.resource, args.host)
         else:
             ids = get_all_resource_ids(src, args.resource)
         migrate_resources(mapping, src, dst, ids)
