@@ -523,6 +523,32 @@ def migrate_roles(mapping, src, dst):
         migrate_role(mapping, src, dst, role.id)
 
 
+def migrate_floating_ip(mapping, src, dst, ip):
+
+    '''Create IP address in floating IP address pool in destination cloud
+
+    Creates IP address if it does not exist. Creates a pool in destination cloud
+    as well if it does not exist.
+
+    :param mapping:     dict mapping entity ids in source and target clouds
+    :param src:         Cloud object representing source cloud
+    :param dst:         Cloud object representing destination cloud
+    :param ip:          IP address
+    :type ip:           string
+    '''
+
+    floating_ip0 = src.nova.floating_ips_bulk.find(address=ip)
+    ip_pool0 = src.nova.floating_ip_pools.find(name=floating_ip0.pool)
+    try:
+        floating_ip1 = dst.nova.floating_ips_bulk.find(address=ip)
+    except nova_excs.NotFound:
+        floating_ip1 = dst.nova.floating_ips_bulk.create(floating_ip0.address,
+                                                         ip_pool0.name)
+        LOG.info("Created: %s", floating_ip1._info)
+    else:
+        LOG.warn("Already exists, %s", floating_ip1._info)
+    return floating_ip1
+
 def migrate(mapping, src, dst):
     migrate_users(mapping, src, dst)
     migrate_servers(mapping, src, dst)
