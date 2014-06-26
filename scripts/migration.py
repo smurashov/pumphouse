@@ -716,20 +716,37 @@ def get_ids_by_tenant(cloud, resource_type, tenant_id):
 
     ids = []
     if resource_type == 'users':
-        users = cloud.keystone.users.list(tenant_id=tenant_id)
-        for user in users:
-            ids.append(user.id)
+        ids = [ user.id for user in
+                cloud.keystone.users.list(tenant_id=tenant_id) ]
     elif resource_type == 'images':
-        images = cloud.glance.images.list(filters={'owner': tenant_id})
-        for image in images:
-            ids.append(image.id)
+        ids = [ image.id for image in
+                cloud.glance.images.list(filters={'owner': tenant_id}) ]
     elif resource_type == 'servers':
-        servers = cloud.nova.servers.list(search_opts={'all_tenants': 1,
-                                                       'tenant': tenant_id})
-        for server in servers:
-            ids.append(server.id)
+        ids = [ server.id for server in
+                cloud.nova.servers.list(search_opts={'all_tenants': 1,
+                                                     'tenant': tenant_id}) ]
     else:
         LOG.warn("Cannot group %s by tenant", resource_type)
+    return ids
+
+
+def get_ids_by_host(cloud, resource_type, hostname):
+
+    '''Selects servers for migration based on hostname of hypervisor
+
+    :param cloud:           a collection of clients to talk to cloud services
+    :param resource_type:   a type of resources designated for migration
+    :param hostname:        a name of physical servers that hosts resources
+    '''
+
+    ids = []
+    if resource_type == 'servers':
+        ids = [ server.id for server in
+                cloud.nova.servers.list(
+                            search_opts={'all_tenants': 1,
+                                         'hypervisor_name': hostname}) ]
+    else:
+        LOG.warn("Cannot group %s by host", resource_type)
     return ids
 
 
