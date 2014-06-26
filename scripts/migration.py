@@ -74,7 +74,11 @@ def get_parser():
                                 default=None,
                                 help="Specify ID of a tenant which should be "
                                      "moved to destination cloud with all it's "
-                                     "resources")
+                                     "resources.")
+    migrate_filter.add_argument("--host",
+                                default=None,
+                                help="Specify hypervisor hostname to filter "
+                                     "servers designated for migration."
     cleanup_parser = subparsers.add_parser("cleanup",
                                            help="Remove resources from a "
                                                 "destination cloud.")
