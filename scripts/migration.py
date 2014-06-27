@@ -196,7 +196,7 @@ def migrate_server(mapping, src, dst, id):
     for n_label, n_params in addresses.iteritems():
         n1 = migrate_network(mapping, src, dst, n_label)
         fixed_ip = n_params[0]
-        floating_ips[fixed_ip] = n_params[1:]
+        floating_ips[fixed_ip["addr"]] = n_params[1:]
         nics.append({
             "net-id": n1.id,
             "v4-fixed-ip": fixed_ip["addr"],
@@ -219,14 +219,22 @@ def migrate_server(mapping, src, dst, id):
     mapping[s0.id] = s1.id
     LOG.info("Created: %s", s1._info)
     for fixed_ip in floating_ips:
-        for floating_ip in floating_ips[fixed_ip]:
+        for floating_ip_dict in floating_ips[fixed_ip]:
             floating_ip1 = migrate_floating_ip(mapping,
                                                src,
                                                dst,
-                                               floating_ip["address"])
-            s1.add_floating_ip(floating_ip1.address,
-                               fixed_ip["address"])
-            s1 = nova.servers.get(s1)
+                                               floating_ip_dict["addr"])
+            while True:
+                try:
+                    s1.add_floating_ip(floating_ip1.address,
+                                       fixed_ip)
+                except nova_excs.BadRequest:
+                    LOG.warn("Network info not ready for instance: %s",
+                             s1._info)
+                    continue
+                else:
+                    break
+            s1 = dst.nova.servers.get(s1)
             LOG.info("Assigned floating ip %s to server: %s",
                      floating_ip1.address,
                      s1._info)
