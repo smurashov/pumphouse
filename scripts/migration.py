@@ -564,9 +564,15 @@ def migrate_floating_ip(mapping, src, dst, ip):
     try:
         floating_ip1 = dst.nova.floating_ips_bulk.find(address=ip)
     except nova_excs.NotFound:
-        floating_ip1 = dst.nova.floating_ips_bulk.create(floating_ip0.address,
-                                                         ip_pool0.name)
-        LOG.info("Created: %s", floating_ip1._info)
+        dst.nova.floating_ips_bulk.create(floating_ip0.address,
+                                          pool=ip_pool0.name)
+        try:
+            floating_ip1 = dst.nova.floating_ips_bulk.find(address=ip)
+        except nova_exc.NotFound:
+            LOG.exception("Not added: %s", ip)
+            raise Error
+        else:
+            LOG.info("Created: %s", floating_ip1._info)
     else:
         LOG.warn("Already exists, %s", floating_ip1._info)
     return floating_ip1
