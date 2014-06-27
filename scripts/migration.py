@@ -194,6 +194,8 @@ def migrate_server(mapping, src, dst, id):
     addresses = s0.addresses
     for n_label, n_params in addresses.iteritems():
         n1 = migrate_network(mapping, src, dst, n_label)
+        # TODO (ogelbukh) Add logic here to handle floating IP addresses
+        # properly
         for n_param in n_params:
             nics.append({
                 "net-id": n1.id,
@@ -216,6 +218,7 @@ def migrate_server(mapping, src, dst, id):
         raise
     mapping[s0.id] = s1.id
     LOG.info("Created: %s", s1._info)
+    # TODO(ogelbukh) Migrate and assign a floating IP if source node has one.
     return s1
 
 
