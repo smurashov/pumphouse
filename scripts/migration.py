@@ -192,15 +192,17 @@ def migrate_server(mapping, src, dst, id):
     nics = []
     i1 = migrate_image(mapping, src, dst, s0.image["id"])
     addresses = s0.addresses
+    floating_ips = dict()
     for n_label, n_params in addresses.iteritems():
         n1 = migrate_network(mapping, src, dst, n_label)
         # TODO (ogelbukh) Add logic here to handle floating IP addresses
         # properly
-        for n_param in n_params:
-            nics.append({
-                "net-id": n1.id,
-                "v4-fixed-ip": n_param["addr"],
-            })
+        fixed_ip = n_params[0]
+        floating_ips[fixed_ip] = n_params[1:]
+        nics.append({
+            "net-id": n1.id,
+            "v4-fixed-ip": fixed_ip["addr"],
+        })
     try:
         src.nova.servers.suspend(s0)
         LOG.info("Suspended: %s", s0._info)
@@ -219,6 +221,18 @@ def migrate_server(mapping, src, dst, id):
     mapping[s0.id] = s1.id
     LOG.info("Created: %s", s1._info)
     # TODO(ogelbukh) Migrate and assign a floating IP if source node has one.
+    for fixed_ip in floating_ips:
+        for floating_ip in floating_ips[fixed_ip]:
+            floating_ip1 = migrate_floating_ip(mapping,
+                                               src,
+                                               dst,
+                                               floating_ip["address"])
+            s1.add_floating_ip(floating_ip1.address,
+                               fixed_ip["address"])
+            s1 = nova.servers.get(s1)
+            LOG.info("Assigned floating ip %s to server: %s",
+                     floating_ip1.address,
+                     s1._info)
     return s1
 
 
