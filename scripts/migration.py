@@ -716,6 +716,8 @@ def get_ids_by_tenant(cloud, resource_type, tenant_id):
     :param cloud:           a collection of clients to talk to cloud services
     :param resource_type:   a type of resources designated for migration
     :param tenant_id:       an identifier of tenant that resources belong to
+    :returns:               a list of IDs of resources according to passed
+                            resource type
     '''
 
     ids = []
