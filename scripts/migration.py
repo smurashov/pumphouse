@@ -231,6 +231,7 @@ def migrate_server(mapping, src, dst, id):
                 except nova_excs.BadRequest:
                     LOG.warn("Network info not ready for instance: %s",
                              s1._info)
+                    time.sleep(1)
                     continue
                 else:
                     break
