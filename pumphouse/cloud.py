@@ -1,76 +1,149 @@
+import collections
 import copy
+import sqlalchemy as sqla
 
-from pumphouse.services.base import Service
-from pumphouse.resources.base import Resource
+from novaclient.v1_1 import client as nova_client
+from novaclient import exceptions as nova_excs
+
+from keystoneclient.v2_0 import client as keystone_client
+from keystoneclient.openstack.common.apiclient import exceptions as keystone_excs
+
+from glanceclient import client as glance
+from glanceclient import exc as glance_excs
+
+
+class Identity(collections.Mapping):
+    select_query = sqla.text("SELECT id, password FROM user "
+                             "WHERE id = :user_id")
+    update_query = sqla.text("UPDATE user SET password = :password "
+                             "WHERE id = :user_id")
+
+    def __init__(self, connection):
+        self.engine = sqla.create_engine(connection)
+        self.hashes = {}
+
+    def fetch(self, user_id):
+        """Fetch a hash of user's password."""
+        users = self.engine.execute(self.select_query, user_id=user_id)
+        for _, password in users:
+            self.hashes[user_id] = password
+            return password
+
+    def push(self):
+        """Push hashes of users' passwords."""
+        with self.engine.begin() as conn:
+            for user_id, password in self.hashes.iteritems():
+                conn.execute(self.update_query,
+                             user_id=user_id, password=password)
+
+    def __len__(self):
+        return len(self.hashes)
+
+    def __iter__(self):
+        return iter(self.hashes)
+
+    def __getitem__(self, user_id):
+        if user_id not in self.hashes:
+            password = self.fetch(user_id)
+            self.hashes[user_id] = password
+        else:
+            password = self.hashes[user_id]
+        return password
+
+    def update(self, iterable):
+        for user_id, password in iterable:
+            self.hashes[user_id] = password
+
+
+class Namespace(object):
+    __slots__ = ("username", "password", "tenant_name", "auth_url")
+
+    def __init__(self, username=None, password=None, tenant_name=None, auth_url=None):
+        self.username = username
+        self.password = password
+        self.tenant_name = tenant_name
+        self.auth_url = auth_url
+
+    def to_dict(self):
+        return dict((attr, getattr(self, attr)) for attr in self.__slots__)
+
+    def restrict(self, *nspace, **attrs):
+        def nspace_getter(x, y, z):
+            return getattr(x, y, z)
+
+        def attrs_getter(x, y, z):
+            return x.get(y, z)
+
+        def restrict_by(attrs, getter):
+            namespace = Namespace()
+            for attr in self.__slots__:
+                value = getter(attrs, attr, None)
+                if value is None:
+                    value = getattr(self, attr)
+                setattr(namespace, attr, value)
+            return namespace
+        return restrict_by(*((nspace[0], nspace_getter)
+                             if nspace else
+                             (attrs, attrs_getter)))
+
+    def __repr__(self):
+        return ("<Namespace(username={!r}, password={!r}, tenant_name={!r}, "
+                "auth_url={!r})>"
+                .format(self.username, self.password, self.tenant_name,
+                        self.auth_url))
+
+    def __eq__(self, other):
+        return (self.username == other.username and
+                self.password == other.password and
+                self.tenant_name == other.tenant_name and
+                self.auth_url == other.auth_url)
 
 
 class Cloud(object):
 
-    """Describes a cloud involved in migration process.
+    """Describes a cloud involved in migration process
 
     Both source and destination clouds are instances of this class.
 
-    :param endpoint: dictionary of OpenStack credentials to access the cloud.
-    :type endpoint: dict
-    :endpoint[username]: name of user with administrative permissions.
-    :endpoint[password]: password of the user.
-    :endpoint[tenant_name]: name of administrative tenant (usually 'admin').
-    :endpoint[auth_url]: URL of Keystone service (e.g. 'http://example.com:5000/v2.0').
-
+    :param cloud_ns:    an administrative credentials namespace of the cloud
+    :type cloud_ns:     object
+    :param user_ns:     a restricted user credentials namespace
+    :type user_ns:      object
+    :param identity:    optional dictionary or object containing access
+                        credentials
     """
 
-    def __init__(self, endpoint, services=None, resources=None):
-        self.endpoint = endpoint
-        self.services = services or dict(Service.discover(self.endpoint))
-
-    def discover(self, resource_class, resource_id):
-    
-        """Get resource by it's type and ID.
-
-        :param resource_class: the type of resource to be returned, e.g. Flavor or Tenant.
-        :type resource_class: str.
-        :param resource_id: the UUID or ID of resource to be returned.
-        :type resource_id: str.
-        :returns: resource instance - resource discovered according to parameters.
-
-        """
-
-        resource_classes = Resource.defined_resources()
-        print resource_classes
-        if resource_class in resource_classes:
-            service_name = resource_classes[resource_class].service.__name__
-            if service_name.lower() in self.services:
-                client = self.services[service_name.lower()]
-                print client
-                resource = resource_classes[resource_class].discover(client, resource_id)
-                print resource
-                return resource
-            else:
-                return None
-
-    def _convert(self, resource):
-        nresource = copy.deepcopy(resource)
-        nresource.service = self.services(resource.service.type)
-        return nresource
-    
-    @classmethod
-    def migrate(cls, resource):
-    
-        """Migrates resource from source cloud to destination cloud.
-
-        Must be called from the destination Cloud instance.
-        :param resource: the instance of resource in the source cloud to be moved.
-        :type resource: object.
-
-        """
-
-        src = resource
-        dst = cls._convert(src)
-        dst = cls.discover(dst)
-        if src == dst:
-            return dst
-        elif not dst:
-            dst.migrate()
+    def __init__(self, cloud_ns, user_ns, identity):
+        self.cloud_ns = cloud_ns
+        self.user_ns = user_ns
+        self.access_ns = cloud_ns.restrict(user_ns)
+        self.nova = nova_client.Client(self.access_ns.username,
+                                       self.access_ns.password,
+                                       self.access_ns.tenant_name,
+                                       self.access_ns.auth_url,
+                                       "compute")
+        self.keystone = keystone_client.Client(**self.access_ns.to_dict())
+        g_endpoint = self.keystone.service_catalog.get_endpoints()["image"][0]
+        self.glance = glance.Client("2",
+                                    endpoint=g_endpoint["publicURL"],
+                                    token=self.keystone.auth_token)
+        if isinstance(identity, Identity):
+            self.identity = identity
         else:
-            
-            raise Exception('Duplicate resources exist in src and dst clouds')
+            self.identity = Identity(**identity)
+
+    def restrict(self, user_ns):
+        return Cloud(self.cloud_ns, user_ns, self.identity)
+
+    @classmethod
+    def from_dict(cls, endpoint, identity):
+        cloud_ns = Namespace(auth_url=endpoint["auth_url"])
+        user_ns = Namespace(
+            username=endpoint["username"],
+            password=endpoint["password"],
+            tenant_name=endpoint["tenant_name"],
+        )
+        return cls(cloud_ns, user_ns, identity)
+
+    def __repr__(self):
+        return "<Cloud(namespace={!r})>".format(self.access_ns)
