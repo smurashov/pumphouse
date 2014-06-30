@@ -15,7 +15,7 @@ LOG = logging.getLogger(__name__)
 SOURCE_CLOUD_TAG = 'source'
 FUEL_MASTER_NODE_TAG = 'fuel.master'
 FUEL_API_IFACE_TAG = 'fuel.api'
-DEFAULT_INVENTORY_FILE='inventory.yaml'
+DEFAULT_INVENTORY_FILE = 'inventory.yaml'
 
 
 class Error(Exception):
@@ -36,9 +36,9 @@ def safe_load_yaml(filename):
 
 
 def get_parser():
-    parser = argparse.ArgumentParser(description="Migrates physical servers from "
-                                                 "OpenStack cloud to Mirantis "
-                                                 "OpenStack cloud.")
+    parser = argparse.ArgumentParser(description="Migrates physical servers "
+                                                 "from OpenStack cloud to "
+                                                 "Mirantis OpenStack cloud.")
     parser.add_argument("-i", "--inventory",
                         default=None,
                         type=safe_load_yaml,
@@ -47,11 +47,12 @@ def get_parser():
     parser.add_argument("-e", "--env-id",
                         default=1,
                         type=int,
-                        help="An ID of target Mirantis OpenStack cloud in Fuel")
+                        help="An ID of target Mirantis "
+                             "OpenStack cloud in Fuel")
     parser.add_argument("hostname",
                         type=str,
-                        help="A host reference of server to migrate as appears "
-                        "in the 'hosts' section in INVENTORY file")
+                        help="A host reference of server to migrate as it "
+                        "appears in the 'hosts' section in INVENTORY file")
     return parser
 
 
@@ -115,7 +116,8 @@ class Fuel(object):
 
         '''Deploy compute node to Mirantis OpenStack cluster via Fuel API
 
-        This function adds a host to Mirantis OpenStack cluster as a Compute node.
+        This function adds a host to Mirantis OpenStack cluster as a Compute
+        node.
         It finds node defined by its ID in Fuel API, verifies that it is in
         'discover' status and assigns 'compute' role to it.
 
@@ -165,7 +167,7 @@ class Fuel(object):
                     raise Error
         else:
             LOG.exception("Timed out while waiting for node: %s",
-                    node_id)
+                          node_id)
             raise TimeoutException
 
 
@@ -193,7 +195,7 @@ def main():
     node = fuel.wait_for_node('discover')
     fuel.assign_role(node)
     try:
-        task = fuel.env.deploy_changes()
+        fuel.env.deploy_changes()
     except urllib2.HTTPError as exc:
         LOG.exception("Cannot deploy changes: %s", exc.code)
         raise Error

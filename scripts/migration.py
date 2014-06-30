@@ -8,21 +8,13 @@ import time
 import urllib
 import yaml
 
-import sqlalchemy as sqla
-
 sys.path.append('../pumphouse')
-from pumphouse.cloud import Identity
 from pumphouse.cloud import Namespace
 from pumphouse.cloud import Cloud
 
-from novaclient.v1_1 import client as nova_client
 from novaclient import exceptions as nova_excs
-
-from keystoneclient.v2_0 import client as keystone_client
-from keystoneclient.openstack.common.apiclient import exceptions as keystone_excs
-
-from glanceclient import client as glance
-from glanceclient import exc as glance_excs
+from keystoneclient.openstack.common.apiclient import exceptions \
+    as keystone_excs
 
 
 LOG = logging.getLogger(__name__)
@@ -30,7 +22,8 @@ RO_SECURITY_GROUPS = ['default']
 SERVICE_TENANT_NAME = 'services'
 BUILTIN_ROLES = ('service', 'admin', '_member_')
 
-TEST_IMAGE_URL = 'http://download.cirros-cloud.net/0.3.2/cirros-0.3.2-x86_64-disk.img'
+TEST_IMAGE_URL = ("http://download.cirros-cloud.net/0.3.2/"
+                  "cirros-0.3.2-x86_64-disk.img")
 TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
 TEST_RESOURCE_PREFIX = "pumphouse-test"
 
@@ -79,8 +72,8 @@ def get_parser():
     migrate_filter.add_argument("-t", "--tenant",
                                 default=None,
                                 help="Specify ID of a tenant which should be "
-                                     "moved to destination cloud with all it's "
-                                     "resources.")
+                                     "moved to destination cloud with all "
+                                     "it's resources.")
     migrate_filter.add_argument("--host",
                                 default=None,
                                 help="Specify hypervisor hostname to filter "
