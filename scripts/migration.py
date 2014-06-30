@@ -208,13 +208,15 @@ def migrate_server(mapping, src, dst, id):
     nics = []
     i1 = migrate_image(mapping, src, dst, s0.image["id"])
     addresses = s0.addresses
+    floating_ips = dict()
     for n_label, n_params in addresses.iteritems():
         n1 = migrate_network(mapping, src, dst, n_label)
-        for n_param in n_params:
-            nics.append({
-                "net-id": n1.id,
-                "v4-fixed-ip": n_param["addr"],
-            })
+        fixed_ip = n_params[0]
+        floating_ips[fixed_ip["addr"]] = n_params[1:]
+        nics.append({
+            "net-id": n1.id,
+            "v4-fixed-ip": fixed_ip["addr"],
+        })
     try:
         src.nova.servers.suspend(s0)
         LOG.info("Suspended: %s", s0._info)
@@ -232,6 +234,27 @@ def migrate_server(mapping, src, dst, id):
         raise
     mapping[s0.id] = s1.id
     LOG.info("Created: %s", s1._info)
+    for fixed_ip in floating_ips:
+        for floating_ip_dict in floating_ips[fixed_ip]:
+            floating_ip1 = migrate_floating_ip(mapping,
+                                               src,
+                                               dst,
+                                               floating_ip_dict["addr"])
+            while True:
+                try:
+                    s1.add_floating_ip(floating_ip1.address,
+                                       fixed_ip)
+                except nova_excs.BadRequest:
+                    LOG.warn("Network info not ready for instance: %s",
+                             s1._info)
+                    time.sleep(1)
+                    continue
+                else:
+                    break
+            s1 = dst.nova.servers.get(s1)
+            LOG.info("Assigned floating ip %s to server: %s",
+                     floating_ip1.address,
+                     s1._info)
     return s1
 
 
@@ -544,6 +567,38 @@ def migrate_roles(mapping, src, dst, ids):
         if role.id in ids:
             migrate_role(mapping, src, dst, role.id)
 
+
+def migrate_floating_ip(mapping, src, dst, ip):
+
+    '''Create IP address in floating IP address pool in destination cloud
+
+    Creates IP address if it does not exist. Creates a pool in destination cloud
+    as well if it does not exist.
+
+    :param mapping:     dict mapping entity ids in source and target clouds
+    :param src:         Cloud object representing source cloud
+    :param dst:         Cloud object representing destination cloud
+    :param ip:          IP address
+    :type ip:           string
+    '''
+
+    floating_ip0 = src.nova.floating_ips_bulk.find(address=ip)
+    ip_pool0 = src.nova.floating_ip_pools.find(name=floating_ip0.pool)
+    try:
+        floating_ip1 = dst.nova.floating_ips_bulk.find(address=ip)
+    except nova_excs.NotFound:
+        dst.nova.floating_ips_bulk.create(floating_ip0.address,
+                                          pool=ip_pool0.name)
+        try:
+            floating_ip1 = dst.nova.floating_ips_bulk.find(address=ip)
+        except nova_exc.NotFound:
+            LOG.exception("Not added: %s", ip)
+            raise Error
+        else:
+            LOG.info("Created: %s", floating_ip1._info)
+    else:
+        LOG.warn("Already exists, %s", floating_ip1._info)
+    return floating_ip1
 
 def migrate(mapping, src, dst):
     migrate_users(mapping, src, dst)
