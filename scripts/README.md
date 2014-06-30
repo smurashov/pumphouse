@@ -27,14 +27,23 @@ $ python scripts/migration.py config.yaml setup
 Then run migration script as follows:
 
 ```sh
-$ pyhon scripts/migration.py config.yaml migrate
+$ pyhon scripts/migration.py config.yaml migrate <resource_class>
 ```
 
-If you need to clean your target cloud up, run migration script with `cleanup`
-command:
+`<resource_class>` could be one of the following:
+
+* `servers`
+* `tenants`
+* `users`
+* `roles`
+* `flavors`
+* `images`
+
+If you need to clean your source or target cloud up, run migration script 
+with `cleanup` command and specify which cloud you want to clean up:
 
 ```sh
-$ python scripts/migration.py config.yaml cleanup
+$ python scripts/migration.py config.yaml cleanup { source | destination }
 ```
 
 ## `migrate_host.py` - Host upgrade to Mirantis OpenStack
