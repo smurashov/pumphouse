@@ -1,11 +1,11 @@
 import argparse
 import logging
 import urllib2
-import yaml
-
 
 from pumphouse import baremetal
 from pumphouse import exceptions
+
+from . import utils
 
 
 LOG = logging.getLogger(__name__)
@@ -16,18 +16,13 @@ FUEL_API_IFACE_TAG = 'fuel.api'
 DEFAULT_INVENTORY_FILE = 'inventory.yaml'
 
 
-def safe_load_yaml(filename):
-    with open(filename) as f:
-        return yaml.safe_load(f.read())
-
-
 def get_parser():
     parser = argparse.ArgumentParser(description="Migrates physical servers "
                                                  "from OpenStack cloud to "
                                                  "Mirantis OpenStack cloud.")
     parser.add_argument("-i", "--inventory",
                         default=None,
-                        type=safe_load_yaml,
+                        type=utils.safe_load_yaml,
                         help="A filename of an inventory of datacenter "
                              "hardware")
     parser.add_argument("-e", "--env-id",
@@ -40,11 +35,6 @@ def get_parser():
                         help="A host reference of server to migrate as it "
                         "appears in the 'hosts' section in INVENTORY file")
     return parser
-
-
-def read_configuration(stream):
-    with stream as f:
-        return yaml.safe_load(f.read())
 
 
 def get_fuel_endpoint(config):
@@ -69,7 +59,7 @@ def main():
     if args.inventory is not None:
         inventory = args.inventory
     else:
-        inventory = safe_load_yaml(DEFAULT_INVENTORY_FILE)
+        inventory = utils.safe_load_yaml(DEFAULT_INVENTORY_FILE)
     fuel_endpoint = get_fuel_endpoint(inventory)
     inventory_host = inventory['hosts'][hostname]
 
