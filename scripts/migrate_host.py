@@ -3,11 +3,16 @@ import logging
 import os
 import pyipmi
 import pyipmi.bmc
+import sys
 import time
 import urllib2
 import yaml
 
+sys.path.append('../pumphouse')
 from operator import attrgetter
+
+from pumphouse.baremetal import Fuel
+from pumphouse.baremetal import IPMI
 
 
 LOG = logging.getLogger(__name__)
@@ -61,31 +66,6 @@ def read_configuration(stream):
         return yaml.safe_load(f.read())
 
 
-def get_bmc(ipmi):
-    host = ipmi['host']
-    username = ipmi['auth']['user']
-    password = ipmi['auth']['password']
-    bmc = pyipmi.make_bmc(pyipmi.bmc.LanBMC,
-                          hostname=host,
-                          username=username,
-                          password=password)
-    return bmc
-
-
-def force_pxeboot(host):
-    host = get_bmc(host['ipmi'])
-    try:
-        host.set_bootdev('pxe')
-    except Exception as exc:
-        LOG.exception("Cannot set boot device to PXE: %s", exc.message)
-    try:
-        host.set_chassis_power('reset')
-    except Exception as exc:
-        LOG.exception("Cannot reset host %s: %s",
-                      host['ipmi']['host'],
-                      exc.message)
-
-
 def get_fuel_endpoint(config):
     for host_ref in config['hosts']:
         host = config['hosts'][host_ref]
@@ -96,79 +76,6 @@ def get_fuel_endpoint(config):
         if FUEL_API_IFACE_TAG in iface['tags']:
             endpoint = iface['ip'][0]
     return endpoint
-
-
-class Fuel(object):
-
-    '''Fuel interface class
-
-    :param endpoint:    IP address of Fuel master node
-    :param env_id:      ID of environment for target Mirantis OpenStack cluster
-    :type env_id:       int
-    '''
-
-    def __init__(self, endpoint, env_id):
-        os.environ['LISTEN_ADDRESS'] = endpoint
-        from fuelclient.objects.environment import Environment
-        self.env = Environment(env_id)
-
-    def assign_role(self, node, role='compute'):
-
-        '''Deploy compute node to Mirantis OpenStack cluster via Fuel API
-
-        This function adds a host to Mirantis OpenStack cluster as a Compute
-        node.
-        It finds node defined by its ID in Fuel API, verifies that it is in
-        'discover' status and assigns 'compute' role to it.
-
-        :param node:        Fuel Node object to assign role to
-        :param role:        role to assign to the node, defaults to 'compute'
-        '''
-
-        node.update()
-        if node.data['status'] == 'discover':
-            self.env.assign((node,), (role,))
-            LOG.info("Assigned role: %s", node.data)
-        elif node.data['status'] == 'error':
-            LOG.exception("Node in 'error' status: %s", node.data)
-            raise Error
-        else:
-            LOG.warn("Node already added: %s", node.data)
-
-    def wait_for_node(self, status='discover', node_id=0, timeout=300):
-        from fuelclient.objects.node import Node
-        node = Node(node_id)
-        start_time = time.clock()
-        while time.clock() < (start_time + timeout):
-            if not node_id:
-                node = sorted(node.get_all(),
-                              key=attrgetter('id'),
-                              reverse=True)[0]
-                if not node.data['cluster']:
-                    return node
-                else:
-                    continue
-            try:
-                node.update()
-            except urllib2.HTTPError as exc:
-                if exc.code == 404:
-                    LOG.info("Waiting for node discovery: %s". node_id)
-                    time.sleep(5)
-                else:
-                    LOG.exception("Exception while waiting for node: %s",
-                                  exc.message)
-                    raise exc
-            else:
-                if node.data['status'] == status:
-                    LOG.info("Node in %s status: %s", status, node.data)
-                    return node
-                elif node.data['status'] == 'error':
-                    LOG.exception("Node in 'error' status: %s", node.data)
-                    raise Error
-        else:
-            LOG.exception("Timed out while waiting for node: %s",
-                          node_id)
-            raise TimeoutException
 
 
 def main():
@@ -191,7 +98,8 @@ def main():
         raise Error
 
     fuel = Fuel(fuel_endpoint, env_id)
-    force_pxeboot(inventory_host)
+    ipmi = IPMI.from_dict(inventory_host['ipmi'])
+    ipmi.force_pxeboot(inventory_host)
     node = fuel.wait_for_node('discover')
     fuel.assign_role(node)
     try:
