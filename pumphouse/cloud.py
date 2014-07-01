@@ -1,15 +1,9 @@
 import collections
-import copy
 import sqlalchemy as sqla
 
 from novaclient.v1_1 import client as nova_client
-from novaclient import exceptions as nova_excs
-
 from keystoneclient.v2_0 import client as keystone_client
-from keystoneclient.openstack.common.apiclient import exceptions as keystone_excs
-
 from glanceclient import client as glance
-from glanceclient import exc as glance_excs
 
 
 class Identity(collections.Mapping):
