@@ -708,8 +708,8 @@ def get_all_resource_ids(cloud, resource_type):
     elif resource_type == 'images':
         ids = [image.id for image in cloud.glance.images.list()]
     elif resource_type == 'servers':
-        ids = [server.id for image in
-               cloud.nova.list(search_opts={'all-tenants': 1})]
+        ids = [server.id for server in
+               cloud.nova.servers.list(search_opts={'all-tenants': 1})]
     elif resource_type == 'flavors':
         ids = [flavor.id for flavor in cloud.nova.flavors.list()]
     elif resource_type == 'security_groups':
