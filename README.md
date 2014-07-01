@@ -1,4 +1,4 @@
-pumphouse
+Pumphouse
 =========
 
 The goal of this project is to provide a tool for migrating workloads (i.e.
