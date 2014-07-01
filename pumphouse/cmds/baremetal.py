@@ -1,18 +1,11 @@
 import argparse
 import logging
-import os
-import pyipmi
-import pyipmi.bmc
-import sys
-import time
 import urllib2
 import yaml
 
-sys.path.append('../pumphouse')
-from operator import attrgetter
 
-from pumphouse.baremetal import Fuel
-from pumphouse.baremetal import IPMI
+from pumphouse import baremetal
+from pumphouse import exceptions
 
 
 LOG = logging.getLogger(__name__)
@@ -21,18 +14,6 @@ SOURCE_CLOUD_TAG = 'source'
 FUEL_MASTER_NODE_TAG = 'fuel.master'
 FUEL_API_IFACE_TAG = 'fuel.api'
 DEFAULT_INVENTORY_FILE = 'inventory.yaml'
-
-
-class Error(Exception):
-    pass
-
-
-class NotFound(Error):
-    pass
-
-
-class TimeoutException(Error):
-    pass
 
 
 def safe_load_yaml(filename):
@@ -79,8 +60,7 @@ def get_fuel_endpoint(config):
 
 
 def main():
-    parser = get_parser()
-    args = parser.parse_args()
+    args = get_parser().parse_args()
 
     logging.basicConfig(level=logging.INFO)
 
@@ -95,10 +75,10 @@ def main():
 
     if SOURCE_CLOUD_TAG not in inventory_host['notes']:
         LOG.exception("Host not in source cloud: %s", inventory_host)
-        raise Error
+        raise exceptions.HostNotInSourceCloud()
 
-    fuel = Fuel(fuel_endpoint, env_id)
-    ipmi = IPMI.from_dict(inventory_host['ipmi'])
+    fuel = baremetal.Fuel(fuel_endpoint, env_id)
+    ipmi = baremetal.IPMI.from_dict(inventory_host['ipmi'])
     ipmi.force_pxeboot(inventory_host)
     node = fuel.wait_for_node('discover')
     fuel.assign_role(node)
@@ -106,7 +86,7 @@ def main():
         fuel.env.deploy_changes()
     except urllib2.HTTPError as exc:
         LOG.exception("Cannot deploy changes: %s", exc.code)
-        raise Error
+        raise
     node = fuel.wait_for_node('ready', node.id, 3600)
     LOG.info("Node deployed: %s", node.data)
 
