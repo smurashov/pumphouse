@@ -6,11 +6,10 @@ import random
 import time
 import urllib
 
-from pumphouse import exceptions
 from pumphouse.cloud import Namespace
 from pumphouse.cloud import Cloud
-
-from . import utils
+from pumphouse import exceptions
+from pumphouse import utils
 
 from keystoneclient.openstack.common.apiclient import exceptions \
     as keystone_excs

@@ -2,10 +2,9 @@ import argparse
 import logging
 import urllib2
 
-from pumphouse import baremetal
 from pumphouse import exceptions
-
-from . import utils
+from pumphouse import baremetal
+from pumphouse import utils
 
 
 LOG = logging.getLogger(__name__)
