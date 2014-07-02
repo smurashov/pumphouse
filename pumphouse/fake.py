@@ -1,33 +1,42 @@
 import collections
 
+from . import exceptions
+
+
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
 
 
-class Resource(object):
-    def __init__(self, objs):
-        self.objs = objs
-        self.resource_class = self.__class__.__name__
+class Collection(object):
+    def __init__(self, resource_class):
+        self.resource_class = resource_class
 
     def __get__(self, obj, type):
-        return self
+        return obj.get_resource(self.resource_class)
+
+
+class Resource(object):
+    def __init__(self, cloud, objects):
+        self.cloud = cloud
+        self.objects = objects
 
     def list(self):
-        return self.objs
+        return self.objects
+
+    findall = list
 
     def create(self, obj):
-        self.objs.append(obj)
+        self.objects.append(obj)
 
     def get(self, id):
-        for obj in self.objs:
+        for obj in self.objects:
             if obj.id == id:
                 return obj
-        raise Exception
+        raise exceptions.NotFound()
 
     find = get
-    findall = list
 
 
 class Server(Resource):
@@ -44,7 +53,7 @@ class Server(Resource):
             })
         server = AttrDict(
 {
- "OS-EXT-STS:task_state": null,
+ "OS-EXT-STS:task_state": None,
  "addresses": addresses,
  "image": {
     "id": image.id,
@@ -73,8 +82,8 @@ class Server(Resource):
  "updated": "2014-06-26T12:48:18Z",
  "hostId": "9de0d0f05e277856424db23d54be4ea0d0bbcdce815ca08740f54609",
  "OS-EXT-SRV-ATTR:host": "ubuntu-1204lts-server-x86",
- "OS-SRV-USG:terminated_at": null,
- "key_name": null,
+ "OS-SRV-USG:terminated_at": None,
+ "key_name": None,
  "OS-EXT-SRV-ATTR:hypervisor_hostname": "ubuntu-1204lts-server-x86",
  "name": name,
  "created": "2014-06-26T12:48:06Z",
@@ -83,8 +92,9 @@ class Server(Resource):
  "metadata": {}
 }
 )
-        self.objs.append(server)
+        self.objects.append(server)
         return server
+
 
 class Image(Resource):
     def data(self, id):
@@ -113,6 +123,7 @@ class Image(Resource):
 class Network(Resource):
     pass
 
+
 class Flavor(Resource):
     def create(self, name, ram, vcpus, disk, **kwargs):
         flavor = AttrDict({"name": name,
@@ -128,7 +139,7 @@ class Flavor(Resource):
         flavor._info = flavor
         self.objs = flavor
         return flavor
-                
+
 
 class FloatingIP(Resource):
     pass
@@ -158,42 +169,59 @@ class Role(Resource):
     pass
 
 
-class Nova(object):
-    servers = Server()
-    flavors = Flavor()
-    networks = Network([])
-    floating_ips = FloatingIP()
-    floating_ips_bulk = FloatingIPBulk()
-    floating_ip_pools = FloatingIPPool()
-    security_groups = SecGroup()
+class Service(object):
+    def __init__(self, cloud):
+        self.cloud = cloud
+        service_name = self.__class__.__name__.lower()
+        self.resources_objects = cloud.get_service(service_name)
+        self.resources = {}
 
-    def __init__(self, data):
-        self.data = data
+    def get_resource(self, resource_class):
+        if resource_class in self.resources:
+            return self.resources[resource_class]
+        resource_name = "{}s".format(resource_class.__name__.lower())
+        objects = self.resources_objects.setdefault(resource_name, [])
+        self.resources[resource_class] = resource = resource_class(self.cloud,
+                                                                   objects)
+        return resource
 
 
-class Glance(object):
-    images = Image([])
+class Nova(Service):
+    servers = Collection(Server)
+    flavors = Collection(Flavor)
+    networks = Collection(Network)
+    floating_ips = Collection(FloatingIP)
+    floating_ips_bulk = Collection(FloatingIPBulk)
+    floating_ip_pools = Collection(FloatingIPPool)
+    security_groups = Collection(SecGroup)
 
 
-class Keystone(object):
-    tenants = Tenant([])
-    users = User([])
-    roles = Role([])
+class Glance(Service):
+    images = Collection(Image)
+
+
+class Keystone(Service):
+    tenants = Collection(Tenant)
+    users = Collection(User)
+    roles = Collection(Role)
 
 
 class Cloud(object):
     def __init__(self, cloud_ns, user_ns, identity):
-        self.cloud_ns = cloud_ns
-        self.user_ns = user_ns
-        self.access_ns = cloud_ns.restrict(user_ns)
+#        self.cloud_ns = cloud_ns
+#        self.user_ns = user_ns
+#        self.access_ns = cloud_ns.restrict(user_ns)
         self.data = {}
-        self.nova = Nova(self.data)
-        self.keystone = Keystone(self.data)
-        self.glance = Glance(self.data)
-        if isinstance(identity, Identity):
-            self.identity = identity
-        else:
-            self.identity = Identity(**identity)
+        self.nova = Nova(self)
+        self.keystone = Keystone(self)
+        self.glance = Glance(self)
+#        if isinstance(identity, Identity):
+#            self.identity = identity
+#        else:
+#            self.identity = Identity(**identity)
+
+    def get_service(self, service_name):
+        return self.data.setdefault(service_name, {})
 
 
 class Identity(collections.Mapping):
