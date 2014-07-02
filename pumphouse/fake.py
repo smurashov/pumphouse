@@ -1,6 +1,5 @@
 import collections
 
-
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
@@ -10,6 +9,7 @@ class AttrDict(dict):
 class Resource(object):
     def __init__(self, objs):
         self.objs = objs
+        self.resource_class = self.__class__.__name__
 
     def __get__(self, obj, type):
         return self
@@ -27,6 +27,7 @@ class Resource(object):
         raise Exception
 
     find = get
+    findall = list
 
 
 class Server(Resource):
@@ -158,13 +159,16 @@ class Role(Resource):
 
 
 class Nova(object):
-    servers = Server([])
-    flavors = Flavor([])
+    servers = Server()
+    flavors = Flavor()
     networks = Network([])
-    floating_ips = FloatingIP([])
-    floating_ips_bulk = FloatingIPBulk([])
-    floating_ip_pools = FloatingIPPool([])
-    security_groups = SecGroup([])
+    floating_ips = FloatingIP()
+    floating_ips_bulk = FloatingIPBulk()
+    floating_ip_pools = FloatingIPPool()
+    security_groups = SecGroup()
+
+    def __init__(self, data):
+        self.data = data
 
 
 class Glance(object):
@@ -182,9 +186,10 @@ class Cloud(object):
         self.cloud_ns = cloud_ns
         self.user_ns = user_ns
         self.access_ns = cloud_ns.restrict(user_ns)
-        self.nova = Nova()
-        self.keystone = Keystone()
-        self.glance = Glance()
+        self.data = {}
+        self.nova = Nova(self.data)
+        self.keystone = Keystone(self.data)
+        self.glance = Glance(self.data)
         if isinstance(identity, Identity):
             self.identity = identity
         else:
