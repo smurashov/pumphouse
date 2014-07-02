@@ -1,6 +1,7 @@
 import collections
 
 from . import exceptions
+from pumphouse.cloud import Namespace
 
 
 class AttrDict(dict):
@@ -36,7 +37,13 @@ class Resource(object):
                 return obj
         raise exceptions.NotFound()
 
-    find = get
+    def find(self, **kwargs):
+        for key in kwargs:
+            for obj in self.objects:
+                if obj[key] == kwargs[key]:
+                    return obj
+            raise exceptions.NotFound()
+
 
 
 class Server(Resource):
@@ -45,7 +52,8 @@ class Server(Resource):
         for nic in nics:
             if nic["net-id"] not in addresses:
                 addresses[nic["net-id"]] = []
-            addresses[nic["net-id"]].append({
+                net = self.cloud.nova.networks.get(nic["net-id"])
+            addresses[net.label].append({
                 "OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:c3:d8:d4",
                 "version": 4,
                 "addr": nic["v4-fixed-ip"],
@@ -116,19 +124,25 @@ class Image(Resource):
  "schema": "/v2/schemas/image"
 },**kwargs
 )
-        self.objs.append(image)
+        self.objects.append(image)
         return image
 
 
 class Network(Resource):
-    pass
+    def create(self, **kwargs):
+        network = AttrDict({"vlan": kwargs["vlan_start"],
+                            "vpn_private_address": kwargs["vpn_start"]},
+                            **kwargs)
+        network._info = network
+        self.objects.append(network)
+        return network
 
 
 class Flavor(Resource):
     def create(self, name, ram, vcpus, disk, **kwargs):
         flavor = AttrDict({"name": name,
                            "ram": ram,
-                           "OS-FLV-DISABLED:disabled": false,
+                           "OS-FLV-DISABLED:disabled": False,
                            "vcpus": vcpus,
                            "swap": kwargs["swap"],
                            "os-flavor-access:is_public": kwargs["is_public"],
@@ -137,7 +151,7 @@ class Flavor(Resource):
                            "disk": disk, 
                            "id": kwargs["flavorid"]})
         flavor._info = flavor
-        self.objs = flavor
+        self.objects.append(flavor)
         return flavor
 
 
@@ -154,15 +168,41 @@ class FloatingIPBulk(Resource):
 
 
 class SecGroup(Resource):
-    pass
+    def create(self, name, description):
+        secgroup = AttrDict({'name': name,
+                             'description': description})
+        secgroup._info = secgroup
+        self.objects.append(secgroup)
+        return secgroup
+
+
+class SecGroupRule(Resource):
+    def create(self, id, **kwargs):
+        rule = AttrDict({'id': id,
+                         'ip_range': {
+                             'cidr': kwargs['cidr']
+                         }
+                        }, **kwargs)
+        rule._info = rule
+        self.objects.append(rule)
+        return rule
 
 
 class Tenant(Resource):
-    pass
+    def create(self, name, **kwargs):
+        tenant = AttrDict({'name': name},
+                          **kwargs)
+        tenant._info = tenant
+        self.objects.append(tenant)
+        return tenant
 
 
 class User(Resource):
-    pass
+    def create(self, **kwargs):
+        user = AttrDict(**kwargs)
+        user._info = user
+        self.objects.append(user)
+        return user
 
 
 class Role(Resource):
@@ -208,20 +248,36 @@ class Keystone(Service):
 
 class Cloud(object):
     def __init__(self, cloud_ns, user_ns, identity):
-#        self.cloud_ns = cloud_ns
-#        self.user_ns = user_ns
-#        self.access_ns = cloud_ns.restrict(user_ns)
+        self.cloud_ns = cloud_ns
+        self.user_ns = user_ns
+        self.access_ns = cloud_ns.restrict(user_ns)
         self.data = {}
         self.nova = Nova(self)
         self.keystone = Keystone(self)
         self.glance = Glance(self)
-#        if isinstance(identity, Identity):
-#            self.identity = identity
-#        else:
-#            self.identity = Identity(**identity)
+        if isinstance(identity, Identity):
+            self.identity = identity
+        else:
+            self.identity = Identity(**identity)
 
     def get_service(self, service_name):
         return self.data.setdefault(service_name, {})
+
+    def restrict(self, user_ns):
+        return Cloud(self.cloud_nd, user_ns, self.identity)
+
+    @classmethod
+    def from_dict(cls, endpoint, identity):
+        cloud_ns = Namespace(auth_url=endpoint["auth_url"])
+        user_ns = Namespace(
+            username=endpoint["username"],
+            password=endpoint["password"],
+            tenant_name=endpoint["tenant_name"],
+        )
+        return cls(cloud_ns, user_ns, identity)
+
+    def __repr__(self):
+        return "<Cloud(namespace={!r})>".format(self.access_ns)
 
 
 class Identity(collections.Mapping):
