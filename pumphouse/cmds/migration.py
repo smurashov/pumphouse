@@ -3,21 +3,21 @@ import collections
 import logging
 import os
 import random
-import sys
 import time
 import urllib
-import yaml
 
-sys.path.append('../pumphouse')
 from pumphouse.cloud import Namespace
 from pumphouse.cloud import Cloud
+from pumphouse import exceptions
+from pumphouse import utils
 
-from novaclient import exceptions as nova_excs
 from keystoneclient.openstack.common.apiclient import exceptions \
     as keystone_excs
+from novaclient import exceptions as nova_excs
 
 
 LOG = logging.getLogger(__name__)
+
 RO_SECURITY_GROUPS = ['default']
 SERVICE_TENANT_NAME = 'services'
 BUILTIN_ROLES = ('service', 'admin', '_member_')
@@ -28,28 +28,11 @@ TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
 TEST_RESOURCE_PREFIX = "pumphouse-test"
 
 
-class Error(Exception):
-    pass
-
-
-class NotFound(Error):
-    pass
-
-
-class TimeoutException(Error):
-    pass
-
-
-def safe_load_yaml(filename):
-    with open(filename) as f:
-        return yaml.safe_load(f)
-
-
 def get_parser():
     parser = argparse.ArgumentParser(description="Migration resources through "
                                                  "OpenStack clouds.")
     parser.add_argument("config",
-                        type=safe_load_yaml,
+                        type=utils.safe_load_yaml,
                         help="A filename of a configuration of clouds "
                              "endpoints and a strategy.")
     subparsers = parser.add_subparsers()
@@ -101,16 +84,17 @@ def get_parser():
 
 
 def wait_for_delete(resource, update_resource, timeout=60,
-                    check_interval=1, exceptions=(NotFound,)):
+                    check_interval=1,
+                    expect_excs=(exceptions.NotFound,)):
     start = time.time()
     while True:
         try:
             resource = update_resource(resource)
-        except exceptions:
+        except expect_excs:
             break
         time.sleep(check_interval)
         if time.time() - start > timeout:
-            raise TimeoutException()
+            raise exceptions.TimeoutException()
 
 
 def migrate_flavor(mapping, src, dst, id):
@@ -516,7 +500,7 @@ def cleanup(cloud):
             continue
         cloud.nova.servers.delete(server)
         wait_for_delete(server, cloud.nova.servers.get,
-                        exceptions=(nova_excs.NotFound,))
+                        expect_excs=(nova_excs.NotFound,))
         LOG.info("Deleted server: %s", server._info)
     for image in cloud.glance.images.list():
         if not is_prefixed(image.name):
@@ -703,7 +687,7 @@ def get_all_resource_ids(cloud, resource_type):
     elif resource_type == 'roles':
         ids = [role.id for role in cloud.keystone.roles.list()]
     elif resource_type == 'users':
-        ids = [user.id for user in 
+        ids = [user.id for user in
                cloud.keystone.users.list()]
     elif resource_type == 'images':
         ids = [image.id for image in cloud.glance.images.list()]
@@ -730,8 +714,7 @@ RESOURCES_MIGRATIONS = collections.OrderedDict([
 
 
 def main():
-    parser = get_parser()
-    args = parser.parse_args()
+    args = get_parser().parse_args()
 
     logging.basicConfig(level=logging.INFO)
 

@@ -1,12 +1,13 @@
 import logging
+import operator
 import os
-import pyipmi
-import pyipmi.bmc
 import time
 import urllib2
 import yaml
 
-from operator import attrgetter
+import pyipmi
+import pyipmi.bmc
+
 
 LOG = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ class Fuel(object):
         while time.clock() < (start_time + timeout):
             if not node_id:
                 node = sorted(node.get_all(),
-                              key=attrgetter('id'),
+                              key=operator.attrgetter('id'),
                               reverse=True)[0]
                 if not node.data['cluster']:
                     return node
@@ -83,15 +84,16 @@ class Fuel(object):
                           node_id)
             raise TimeoutException
 
+
 class IPMI(object):
     """IPMI interface class
 
     This class allows to manage the host via IPMI protocol. It could be
     instantiated from dictionary with class method from_dict, for example:
-    
+
         host = {
                 'host': '10.0.0.1',
-                'auth': 
+                'auth':
                 {
                     'user': 'admin',
                     'password': 'pass'
@@ -112,7 +114,7 @@ class IPMI(object):
                                       hostname=self.host,
                                       usernmae=self.username,
                                       password=self.password)
-    
+
     @classmethod
     def from_dict(cls, ipmi_dict):
         hostname = ipmi_dict["host"]
