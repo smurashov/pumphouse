@@ -111,8 +111,8 @@ class IPMI(object):
         self.username = username
         self.password = password
         self.client = pyipmi.make_bmc(pyipmi.bmc.LanBMC,
-                                      hostname=self.host,
-                                      usernmae=self.username,
+                                      hostname=self.hostname,
+                                      username=self.username,
                                       password=self.password)
 
     @classmethod

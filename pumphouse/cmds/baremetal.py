@@ -68,7 +68,7 @@ def main():
 
     fuel = baremetal.Fuel(fuel_endpoint, env_id)
     ipmi = baremetal.IPMI.from_dict(inventory_host['ipmi'])
-    ipmi.force_pxeboot(inventory_host)
+    ipmi.force_pxeboot()
     node = fuel.wait_for_node('discover')
     fuel.assign_role(node)
     try:
