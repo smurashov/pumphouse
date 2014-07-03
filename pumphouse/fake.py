@@ -50,9 +50,27 @@ class Resource(object):
                     return obj
             raise exceptions.NotFound()
 
+    def _get_user_id(self, username):
+        for user in self.cloud.data['keystone']['users']:
+            if user['name'] == username:
+                return user.id
+        raise exceptions.NotFound
+
+    def _get_tenant_id(self, tenant_name):
+        for tenant in self.cloud.data['keystone']['tenants']:
+            if tenant['name'] == tenant_name:
+                return tenant.id
+        raise exceptions.NotFound
 
 
 class Server(Resource):
+    def random_mac(self):
+        mac = [ 0x00, 0x16, 0x3e,
+                random.randint(0x00, 0x7f),
+                random.randint(0x00, 0xff),
+                random.randint(0x00, 0xff) ]
+        return ':'.join(map(lambda x: "%02x" % x, mac))
+
     def create(self, name, image, flavor, nics=[]):
         addresses = {}
         for nic in nics:
@@ -60,7 +78,7 @@ class Server(Resource):
                 addresses[nic["net-id"]] = []
                 net = self.cloud.nova.networks.get(nic["net-id"])
             addresses[net.label].append({
-                "OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:c3:d8:d4",
+                "OS-EXT-IPS-MAC:mac_addr": self.random_mac(),
                 "version": 4,
                 "addr": nic["v4-fixed-ip"],
                 "OS-EXT-IPS:type": "fixed"
@@ -74,7 +92,7 @@ class Server(Resource):
  },
  "OS-EXT-STS:vm_state": "active",
  "OS-EXT-SRV-ATTR:instance_name": "instance-00000004",
- "OS-SRV-USG:launched_at": "2014-06-26T12:48:18.000000",
+ "OS-SRV-USG:launched_at": str(datetime.datetime.now()),
  "flavor": {
   "id": flavor.id,
  },
