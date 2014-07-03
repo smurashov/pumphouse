@@ -53,13 +53,13 @@ class Resource(object):
     def _get_user_id(self, username):
         for user in self.cloud.data['keystone']['users']:
             if user['name'] == username:
-                return user.id
+                return user['id']
         raise exceptions.NotFound
 
     def _get_tenant_id(self, tenant_name):
         for tenant in self.cloud.data['keystone']['tenants']:
             if tenant['name'] == tenant_name:
-                return tenant.id
+                return tenant['id']
         raise exceptions.NotFound
 
 
@@ -88,13 +88,13 @@ class Server(Resource):
  "OS-EXT-STS:task_state": None,
  "addresses": addresses,
  "image": {
-    "id": image.id,
+    "id": image["id"],
  },
  "OS-EXT-STS:vm_state": "active",
  "OS-EXT-SRV-ATTR:instance_name": "instance-00000004",
  "OS-SRV-USG:launched_at": str(datetime.datetime.now()),
  "flavor": {
-  "id": flavor.id,
+  "id": flavor["id"],
  },
  "id": str(self.id),
  "security_groups": [
@@ -290,10 +290,10 @@ class Role(Resource):
 
     def add_user_role(self, user_id, role_id, tenant):
         for role in self.objects:
-            if role.id == role_id:
+            if role['id'] == role_id:
                 break
         for user in self.cloud.data['keystone']['users']:
-            if user.id == user_id:
+            if user['id'] == user_id:
                 if user['roles']:
                     user['roles'].append(role)
                 else:
@@ -303,7 +303,7 @@ class Role(Resource):
 
     def roles_for_user(self, user_id, **kwargs):
         for user in self.cloud.data['keystone']['users']:
-            if user.id == user_id:
+            if user['id'] == user_id:
                 return user['roles']
         raise exceptions.NotFound
 
