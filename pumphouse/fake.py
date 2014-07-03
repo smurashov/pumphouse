@@ -140,6 +140,9 @@ class Server(Resource):
                     if addr['addr'] == fixed_ip:
                         net.append(floating_ip_addr)
                         server._info = server
+                        for ip in self.cloud.data['nova']['floatingipsbulk']:
+                            if ip['addr'] == floating_ip:
+                                ip['instance_uuid'] = server["id"]
                         return server
         raise exceptions.NotFound
 
@@ -232,7 +235,10 @@ class FloatingIPPool(Resource):
 class FloatingIPBulk(Resource):
     def create(self, address, pool=None):
         floating_ip = AttrDict({'address': address,
-                                'id': str(self.id)})
+                                'id': str(self.id),
+                                'instance_uuid': None,
+                                'project_id': None,
+                                'pool': pool})
         floating_ip._info = floating_ip
         self.objects.append(floating_ip)
         return floating_ip
