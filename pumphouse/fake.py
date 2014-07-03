@@ -103,6 +103,22 @@ class Server(Resource):
         self.objects.append(server)
         return server
 
+    def add_floating_ip(self, floating_ip, fixed_ip):
+        floating_ip_addr = {
+            "OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:c3:d8:d4",
+            "version": 4,
+            "addr": floating_ip,
+            "OS-EXT-IPS:type": "floating"
+        }
+        for server in self.objects:
+            for net in server["addresses"]:
+                for addr in net:
+                    if addr['addr'] == fixed_ip:
+                        net.append(floating_ip_addr)
+                        server._info = server
+                        return server
+        raise exceptions.NotFound
+
 
 class Image(Resource):
     def data(self, id):
@@ -164,7 +180,11 @@ class FloatingIPPool(Resource):
 
 
 class FloatingIPBulk(Resource):
-    pass
+    def create(self, address, pool=None):
+        floating_ip = AttrDict({'address': address})
+        floating_ip._info = floating_ip
+        self.objects.append(floating_ip)
+        return floating_ip
 
 
 class SecGroup(Resource):
@@ -206,7 +226,30 @@ class User(Resource):
 
 
 class Role(Resource):
-    pass
+    def create(self, name):
+        role = AttrDict({'name': name})
+        role._info = role
+        self.objects.append(role)
+        return role
+
+    def add_user_role(self, user_id, role_id, tenant):
+        for role in self.objects:
+            if role.id == role_id:
+                break
+        for user in self.cloud.data['keystone']['users']:
+            if user.id == user_id:
+                if user['roles']:
+                    user['roles'].append(role)
+                else:
+                    user['roles'] = [role,]
+                return
+        raise exceptions.NotFound
+
+    def roles_for_user(self, user_id, **kwargs):
+        for user in self.cloud.data['keystone']['users']:
+            if user.id == user_id:
+                return user['roles']
+        raise exceptions.NotFound
 
 
 class Service(object):
@@ -289,11 +332,11 @@ class Identity(collections.Mapping):
 
     def fetch(self, user_id):
         """Fetch a hash of user's password."""
-        pass
+        return self.hashes[user_id]
 
     def push(self):
         """Push hashes of users' passwords."""
-        pass
+        return
 
     def __len__(self):
         return len(self.hashes)
