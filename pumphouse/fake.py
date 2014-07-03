@@ -1,4 +1,5 @@
 import collections
+import uuid
 
 from . import exceptions
 from pumphouse.cloud import Namespace
@@ -22,6 +23,7 @@ class Resource(object):
     def __init__(self, cloud, objects):
         self.cloud = cloud
         self.objects = objects
+        self.id = uuid.uuid4()
 
     def list(self):
         return self.objects
@@ -72,7 +74,7 @@ class Server(Resource):
  "flavor": {
   "id": flavor.id,
  },
- "id": "4a7318d7-8508-43a1-a7ea-1e228c71fc4d",
+ "id": str(self.id),
  "security_groups": [
   {
    "name": "default"
@@ -131,11 +133,11 @@ class Image(Resource):
  "status": "active",
  "tags": [],
  "updated_at": "2014-06-26T12:48:05Z",
- "file": "/v2/images/8bda63f2-dbb3-40ff-a68c-5ba3462aa8c5/file",
+ "file": "/v2/images/{}/file".format(str(self.id)),
  "owner": "7c825ee789b7416895e3bccf66edd05d",
- "id": "8bda63f2-dbb3-40ff-a68c-5ba3462aa8c5",
+ "id": str(self.id),
  "size": 13167616,
- "checksum": "64d7c1cd2b6f60c92c14662941cb7913",
+ "checksum": self.id.hex,
  "created_at": "2014-06-26T12:48:04Z",
  "schema": "/v2/schemas/image"
 },**kwargs
@@ -147,7 +149,8 @@ class Image(Resource):
 class Network(Resource):
     def create(self, **kwargs):
         network = AttrDict({"vlan": kwargs["vlan_start"],
-                            "vpn_private_address": kwargs["vpn_start"]},
+                            "vpn_private_address": kwargs["vpn_start"],
+                            "id": str(self.id)},
                             **kwargs)
         network._info = network
         self.objects.append(network)
@@ -181,7 +184,8 @@ class FloatingIPPool(Resource):
 
 class FloatingIPBulk(Resource):
     def create(self, address, pool=None):
-        floating_ip = AttrDict({'address': address})
+        floating_ip = AttrDict({'address': address,
+                                'id': str(self.id)})
         floating_ip._info = floating_ip
         self.objects.append(floating_ip)
         return floating_ip
@@ -190,7 +194,8 @@ class FloatingIPBulk(Resource):
 class SecGroup(Resource):
     def create(self, name, description):
         secgroup = AttrDict({'name': name,
-                             'description': description})
+                             'description': description,
+                             'id': str(self.id)})
         secgroup._info = secgroup
         self.objects.append(secgroup)
         return secgroup
@@ -210,7 +215,8 @@ class SecGroupRule(Resource):
 
 class Tenant(Resource):
     def create(self, name, **kwargs):
-        tenant = AttrDict({'name': name},
+        tenant = AttrDict({'name': name,
+                           'id': str(self.id)},
                           **kwargs)
         tenant._info = tenant
         self.objects.append(tenant)
@@ -219,7 +225,7 @@ class Tenant(Resource):
 
 class User(Resource):
     def create(self, **kwargs):
-        user = AttrDict(**kwargs)
+        user = AttrDict({'id': str(self.id)}, **kwargs)
         user._info = user
         self.objects.append(user)
         return user
@@ -227,7 +233,7 @@ class User(Resource):
 
 class Role(Resource):
     def create(self, name):
-        role = AttrDict({'name': name})
+        role = AttrDict({'id': str(self.id), 'name': name})
         role._info = role
         self.objects.append(role)
         return role
