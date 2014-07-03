@@ -26,8 +26,8 @@ class Resource(object):
         self.cloud = cloud
         self.objects = objects
         self.id = uuid.uuid4()
-        self.user_id = self._get_user_id(self.cloud.user_ns.username)
-        self.tenant_id = self._get_tenant_id(self.cloud.user_ns.tenant_name)
+        self.user_id = self._get_user_id(self.cloud.access_ns.username)
+        self.tenant_id = self._get_tenant_id(self.cloud.access_ns.tenant_name)
 
     def list(self):
         return self.objects
@@ -346,11 +346,27 @@ class Keystone(Service):
 
 
 class Cloud(object):
-    def __init__(self, cloud_ns, user_ns, identity):
+    def __init__(self, cloud_ns, user_ns, identity, data=None):
         self.cloud_ns = cloud_ns
         self.user_ns = user_ns
         self.access_ns = cloud_ns.restrict(user_ns)
-        self.data = {}
+        if not data:
+            self.data = {
+                         'glance': {},
+                         'keystone': {
+                            'tenants': [{
+                                'name': self.access_ns.tenant_name,
+                                'id': str(uuid.uuid4())
+                                }],
+                            'users': [{
+                                'username': self.access_ns.username,
+                                'name': self.access_ns.username,
+                                'id': str(uuid.uuid4())
+                            }]},
+                         'nova': {}
+                        }
+        else:
+            self.data = data
         self.nova = Nova(self)
         self.keystone = Keystone(self)
         self.glance = Glance(self)
@@ -363,7 +379,7 @@ class Cloud(object):
         return self.data.setdefault(service_name, {})
 
     def restrict(self, user_ns):
-        return Cloud(self.cloud_ns, user_ns, self.identity)
+        return Cloud(self.cloud_ns, user_ns, self.identity, self.data)
 
     @classmethod
     def from_dict(cls, endpoint, identity):
