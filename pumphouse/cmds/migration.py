@@ -7,7 +7,7 @@ import time
 import urllib
 
 from pumphouse.cloud import Namespace
-from pumphouse.cloud import Cloud
+from pumphouse.fake import Cloud
 from pumphouse import exceptions
 from pumphouse import utils
 
