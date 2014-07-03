@@ -1,4 +1,6 @@
 import collections
+import datetime
+import random
 import uuid
 
 from . import exceptions
@@ -24,6 +26,8 @@ class Resource(object):
         self.cloud = cloud
         self.objects = objects
         self.id = uuid.uuid4()
+        self.user_id = self._get_user_id(self.cloud.user_ns.username)
+        self.tenant_id = self._get_tenant_id(self.cloud.user_ns.tenant_name)
 
     def list(self):
         return self.objects
@@ -80,7 +84,7 @@ class Server(Resource):
    "name": "default"
   }
  ],
- "user_id": "189f0c4c66fe4f2bb32238c7f0e32109",
+ "user_id": self.user_id,
  "OS-DCF:diskConfig": "MANUAL",
  "accessIPv4": "",
  "accessIPv6": "",
@@ -90,14 +94,14 @@ class Server(Resource):
  "config_drive": "",
  "status": "ACTIVE",
  "updated": "2014-06-26T12:48:18Z",
- "hostId": "9de0d0f05e277856424db23d54be4ea0d0bbcdce815ca08740f54609",
+ "hostId": self.id.hex,
  "OS-EXT-SRV-ATTR:host": "ubuntu-1204lts-server-x86",
  "OS-SRV-USG:terminated_at": None,
  "key_name": None,
  "OS-EXT-SRV-ATTR:hypervisor_hostname": "ubuntu-1204lts-server-x86",
  "name": name,
  "created": "2014-06-26T12:48:06Z",
- "tenant_id": "7c825ee789b7416895e3bccf66edd05d",
+ "tenant_id": self.tenant_id,
  "os-extended-volumes:volumes_attached": [],
  "metadata": {}
 }
@@ -132,9 +136,9 @@ class Image(Resource):
         image = AttrDict({
  "status": "active",
  "tags": [],
- "updated_at": "2014-06-26T12:48:05Z",
+ "updated_at": str(datetime.datetime.now()),
  "file": "/v2/images/{}/file".format(str(self.id)),
- "owner": "7c825ee789b7416895e3bccf66edd05d",
+ "owner": self.tenant_id,
  "id": str(self.id),
  "size": 13167616,
  "checksum": self.id.hex,
@@ -225,7 +229,9 @@ class Tenant(Resource):
 
 class User(Resource):
     def create(self, **kwargs):
-        user = AttrDict({'id': str(self.id)}, **kwargs)
+        user = AttrDict({'id': str(self.id),
+                         'tenantId': kwargs['tenant_id']},
+                         **kwargs)
         user._info = user
         self.objects.append(user)
         return user
@@ -313,7 +319,7 @@ class Cloud(object):
         return self.data.setdefault(service_name, {})
 
     def restrict(self, user_ns):
-        return Cloud(self.cloud_nd, user_ns, self.identity)
+        return Cloud(self.cloud_ns, user_ns, self.identity)
 
     @classmethod
     def from_dict(cls, endpoint, identity):
