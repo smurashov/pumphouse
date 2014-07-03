@@ -18,7 +18,6 @@ def create_app():
         "CLOUD_DRIVER": "pumphouse.cloud.Cloud",
         "IDENTITY_DRIVER": "pumphouse.cloud.Identity",
     })
-    print(app.config.root_path)
     return app
 
 

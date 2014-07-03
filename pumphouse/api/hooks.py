@@ -10,6 +10,11 @@ LOG = logging.getLogger(__name__)
 
 
 def setup_cloud(cloud_name):
+    """Initializes the decorator for creating connection to a cloud.
+
+    :param cloud_name: a string with the name of the initialized cloud
+    :returns: a callback that create a real connection
+    """
     attribute_name = "{}_cloud".format(cloud_name)
     def setup_selected_cloud():
         cloud = getattr(flask.g, attribute_name, None)
