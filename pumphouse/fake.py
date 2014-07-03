@@ -170,10 +170,35 @@ class Image(Resource):
 
 class Network(Resource):
     def create(self, **kwargs):
-        network = AttrDict({"vlan": kwargs["vlan_start"],
-                            "vpn_private_address": kwargs["vpn_start"],
-                            "id": str(self.id)},
-                            **kwargs)
+        network = AttrDict({
+ "bridge": "br100",
+ "vpn_public_port": None,
+ "dhcp_start": "10.10.0.2",
+ "bridge_interface": "eth0",
+ "updated_at": str(datetime.datetime.now()),
+ "id": str(self.id),
+ "cidr_v6": None,
+ "deleted_at": None,
+ "gateway": "10.10.0.1",
+ "rxtx_base": None,
+ "priority": None,
+ "project_id": self.tenant_id,
+ "vpn_private_address": None,
+ "deleted": 0,
+ "vlan": 390,
+ "broadcast": "10.10.0.255",
+ "netmask": "255.255.255.0",
+ "injected": False,
+ "cidr": "10.10.0.0/24",
+ "vpn_public_address": None,
+ "multi_host": False,
+ "dns2": None,
+ "created_at": str(datetime.datetime.now()),
+ "host": "ubuntu-1204lts-server-x86",
+ "gateway_v6": None,
+ "netmask_v6": None,
+ "dns1": "8.8.4.4"
+}, **kwargs)
         network._info = network
         self.objects.append(network)
         return network
@@ -248,7 +273,8 @@ class Tenant(Resource):
 class User(Resource):
     def create(self, **kwargs):
         user = AttrDict({'id': str(self.id),
-                         'tenantId': kwargs['tenant_id']},
+                         'tenantId': kwargs['tenant_id'],
+                         'username': kwargs['name']},
                          **kwargs)
         user._info = user
         self.objects.append(user)
