@@ -252,7 +252,8 @@ class Flavor(Resource):
                            "rxtx_factor": 1.0,
                            "OS-FLV-EXT-DATA:ephemeral": 0,
                            "disk": disk, 
-                           "id": flavor_id})
+                           "id": flavor_id,
+                           "ephemeral": 0}, **kwargs)
         flavor._info = flavor
         self.objects.append(flavor)
         return flavor
