@@ -47,7 +47,7 @@ def get_parser():
                                 default="all",
                                 help="Specify a type of resources to migrate "
                                      "to the destination cloud.")
-    migrate_filter = migrate_parser.add_mutually_exclusive_group(required=True)
+    migrate_filter = migrate_parser.add_mutually_exclusive_group(required=False)
     migrate_filter.add_argument("-i", "--ids",
                                 nargs="*",
                                 help="A list of IDs of resource to migrate to "
