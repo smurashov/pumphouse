@@ -67,7 +67,7 @@ class Fuel(object):
                 node.update()
             except urllib2.HTTPError as exc:
                 if exc.code == 404:
-                    LOG.info("Waiting for node discovery: %s". node_id)
+                    LOG.info("Waiting for node discovery: %s", node_id)
                     time.sleep(5)
                 else:
                     LOG.exception("Exception while waiting for node: %s",
@@ -132,5 +132,5 @@ class IPMI(object):
             self.client.set_chassis_power('reset')
         except Exception as exc:
             LOG.exception("Cannot reset host %s: %s",
-                          self.host,
+                          self.hostname,
                           exc.message)
