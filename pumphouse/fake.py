@@ -42,10 +42,13 @@ class Resource(object):
         self.objects.append(obj)
 
     def get(self, id):
-        for obj in self.objects:
-            if obj.id == id:
-                return obj
-        raise exceptions.NotFound()
+        if isinstance(id, AttrDict):
+            return id
+        else:
+            for obj in self.objects:
+                if obj.id == real_id:
+                    return obj
+            raise exceptions.NotFound()
 
     def find(self, **kwargs):
         for key in kwargs:
