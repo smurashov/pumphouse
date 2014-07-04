@@ -192,7 +192,11 @@ class Image(Resource):
  "size": 13167616,
  "checksum": image_uuid.hex,
  "created_at": "2014-06-26T12:48:04Z",
- "schema": "/v2/schemas/image"
+ "schema": "/v2/schemas/image",
+ "visibility": '',
+ "min_ram": 0,
+ "min_disk": 0,
+ "protected": False,
 },**kwargs
 )
         self.objects.append(image)
