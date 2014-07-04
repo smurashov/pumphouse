@@ -3,10 +3,11 @@ import operator
 import os
 import time
 import urllib2
-import yaml
 
 import pyipmi
 import pyipmi.bmc
+
+from pumphouse import exceptions
 
 
 LOG = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ class Fuel(object):
             LOG.info("Assigned role: %s", node.data)
         elif node.data['status'] == 'error':
             LOG.exception("Node in 'error' status: %s", node.data)
-            raise Error
+            raise exceptions.Error
         else:
             LOG.warn("Node already added: %s", node.data)
 
@@ -78,11 +79,11 @@ class Fuel(object):
                     return node
                 elif node.data['status'] == 'error':
                     LOG.exception("Node in 'error' status: %s", node.data)
-                    raise Error
+                    raise exceptions.Error
         else:
             LOG.exception("Timed out while waiting for node: %s",
                           node_id)
-            raise TimeoutException
+            raise exceptions.TimeoutException
 
 
 class IPMI(object):
