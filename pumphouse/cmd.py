@@ -1,8 +1,6 @@
 import argparse
 import yaml
 from pumphouse import cloud
-from pumphouse.services import base
-from pumphouse.resources import base
 
 
 def safe_load_yaml(filename):
