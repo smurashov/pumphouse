@@ -80,11 +80,20 @@ class Server(Resource):
 
     def create(self, name, image, flavor, nics=[]):
         addresses = {}
+        server_uuid = uuid.uuid4()
+        if isinstance(image, six.string_types):
+            image_id = image
+        else:
+            image_id = image['id']
+        if isinstance(flavor, int):
+            flavor_id = flavor
+        else:
+            flavor_id = flavor['id']
         for nic in nics:
-            if nic["net-id"] not in addresses:
-                addresses[nic["net-id"]] = []
-                net = self.cloud.nova.networks.get(nic["net-id"])
-            addresses[net.label].append({
+            net = self.cloud.nova.networks.get(nic["net-id"])
+            if net['label'] not in addresses:
+                addresses[net['label']] = []
+            addresses[net['label']].append({
                 "OS-EXT-IPS-MAC:mac_addr": self.random_mac(),
                 "version": 4,
                 "addr": nic["v4-fixed-ip"],
@@ -95,15 +104,15 @@ class Server(Resource):
  "OS-EXT-STS:task_state": None,
  "addresses": addresses,
  "image": {
-    "id": image["id"],
+    "id": image_id,
  },
  "OS-EXT-STS:vm_state": "active",
  "OS-EXT-SRV-ATTR:instance_name": "instance-00000004",
  "OS-SRV-USG:launched_at": str(datetime.datetime.now()),
  "flavor": {
-  "id": flavor["id"],
+  "id": flavor_id,
  },
- "id": str(self.id),
+ "id": str(server_uuid),
  "security_groups": [
   {
    "name": "default"
