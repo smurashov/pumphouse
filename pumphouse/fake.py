@@ -1,9 +1,13 @@
 import collections
 import datetime
 import random
+import six
 import uuid
 
 from . import exceptions
+from novaclient import exceptions as nova_excs
+from keystoneclient.openstack.common.apiclient import exceptions as keystone_excs
+from glanceclient.openstack.common.apiclient import exceptions as glance_excs
 from pumphouse.cloud import Namespace
 
 
