@@ -285,7 +285,9 @@ class SecGroup(Resource):
         secgroup_uuid = uuid.uuid4()
         secgroup = AttrDict({'name': name,
                              'description': description,
-                             'id': str(secgroup_uuid)})
+                             'id': str(secgroup_uuid),
+                             'rules': '',
+                             'tenant_id': self.tenant_id})
         secgroup._info = secgroup
         self.objects.append(secgroup)
         return secgroup
