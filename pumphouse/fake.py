@@ -161,6 +161,15 @@ class Server(Resource):
                         return server
         raise exceptions.NotFound
 
+    def suspend(self, id):
+        pass
+
+    def delete(self, id):
+        pass
+
+    def resume(self, id):
+        pass
+
 
 class Image(Resource):
     def data(self, id):
