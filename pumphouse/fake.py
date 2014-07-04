@@ -30,11 +30,10 @@ class Resource(object):
     def __init__(self, cloud, objects):
         self.cloud = cloud
         self.objects = objects
-        self.id = uuid.uuid4()
         self.user_id = self._get_user_id(self.cloud.access_ns.username)
         self.tenant_id = self._get_tenant_id(self.cloud.access_ns.tenant_name)
 
-    def list(self):
+    def list(self, search_opts=None, filters=None, tenant_id=None):
         return self.objects
 
     findall = list
