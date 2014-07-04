@@ -44,7 +44,7 @@ def get_parser():
     migrate_parser.add_argument("resource",
                                 choices=RESOURCES_MIGRATIONS.keys(),
                                 nargs="?",
-                                default="all",
+                                default="servers",
                                 help="Specify a type of resources to migrate "
                                      "to the destination cloud.")
     migrate_filter = migrate_parser.add_mutually_exclusive_group(required=False)
@@ -702,7 +702,6 @@ def get_all_resource_ids(cloud, resource_type):
 
 
 RESOURCES_MIGRATIONS = collections.OrderedDict([
-    ("all", migrate),
     ("tenants", migrate_tenants),
     ("users", migrate_users),
     ("images", migrate_images),
