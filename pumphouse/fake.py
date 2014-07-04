@@ -128,7 +128,7 @@ class Server(Resource):
  "config_drive": "",
  "status": "ACTIVE",
  "updated": "2014-06-26T12:48:18Z",
- "hostId": self.id.hex,
+ "hostId": server_uuid.hex,
  "OS-EXT-SRV-ATTR:host": "ubuntu-1204lts-server-x86",
  "OS-SRV-USG:terminated_at": None,
  "key_name": None,
@@ -169,16 +169,20 @@ class Image(Resource):
         data._resp = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
         return data
 
+    def upload(self, image_id, data):
+        pass
+
     def create(self, **kwargs):
+        image_uuid = uuid.uuid4()
         image = AttrDict({
  "status": "active",
  "tags": [],
  "updated_at": str(datetime.datetime.now()),
- "file": "/v2/images/{}/file".format(str(self.id)),
+ "file": "/v2/images/{}/file".format(str(image_uuid)),
  "owner": self.tenant_id,
- "id": str(self.id),
+ "id": str(image_uuid),
  "size": 13167616,
- "checksum": self.id.hex,
+ "checksum": image_uuid.hex,
  "created_at": "2014-06-26T12:48:04Z",
  "schema": "/v2/schemas/image"
 },**kwargs
@@ -189,13 +193,14 @@ class Image(Resource):
 
 class Network(Resource):
     def create(self, **kwargs):
+        net_uuid = uuid.uuid4()
         network = AttrDict({
  "bridge": "br100",
  "vpn_public_port": None,
  "dhcp_start": "10.10.0.2",
  "bridge_interface": "eth0",
  "updated_at": str(datetime.datetime.now()),
- "id": str(self.id),
+ "id": str(net_uuid),
  "cidr_v6": None,
  "deleted_at": None,
  "gateway": "10.10.0.1",
@@ -225,16 +230,17 @@ class Network(Resource):
 
 class Flavor(Resource):
     def create(self, name, ram, vcpus, disk, **kwargs):
+        flavor_id = random.randint(0,100)
         flavor = AttrDict({"name": name,
                            "ram": ram,
                            "OS-FLV-DISABLED:disabled": False,
                            "vcpus": vcpus,
-                           "swap": kwargs["swap"],
-                           "os-flavor-access:is_public": kwargs["is_public"],
-                           "rxtx_factor": kwargs["rxtx_factor"],
+                           "swap": 0,
+                           "os-flavor-access:is_public": True,
+                           "rxtx_factor": 1.0,
                            "OS-FLV-EXT-DATA:ephemeral": 0,
                            "disk": disk, 
-                           "id": kwargs["flavorid"]})
+                           "id": flavor_id})
         flavor._info = flavor
         self.objects.append(flavor)
         return flavor
@@ -250,8 +256,9 @@ class FloatingIPPool(Resource):
 
 class FloatingIPBulk(Resource):
     def create(self, address, pool=None):
+        floating_ip_uuid = uuid.uuid4()
         floating_ip = AttrDict({'address': address,
-                                'id': str(self.id),
+                                'id': str(floating_ip_uuid),
                                 'instance_uuid': None,
                                 'project_id': None,
                                 'pool': pool})
@@ -262,9 +269,10 @@ class FloatingIPBulk(Resource):
 
 class SecGroup(Resource):
     def create(self, name, description):
+        secgroup_uuid = uuid.uuid4()
         secgroup = AttrDict({'name': name,
                              'description': description,
-                             'id': str(self.id)})
+                             'id': str(secgroup_uuid)})
         secgroup._info = secgroup
         self.objects.append(secgroup)
         return secgroup
@@ -284,8 +292,9 @@ class SecGroupRule(Resource):
 
 class Tenant(Resource):
     def create(self, name, **kwargs):
+        tenant_uuid = uuid.uuid4()
         tenant = AttrDict({'name': name,
-                           'id': str(self.id)},
+                           'id': str(tenant_uuid)},
                           **kwargs)
         tenant._info = tenant
         self.objects.append(tenant)
@@ -294,7 +303,8 @@ class Tenant(Resource):
 
 class User(Resource):
     def create(self, **kwargs):
-        user = AttrDict({'id': str(self.id),
+        user_uuid = uuid.uuid4()
+        user = AttrDict({'id': str(user_uuid),
                          'tenantId': kwargs['tenant_id'],
                          'username': kwargs['name']},
                          **kwargs)
@@ -305,22 +315,25 @@ class User(Resource):
 
 class Role(Resource):
     def create(self, name):
-        role = AttrDict({'id': str(self.id), 'name': name})
+        role_uuid = uuid.uuid4()
+        role = AttrDict({'id': str(role_uuid), 'name': name})
         role._info = role
         self.objects.append(role)
         return role
 
     def add_user_role(self, user_id, role_id, tenant):
         for role in self.objects:
-            if role['id'] == role_id:
+            if role['id'] == role_id['id']:
                 break
         for user in self.cloud.data['keystone']['users']:
-            if user['id'] == user_id:
-                if user['roles']:
+            if user['id'] == user_id['id']:
+                if 'roles' in user:
                     user['roles'].append(role)
                 else:
                     user['roles'] = [role,]
                 return
+        print user_id
+        print role_id
         raise exceptions.NotFound
 
     def roles_for_user(self, user_id, **kwargs):
