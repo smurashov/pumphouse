@@ -401,19 +401,27 @@ class Cloud(object):
         self.user_ns = user_ns
         self.access_ns = cloud_ns.restrict(user_ns)
         if not data:
+            admin_tenant_id = str(uuid.uuid4())
             self.data = {
                          'glance': {},
                          'keystone': {
-                            'tenants': [{
+                            'tenants': [AttrDict({
                                 'name': self.access_ns.tenant_name,
-                                'id': str(uuid.uuid4())
-                                }],
-                            'users': [{
+                                'id': admin_tenant_id
+                                })],
+                            'users': [AttrDict({
                                 'username': self.access_ns.username,
                                 'name': self.access_ns.username,
                                 'id': str(uuid.uuid4())
-                            }]},
-                         'nova': {}
+                            })]},
+                         'nova': {
+                             'secgroups': [AttrDict({
+                                 'name': 'default',
+                                 'description': 'default',
+                                 'tenant_id': admin_tenant_id,
+                                 'id': str(uuid.uuid4()),
+                                 'rules': ''}
+                                 )]},
                         }
         else:
             self.data = data
