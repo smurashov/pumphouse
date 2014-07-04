@@ -52,7 +52,11 @@ class Identity(collections.Mapping):
 class Namespace(object):
     __slots__ = ("username", "password", "tenant_name", "auth_url")
 
-    def __init__(self, username=None, password=None, tenant_name=None, auth_url=None):
+    def __init__(self,
+                 username=None,
+                 password=None,
+                 tenant_name=None,
+                 auth_url=None):
         self.username = username
         self.password = password
         self.tenant_name = tenant_name
