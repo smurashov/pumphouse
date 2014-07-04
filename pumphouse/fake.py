@@ -41,31 +41,32 @@ class Resource(object):
 
     def get(self, id):
         if isinstance(id, AttrDict):
-            return id
+            real_id = id['id']
         else:
-            for obj in self.objects:
-                if obj.id == real_id:
-                    return obj
-            raise exceptions.NotFound()
+            real_id = id
+        for obj in self.objects:
+            if obj.id == real_id:
+                return obj
+        raise nova_excs.NotFound("Not found: {}".format(id))
 
     def find(self, **kwargs):
         for key in kwargs:
             for obj in self.objects:
                 if obj[key] == kwargs[key]:
                     return obj
-            raise exceptions.NotFound()
+            raise nova_excs.NotFound("Not found: {}".format(id))
 
     def _get_user_id(self, username):
         for user in self.cloud.data['keystone']['users']:
             if user['name'] == username:
                 return user['id']
-        raise exceptions.NotFound
+        raise exceptions.NotFound()
 
     def _get_tenant_id(self, tenant_name):
         for tenant in self.cloud.data['keystone']['tenants']:
             if tenant['name'] == tenant_name:
                 return tenant['id']
-        raise exceptions.NotFound
+        raise exceptions.NotFound()
 
 
 class Server(Resource):
