@@ -47,6 +47,12 @@ def cloud_resources(cloud):
     return resources
 
 
+@pump.route("/")
+def index():
+    filename = "{}/static/index.html".format(flask.current_app.config.root_path)
+    return flask.send_file(filename)
+
+
 @pump.route("/resources")
 def resources():
     return flask.jsonify(

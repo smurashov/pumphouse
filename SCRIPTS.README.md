@@ -3,6 +3,10 @@
 To use scripts install pumphouse package. The package contains scripts that
 implement main tasks of the Pumphouse utility.
 
+To perform installation with a third-party user interface the package should be
+prepared. It is a simple action and it require just copy files in the
+pumphouse/api/static directory. A file with the index.html name must be there.
+
 To install the pumphouse package use the command:
 
 ```sh
