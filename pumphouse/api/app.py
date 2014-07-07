@@ -1,6 +1,7 @@
 import flask
 
 from . import handlers
+from . import hooks
 
 
 def create_app():
@@ -29,7 +30,8 @@ def start_app(config=None, **kwargs):
     app = create_app()
     if config is not None:
         app.config.update(config)
-    app.run(**kwargs)
+    hooks.events.init_app(app)
+    hooks.events.run(app)
 
 
 if __name__ == "__main__":

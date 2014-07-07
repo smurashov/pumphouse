@@ -1,6 +1,9 @@
+import gevent
+
 import flask
 
-from .hooks import source, destination
+from . import hooks
+from . import migration
 
 
 pump = flask.Blueprint("pumphouse", __name__)
@@ -46,11 +49,9 @@ def cloud_resources(cloud):
 
 @pump.route("/resources")
 def resources():
-    src_resources = cloud_resources(source)
-    dst_resources = cloud_resources(destination)
     return flask.jsonify(
-        source=cloud_resources(source),
-        destination=cloud_resources(destination),
+        source=cloud_resources(hooks.source),
+        destination=cloud_resources(hooks.destination),
         # TODO(akscram): A set of hosts that don't belong to any cloud.
         hosts=[],
         # TODO(akscram): A set of current events.
@@ -58,6 +59,15 @@ def resources():
     )
 
 
-@pump.route("/events")
-def events():
-    return "events"
+@pump.route("/tenants/<tenant_id>", methods=["POST"])
+def migrate_tenant(tenant_id):
+    @flask.copy_current_request_context
+    def migrate():
+        migration.migrate_resources(tenant_id)
+    gevent.spawn(migrate)
+    return flask.make_response()
+
+
+@pump.route("/hosts/<host_name>", methods=["POST"])
+def evacuate_host(host_name):
+    return

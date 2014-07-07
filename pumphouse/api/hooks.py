@@ -1,12 +1,15 @@
 import logging
 
 import flask
+from flask.ext import socketio
 from werkzeug.local import LocalProxy
 
 from pumphouse import utils
 
 
 LOG = logging.getLogger(__name__)
+
+events = socketio.SocketIO()
 
 
 def setup_cloud(cloud_name):
