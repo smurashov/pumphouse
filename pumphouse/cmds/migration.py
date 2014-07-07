@@ -509,6 +509,10 @@ def cleanup(cloud):
         utils.wait_for(server, cloud.nova.servers.get,
                        expect_excs=(nova_excs.NotFound,))
         LOG.info("Deleted server: %s", server._info)
+    for flavor in cloud.nova.flavors.list():
+        if is_prefixed(flavor.name):
+            cloud.nova.flavors.delete(flavor)
+            LOG.info("Deleted flavor: %s", flavor._info)
     for image in cloud.glance.images.list():
         if not is_prefixed(image.name):
             continue
