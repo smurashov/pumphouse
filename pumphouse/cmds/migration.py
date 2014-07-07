@@ -260,7 +260,7 @@ def migrate_network(mapping, src, dst, name):
                                   project_id=n0.project_id,
                                   vlan_start=n0.vlan,
                                   vpn_start=n0.vpn_private_address)
-    mapping[n0.id] = n1
+    mapping[n0.id] = n1.id
     return n1
 
 
