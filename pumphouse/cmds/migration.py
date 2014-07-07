@@ -7,7 +7,7 @@ import time
 import urllib
 
 from pumphouse.cloud import Namespace
-from pumphouse.cloud import Cloud
+from pumphouse.fake import Cloud
 from pumphouse import exceptions
 from pumphouse import utils
 
@@ -41,6 +41,12 @@ def get_parser():
                                                 "resources from a source "
                                                 "cloud to a distination.")
     migrate_parser.set_defaults(action="migrate")
+    migrate_parser.add_argument("--setup",
+                                action="store_true",
+                                help="If present, will add test resources to "
+                                     "the source cloud before start "
+                                     "migration, as 'setup' command "
+                                     "would do.")
     migrate_parser.add_argument("resource",
                                 choices=RESOURCES_MIGRATIONS.keys(),
                                 nargs="?",
@@ -475,7 +481,6 @@ def evacuate(cloud, host):
         if len(hypervs) > 1:
             LOG.warning("More than one hypervisor found at the host: %s",
                         host)
-        import pdb; pdb.set_trace()
         for hyperv in hypervs:
             details = cloud.nova.hypervisors.get(hyperv.id)
             host = details.service["host"]
@@ -720,6 +725,8 @@ def main():
     if args.action == "migrate":
         mapping = {}
         src = Cloud.from_dict(**args.config["source"])
+        if args.setup:
+            setup(src)
         dst = Cloud.from_dict(**args.config["destination"])
         migrate_resources = RESOURCES_MIGRATIONS[args.resource]
         if args.ids:
