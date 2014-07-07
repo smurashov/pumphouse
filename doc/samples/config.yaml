@@ -1,15 +1,16 @@
 source:
-  name:    good_old_openstack
   endpoint:
     auth_url:       http://10.0.0.1:5000/v2.0/
     username:       admin
     password:       admin
     tenant_name:    admin
-target:
-  name:    mira-os-1
+  identity:
+    connection:     mysql+mysqlconnector://root:pass@10.0.0.1:3607/keystone
+destination:
   endpoint:
     auth_url:       http://api.endpoint.com:5000/v2.0/
-    fuel_url:       http://127.0.0.1:8000/api/
     username:       admin
     password:       admin
     tenant_name:    admin
+  identity:
+    connection:     mysql+mysqlconnector://root:pass@127.0.0.1:3607/keystone
