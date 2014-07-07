@@ -53,7 +53,8 @@ def get_parser():
                                 default="servers",
                                 help="Specify a type of resources to migrate "
                                      "to the destination cloud.")
-    migrate_filter = migrate_parser.add_mutually_exclusive_group(required=False)
+    migrate_filter = migrate_parser.add_mutually_exclusive_group(
+        required=False)
     migrate_filter.add_argument("-i", "--ids",
                                 nargs="*",
                                 help="A list of IDs of resource to migrate to "
@@ -325,17 +326,20 @@ def migrate_secgroup(mapping, src, dst, id):
 def migrate_secgroup_rule(mapping, src, dst, src_rule, id):
     r0 = src_rule
     try:
-        r1 = dst.nova.security_group_rules.create(
-                                id,
-                                ip_protocol=r0['ip_protocol'],
-                                from_port=r0['from_port'],
-                                to_port=r0['to_port'],
-                                cidr=r0['ip_range']['cidr'])
-        LOG.info("Created: %s",r1._info)
+        r1 = dst.nova.security_group_rules.create(id,
+                                                  ip_protocol=r0[
+                                                      'ip_protocol'],
+                                                  from_port=r0[
+                                                      'from_port'],
+                                                  to_port=r0['to_port'],
+                                                  cidr=r0[
+                                                      'ip_range']['cidr'])
+        LOG.info("Created: %s", r1._info)
     except nova_excs.BadRequest:
         LOG.warn("Duplicated rule: %s", r0)
     except nova_excs.NotFound:
-        LOG.exception("Rule create attempted for non-existent security group: %s", r0)
+        LOG.exception("Rule create attempted for non-existent "
+                      "security group: %s", r0)
         raise
 
 
@@ -348,8 +352,8 @@ def migrate_secgroups(mapping, src, dst, ids):
 def migrate_user(mapping, src, dst, id):
     u0 = src.keystone.users.get(id)
     user_dict = dict(name=u0.name,
-                 password='default',
-                 enabled=u0.enabled)
+                     password='default',
+                     enabled=u0.enabled)
     if hasattr(u0, "tenantId"):
         t0 = src.keystone.tenants.get(u0.tenantId)
         if t0.name == SERVICE_TENANT_NAME:
@@ -437,8 +441,8 @@ def migrate_floating_ip(mapping, src, dst, ip):
 
     '''Create IP address in floating IP address pool in destination cloud
 
-    Creates IP address if it does not exist. Creates a pool in destination cloud
-    as well if it does not exist.
+    Creates IP address if it does not exist. Creates a pool in destination
+    cloud as well if it does not exist.
 
     :param mapping:     dict mapping entity ids in source and target clouds
     :param src:         Cloud object representing source cloud
@@ -456,14 +460,15 @@ def migrate_floating_ip(mapping, src, dst, ip):
                                           pool=ip_pool0.name)
         try:
             floating_ip1 = dst.nova.floating_ips_bulk.find(address=ip)
-        except nova_exc.NotFound:
+        except nova_excs.NotFound:
             LOG.exception("Not added: %s", ip)
-            raise Error
+            raise exceptions.Error()
         else:
             LOG.info("Created: %s", floating_ip1._info)
     else:
         LOG.warn("Already exists, %s", floating_ip1._info)
     return floating_ip1
+
 
 def migrate(mapping, src, dst):
     migrate_users(mapping, src, dst)
@@ -493,7 +498,6 @@ def evacuate(cloud, host):
                 LOG.exception("An error occured during evacuation servers "
                               "from the host %r", host)
                 cloud.nova.services.enable(host, binary)
-
 
 
 def cleanup(cloud):
@@ -557,41 +561,41 @@ def setup(cloud):
     test_roles = {}
     for i in range(2):
         flavor = cloud.nova.flavors.create(
-                    "{0}-flavor-{1}"
-                   .format(prefix,
-                           str(random.randint(1,0x7fffffff))),
-                   '1','1','2',is_public='True')
+            "{0}-flavor-{1}"
+            .format(prefix,
+                    str(random.randint(1, 0x7fffffff))),
+            '1', '1', '2', is_public='True')
         test_flavors[flavor.id] = flavor
         LOG.info("Created: %s", flavor._info)
         tenant = cloud.keystone.tenants.create(
-                    "{0}-tenant-{1}"
-                    .format(prefix,
-                            str(random.randint(1, 0x7fffffff))),
-                    description="pumphouse test tenant")
+            "{0}-tenant-{1}"
+            .format(prefix,
+                    str(random.randint(1, 0x7fffffff))),
+            description="pumphouse test tenant")
         test_tenants[tenant.id] = tenant
         LOG.info("Created: %s", tenant._info)
         role = cloud.keystone.roles.create(
-                    "{0}-role-{1}"
-                    .format(prefix,
-                            str(random.randint(1, 0x7fffffff))))
+            "{0}-role-{1}"
+            .format(prefix,
+                    str(random.randint(1, 0x7fffffff))))
         test_roles[role.id] = role
         LOG.info("Created: %s", role._info)
         user = cloud.keystone.users.create(
-                    name="{0}-user-{1}"
-                    .format(prefix, str(random.randint(1, 0x7fffffff))),
-                    password="default",
-                    tenant_id=tenant.id)
+            name="{0}-user-{1}"
+            .format(prefix, str(random.randint(1, 0x7fffffff))),
+            password="default",
+            tenant_id=tenant.id)
         test_users[tenant.id] = user
         LOG.info("Created: %s", user._info)
         user_role = cloud.keystone.roles.add_user_role(
-                    user,
-                    role,
-                    tenant=tenant.id)
-        LOG.info("Assigned %s: %s", user._info, role._info)
+            user,
+            role,
+            tenant=tenant.id)
+        LOG.info("Assigned: %s", user_role)
         net = cloud.nova.networks.create(
-                    label="{0}-pumphouse-{1}".format(prefix, i),
-                    cidr="10.10.{0}.0/24".format(i),
-                    project_id=tenant.id)
+            label="{0}-pumphouse-{1}".format(prefix, i),
+            cidr="10.10.{0}.0/24".format(i),
+            project_id=tenant.id)
         test_nets[tenant.id] = net
         LOG.info("Created: %s", net._info)
         user_ns = Namespace(username=user.name,
@@ -601,26 +605,26 @@ def setup(cloud):
     for tenant_ref in test_tenants:
         cloud = test_clouds[tenant_ref]
         image = cloud.glance.images.create(
-                    disk_format='qcow2',
-                    container_format='bare',
-                    name="{0}-image-{1}"
-                    .format(prefix,
-                            random.randint(1,0x7fffffff)))
+            disk_format='qcow2',
+            container_format='bare',
+            name="{0}-image-{1}"
+            .format(prefix,
+                    random.randint(1, 0x7fffffff)))
         cloud.glance.images.upload(image.id, open(TEST_IMAGE_FILE, "rb"))
         test_images[image.id] = image
         LOG.info("Created: %s", dict(image))
         (net, _, addr) = test_nets[tenant_ref].dhcp_start.rpartition('.')
-        ip = ".".join( (net, str(int(addr)+len(test_servers))) )
+        ip = ".".join((net, str(int(addr) + len(test_servers))))
         nics = [{
-                            "net-id": test_nets[tenant_ref].id,
-                            "v4-fixed-ip": ip,
+            "net-id": test_nets[tenant_ref].id,
+            "v4-fixed-ip": ip,
         }]
         server = cloud.nova.servers.create(
-                    "{0}-{1}".format(prefix,
-                                     str(random.randint(1, 0x7fffffff))),
-                    image.id,
-                    flavor.id,
-                    nics=nics)
+            "{0}-{1}".format(prefix,
+                             str(random.randint(1, 0x7fffffff))),
+            image.id,
+            flavor.id,
+            nics=nics)
         test_servers[server.id] = server
         LOG.info("Created: %s", server._info)
 
@@ -641,15 +645,15 @@ def get_ids_by_tenant(cloud, resource_type, tenant_id):
 
     ids = []
     if resource_type == 'users':
-        ids = [ user.id for user in
-                cloud.keystone.users.list(tenant_id=tenant_id) ]
+        ids = [user.id for user in
+               cloud.keystone.users.list(tenant_id=tenant_id)]
     elif resource_type == 'images':
-        ids = [ image.id for image in
-                cloud.glance.images.list(filters={'owner': tenant_id}) ]
+        ids = [image.id for image in
+               cloud.glance.images.list(filters={'owner': tenant_id})]
     elif resource_type == 'servers':
-        ids = [ server.id for server in
-                cloud.nova.servers.list(search_opts={'all_tenants': 1,
-                                                     'tenant': tenant_id}) ]
+        ids = [server.id for server in
+               cloud.nova.servers.list(search_opts={'all_tenants': 1,
+                                                    'tenant': tenant_id})]
     else:
         LOG.warn("Cannot group %s by tenant", resource_type)
     return ids
@@ -666,10 +670,10 @@ def get_ids_by_host(cloud, resource_type, hostname):
 
     ids = []
     if resource_type == 'servers':
-        ids = [ server.id for server in
-                cloud.nova.servers.list(
-                            search_opts={'all_tenants': 1,
-                                         'hypervisor_name': hostname}) ]
+        ids = [server.id for server in
+               cloud.nova.servers.list(
+                   search_opts={'all_tenants': 1,
+                                'hypervisor_name': hostname})]
     else:
         LOG.warn("Cannot group %s by host", resource_type)
     return ids
