@@ -102,20 +102,6 @@ def get_parser():
     return parser
 
 
-def wait_for_delete(resource, update_resource, timeout=60,
-                    check_interval=1,
-                    expect_excs=(exceptions.NotFound,)):
-    start = time.time()
-    while True:
-        try:
-            resource = update_resource(resource)
-        except expect_excs:
-            break
-        time.sleep(check_interval)
-        if time.time() - start > timeout:
-            raise exceptions.TimeoutException()
-
-
 def migrate_flavor(mapping, src, dst, id):
     f0 = src.nova.flavors.get(id)
     if f0.id in mapping:
@@ -520,8 +506,8 @@ def cleanup(cloud):
         if not is_prefixed(server.name):
             continue
         cloud.nova.servers.delete(server)
-        wait_for_delete(server, cloud.nova.servers.get,
-                        expect_excs=(nova_excs.NotFound,))
+        utils.wait_for(server, cloud.nova.servers.get,
+                       expect_excs=(nova_excs.NotFound,))
         LOG.info("Deleted server: %s", server._info)
     for image in cloud.glance.images.list():
         if not is_prefixed(image.name):
