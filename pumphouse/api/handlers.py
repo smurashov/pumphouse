@@ -1,10 +1,13 @@
 import gevent
+import logging
 
 import flask
 
 from . import hooks
 from . import migration
 
+
+LOG = logging.getLogger(__name__)
 
 pump = flask.Blueprint("pumphouse", __name__)
 
@@ -78,3 +81,8 @@ def migrate_tenant(tenant_id):
 @pump.route("/hosts/<host_name>", methods=["POST"])
 def evacuate_host(host_name):
     return
+
+
+@hooks.events.on("connect", namespace="/events")
+def handle_events_connection():
+    LOG.debug("Client connected to '/events'.")
