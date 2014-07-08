@@ -236,10 +236,10 @@ def migrate_server(mapping, events, src, dst, id):
         try:
             s1 = user_dst.nova.servers.create(s0.name, i1, f1, nics=nics)
             events.emit("server add", {
-                "cloud": "source",
+                "cloud": "destination",
                 "id": s1.id,
                 "name": s1.name,
-                "tenant": s1.tenant_id,
+                "tenant_id": s1.tenant_id,
                 "image_id": s1.image["id"],
             }, namespace="/events")
             utils.wait_for(s1, user_dst.nova.servers.get, value="ACTIVE")
