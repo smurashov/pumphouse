@@ -733,8 +733,6 @@ RESOURCES_MIGRATIONS = collections.OrderedDict([
 ])
 
 
-
-
 def main():
     args = get_parser().parse_args()
 
