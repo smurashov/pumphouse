@@ -1,7 +1,7 @@
 import logging
 
 from pumphouse import cloud
-from pumohouse import exceptions
+from pumphouse import exceptions
 from pumphouse import utils
 
 from . import hooks
@@ -230,14 +230,28 @@ def migrate_server(mapping, events, src, dst, id):
     try:
         src.nova.servers.suspend(s0)
         utils.wait_for(s0, src.nova.servers.get, value="SUSPENDED")
+        events.emit("server suspended", {"id": s0.id, "cloud": "source"},
+                    namespace="/events")
         LOG.info("Suspended: %s", s0._info)
         try:
             s1 = user_dst.nova.servers.create(s0.name, i1, f1, nics=nics)
+            events.emit("server add", {
+                "cloud": "source",
+                "id": s1.id,
+                "name": s1.name,
+                "tenant": s1.tenant_id,
+                "image_id": s1.image["id"],
+            }, namespace="/events")
+            utils.wait_for(s1, user_dst.nova.servers.get, value="ACTIVE")
+            events.emit("server boot", {"cloud": "destination", "id": s1.id},
+                        namespace="/events")
         except Exception:
             LOG.exception("Failed to create server: %s", s0._info)
             raise
         else:
             src.nova.servers.delete(s0)
+            events.emit("server terminate", {"cloud": "source", "id": s0.id},
+                        namespace="/events")
             LOG.info("Deleted: %s", s0)
     except Exception:
         LOG.exception("Error occured in migration: %s", s0._info)
@@ -269,8 +283,14 @@ def migrate_resources(tenant_id):
     events, source, destination = (hooks.events, hooks.source,
                                    hooks.destination)
     mapping = {}
+    events.emit("tenant migrate", {"id": tenant_id}, namespace="/events")
     src_tenant, dst_tenant = migrate_tenant(mapping, events, source,
                                             destination, tenant_id)
+    events.emit("tenant create", {
+        "id": dst_tenant.id,
+        "source_id": src_tenant.id,
+        "cloud": "destination",
+    }, namespace="/events")
     become_admin_in_tenant(destination, destination.keystone.auth_ref.user_id,
                            dst_tenant.id)
     for user in src_tenant.list_users():
@@ -283,5 +303,13 @@ def migrate_resources(tenant_id):
         # XXX(akscram): Yeah, here is a double check of tenant-servers
         #               association because Nova behaves untrusted.
         if server.tenant_id == tenant_id:
-            migrate_server(mapping, events, source, destination, server)
+            events.emit("server migrate", {"id": server.id},
+                        namespace="/events")
+            _, dst_server = migrate_server(mapping, events, source,
+                                           destination, server)
+            events.emit("server migrated", {
+                "source_id": server.id,
+                "destination_id": dst_server.id,
+            }, namespace="/events")
     update_users_passwords(mapping, events, source, destination)
+    events.emit("tenant migrated", {"id": tenant_id}, namespace="/events")
