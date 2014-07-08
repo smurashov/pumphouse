@@ -7,7 +7,6 @@ import time
 import urllib
 
 from pumphouse.cloud import Namespace
-from pumphouse.fake import Cloud
 from pumphouse import exceptions
 from pumphouse import utils
 
@@ -41,6 +40,10 @@ def get_parser():
                                                 "resources from a source "
                                                 "cloud to a distination.")
     migrate_parser.set_defaults(action="migrate")
+    migrate_parser.add_argument("--fake",
+                                action="store_true",
+                                help="Work with FakeCloud back-end instead "
+                                     "real back-end from config.yaml")
     migrate_parser.add_argument("--setup",
                                 action="store_true",
                                 help="If present, will add test resources to "
@@ -728,6 +731,10 @@ def main():
 
     if args.action == "migrate":
         mapping = {}
+        if args.fake:
+            utils.load_class("pumphouse.fake.Cloud")
+        else:
+            utils.load_class("pumphouse.cloud.Cloud")
         src = Cloud.from_dict(**args.config["source"])
         if args.setup:
             setup(src)
