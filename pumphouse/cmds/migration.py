@@ -41,6 +41,10 @@ def get_parser():
                                                 "resources from a source "
                                                 "cloud to a distination.")
     migrate_parser.set_defaults(action="migrate")
+    migrate_parser.add_argument("--fake",
+                                action="store_true",
+                                help="Work with FakeCloud back-end instead "
+                                     "real back-end from config.yaml")
     migrate_parser.add_argument("--setup",
                                 action="store_true",
                                 help="If present, will add test resources to "
