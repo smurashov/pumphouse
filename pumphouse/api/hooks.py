@@ -19,6 +19,7 @@ def setup_cloud(cloud_name):
     :returns: a callback that create a real connection
     """
     attribute_name = "{}_cloud".format(cloud_name)
+
     def setup_selected_cloud():
         cloud = getattr(flask.g, attribute_name, None)
         if cloud is None:
@@ -27,7 +28,8 @@ def setup_cloud(cloud_name):
 
             LOG.debug("Cloud driver will be used: %s", config["CLOUD_DRIVER"])
             Cloud = utils.load_class(config["CLOUD_DRIVER"])
-            LOG.debug("Identity driver will be used: %s", config["IDENTITY_DRIVER"])
+            LOG.debug("Identity driver will be used: %s",
+                      config["IDENTITY_DRIVER"])
             Identity = utils.load_class(config["IDENTITY_DRIVER"])
 
             identity = Identity(**cloud_config["identity"])

@@ -1,10 +1,7 @@
 import logging
-import os
-import random
-import time
-import urllib
 
 from pumphouse import cloud
+from pumohouse import exceptions
 from pumphouse import utils
 
 from . import hooks
@@ -53,8 +50,8 @@ def get_user(mapping, events, src, dst, id):
 def migrate_user(mapping, events, src, dst, id):
     u0 = src.keystone.users.get(id)
     user_dict = dict(name=u0.name,
-                 password='default',
-                 enabled=u0.enabled)
+                     password='default',
+                     enabled=u0.enabled)
     if hasattr(u0, "tenantId"):
         _, t1 = migrate_tenant(mapping, events, src, dst, u0.tenantId)
         user_dict['tenant_id'] = t1.id
@@ -144,7 +141,7 @@ def migrate_image(mapping, events, src, dst, id):
             LOG.info("Found kernel image: %s", i0.kernel_id)
             _, ik1 = migrate_image(mapping, events, src, dst, i0.kernel_id)
             params["kernel_id"] = ik1["id"]
-        if "ramdisk_id" in i0:
+        if hasattr(i0, "ramdisk_id"):
             LOG.info("Found ramdisk image: %s", i0.ramdisk_id)
             _, ir0 = migrate_image(mapping, events, src, dst, i0.ramdisk_id)
             params["ramdisk_id"] = ir0["id"]
@@ -180,7 +177,6 @@ def migrate_flavor(mapping, events, src, dst, id):
 
 def migrate_network(mapping, events, src, dst, name):
     nets0 = dict((n.label, n) for n in src.nova.networks.list())
-    nets1 = dict((n.label, n) for n in dst.nova.networks.list())
     n0 = nets0[name]
     if n0.id in mapping:
         LOG.warn("Skipped because mapping: %s", n0._info)
@@ -261,8 +257,8 @@ def become_admin_in_tenant(cloud, user, tenant):
     :raises: exceptions.NotFound
     """
     admin_roles = [r
-                  for r in cloud.keystone.roles.list()
-                  if r.name == "admin"]
+                   for r in cloud.keystone.roles.list()
+                   if r.name == "admin"]
     if not admin_roles:
         raise exceptions.NotFound()
     admin_role = admin_roles[0]

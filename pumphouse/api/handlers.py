@@ -38,8 +38,8 @@ def cloud_resources(cloud):
             "name": hyperv.service["host"],
             "status": "available"
                       if cloud.nova.services.list(
-                            host=hyperv.service["host"],
-                            binary="nova-compute")[0].state
+                          host=hyperv.service["host"],
+                          binary="nova-compute")[0].state
                       else "unavailable",
         } for hyperv in cloud.nova.hypervisors.list()
         ],
@@ -49,7 +49,8 @@ def cloud_resources(cloud):
 
 @pump.route("/")
 def index():
-    filename = "{}/static/index.html".format(flask.current_app.config.root_path)
+    filename = "{}/static/index.html".format(
+        flask.current_app.config.root_path)
     return flask.send_file(filename)
 
 
