@@ -732,9 +732,9 @@ def main():
     if args.action == "migrate":
         mapping = {}
         if args.fake:
-            utils.load_class("pumphouse.fake.Cloud")
+            Cloud = utils.load_class("pumphouse.fake.Cloud")
         else:
-            utils.load_class("pumphouse.cloud.Cloud")
+            Cloud = utils.load_class("pumphouse.cloud.Cloud")
         src = Cloud.from_dict(**args.config["source"])
         if args.setup:
             setup(src)
