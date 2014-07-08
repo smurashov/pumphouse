@@ -27,6 +27,15 @@ TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
 TEST_RESOURCE_PREFIX = "pumphouse-test"
 
 
+def load_cloud_driver(is_fake=False):
+    if is_fake:
+        import_path = "pumphouse.fake.Cloud"
+    else:
+        import_path = "pumphouse.cloud.Cloud"
+    cloud_driver = utils.load_class(import_path)
+    return cloud_driver
+
+
 def get_parser():
     parser = argparse.ArgumentParser(description="Migration resources through "
                                                  "OpenStack clouds.")
@@ -34,16 +43,16 @@ def get_parser():
                         type=utils.safe_load_yaml,
                         help="A filename of a configuration of clouds "
                              "endpoints and a strategy.")
+    parser.add_argument("--fake",
+                        action="store_true",
+                        help="Work with FakeCloud back-end instead real "
+                             "back-end from config.yaml")
     subparsers = parser.add_subparsers()
     migrate_parser = subparsers.add_parser("migrate",
                                            help="Perform a migration of "
                                                 "resources from a source "
                                                 "cloud to a distination.")
     migrate_parser.set_defaults(action="migrate")
-    migrate_parser.add_argument("--fake",
-                                action="store_true",
-                                help="Work with FakeCloud back-end instead "
-                                     "real back-end from config.yaml")
     migrate_parser.add_argument("--setup",
                                 action="store_true",
                                 help="If present, will add test resources to "
@@ -724,17 +733,17 @@ RESOURCES_MIGRATIONS = collections.OrderedDict([
 ])
 
 
+
+
 def main():
     args = get_parser().parse_args()
 
     logging.basicConfig(level=logging.INFO)
 
+    Cloud = load_cloud_driver(is_fake=args.fake)
+
     if args.action == "migrate":
         mapping = {}
-        if args.fake:
-            Cloud = utils.load_class("pumphouse.fake.Cloud")
-        else:
-            Cloud = utils.load_class("pumphouse.cloud.Cloud")
         src = Cloud.from_dict(**args.config["source"])
         if args.setup:
             setup(src)
