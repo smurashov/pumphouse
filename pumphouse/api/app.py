@@ -29,7 +29,7 @@ def start_app(config=None, **kwargs):
 
     :param config: a dict with configuration values
     """
-    logging.basicConfig()
+    logging.basicConfig(level=logging.INFO)
     app = create_app()
     if config is not None:
         app.config.update(config)
