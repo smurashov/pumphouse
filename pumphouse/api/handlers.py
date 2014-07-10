@@ -3,6 +3,7 @@ import logging
 
 import flask
 
+from . import evacuation
 from . import hooks
 from . import migration
 
@@ -80,9 +81,14 @@ def migrate_tenant(tenant_id):
 
 @pump.route("/hosts/<host_name>", methods=["POST"])
 def evacuate_host(host_name):
-    return
+    @flask.copy_current_request_context
+    def evacuate():
+        evacuation.evacuate_servers(host_name)
+    gevent.spawn(evacuate)
+    return flask.make_response()
 
 
+# XXX(akscram): Nothing works without this.
 @hooks.events.on("connect", namespace="/events")
 def handle_events_connection():
     LOG.debug("Client connected to '/events'.")
