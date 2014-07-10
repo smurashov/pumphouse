@@ -14,6 +14,17 @@ pump = flask.Blueprint("pumphouse", __name__)
 
 
 def cloud_resources(cloud):
+    def get_host_status(hostname):
+        services = cloud.nova.services.list(host=hyperv.service["host"],
+                                            binary="nova-compute")
+        service = services[0]
+        if service.state == "up":
+            if service.status == "enabled":
+                return "available"
+            else:
+                return "blocked"
+        return "error"
+
     resources = {
         "tenants": [{
             "id": tenant.id,
@@ -25,6 +36,7 @@ def cloud_resources(cloud):
             "id": server.id,
             "type": "server",
             "name": server.name,
+            "status": "error" if server.status != "ACTIVE" else "",
             "tenant_id": server.tenant_id,
             "image_id": server.image["id"],
             # TODO(akscram): Mapping of real hardware servers to
@@ -35,16 +47,13 @@ def cloud_resources(cloud):
         ] + [{
             "id": image["id"],
             "type": "image",
+            "status": "",
             "name": image["name"],
         } for image in cloud.glance.images.list()
         ],
         "hosts": [{
             "name": hyperv.service["host"],
-            "status": "available"
-                      if cloud.nova.services.list(
-                          host=hyperv.service["host"],
-                          binary="nova-compute")[0].state
-                      else "unavailable",
+            "status": get_host_status(hyperv.service["host"]),
         } for hyperv in cloud.nova.hypervisors.list()
         ],
     }
