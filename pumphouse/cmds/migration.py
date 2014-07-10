@@ -26,6 +26,7 @@ TEST_IMAGE_URL = ("http://download.cirros-cloud.net/0.3.2/"
                   "cirros-0.3.2-x86_64-disk.img")
 TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
 TEST_RESOURCE_PREFIX = "pumphouse-test"
+FLOATING_IP_STRING = "172.18.167.{}"
 
 
 def load_cloud_driver(is_fake=False):
@@ -632,20 +633,42 @@ def setup(cloud, num_tenants=2, num_servers=1):
         cloud.glance.images.upload(image.id, open(TEST_IMAGE_FILE, "rb"))
         test_images[image.id] = image
         LOG.info("Created: %s", dict(image))
-        (net, _, addr) = test_nets[tenant_ref].dhcp_start.rpartition('.')
-        ip = ".".join((net, str(int(addr) + len(test_servers))))
-        nics = [{
-            "net-id": test_nets[tenant_ref].id,
-            "v4-fixed-ip": ip,
-        }]
-        server = cloud.nova.servers.create(
-            "{0}-{1}".format(prefix,
-                             str(random.randint(1, 0x7fffffff))),
-            image.id,
-            flavor.id,
-            nics=nics)
-        test_servers[server.id] = server
-        LOG.info("Created: %s", server._info)
+        for i in range(num_servers):
+            (net, _, addr) = test_nets[tenant_ref].dhcp_start.rpartition('.')
+            ip = ".".join((net, str(int(addr) + len(test_servers))))
+            nics = [{
+                "net-id": test_nets[tenant_ref].id,
+                "v4-fixed-ip": ip,
+            }]
+            server = cloud.nova.servers.create(
+                "{0}-{1}".format(prefix,
+                                 str(random.randint(1, 0x7fffffff))),
+                image.id,
+                flavor.id,
+                nics=nics)
+            test_servers[server.id] = server
+            LOG.info("Created: %s", server._info)
+            try:
+                floating_addr = FLOATING_IP_STRING.format(155 + len(
+                    test_servers))
+                floating_range = cloud.nova.floating_ips_bulk.create(
+                    floating_addr,
+                    pool="{}-pool-{}"
+                    .format(prefix, tenant_ref))
+            except Exception as exc:
+                LOG.exception("Cannot create floating ip range: %s",
+                              exc.message)
+                break
+            else:
+                LOG.info("Created: %s", floating_range._info)
+            try:
+                server.add_floating_ip(floating_addr)
+            except nova_excs.BadRequest:
+                LOG.execption("No nw_info cache associated with instance: %s",
+                              server._info)
+            else:
+                server = cloud.nova.servers.get(server)
+                LOG.info("Associated: %s", server._info['addresses'])
 
 
 def get_ids_by_tenant(cloud, resource_type, tenant_id):
