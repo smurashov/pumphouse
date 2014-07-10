@@ -235,14 +235,18 @@ def migrate_server(mapping, events, src, dst, id):
         LOG.info("Suspended: %s", s0._info)
         try:
             s1 = user_dst.nova.servers.create(s0.name, i1, f1, nics=nics)
+            s1 = dst.nova.servers.get(s1)
+            hostname = getattr(s1,
+                "OS-EXT-SRV-ATTR:hypervisor_hostname")
             events.emit("server add", {
                 "cloud": "destination",
                 "id": s1.id,
                 "name": s1.name,
                 "tenant_id": s1.tenant_id,
                 "image_id": s1.image["id"],
+                "host_name": hostname,
             }, namespace="/events")
-            utils.wait_for(s1, user_dst.nova.servers.get, value="ACTIVE")
+            s1 = utils.wait_for(s1, user_dst.nova.servers.get, value="ACTIVE")
             events.emit("server boot", {"cloud": "destination", "id": s1.id},
                         namespace="/events")
         except Exception:
@@ -276,7 +280,11 @@ def become_admin_in_tenant(cloud, user, tenant):
     if not admin_roles:
         raise exceptions.NotFound()
     admin_role = admin_roles[0]
-    cloud.keystone.tenants.add_user(tenant, user, admin_role)
+    try:
+        cloud.keystone.tenants.add_user(tenant, user, admin_role)
+    except keystone_excs.Conflict:
+        LOG.warning("User %r already in %r tenant with 'admin' role",
+                    user, tenant)
 
 
 def migrate_resources(tenant_id):
@@ -305,8 +313,7 @@ def migrate_resources(tenant_id):
         if server.tenant_id == tenant_id:
             events.emit("server migrate", {"id": server.id},
                         namespace="/events")
-            _, dst_server = migrate_server(mapping, events, source,
-                                           destination, server)
+            migrate_server(mapping, events, source, destination, server)
             events.emit("server migrated", {
                 "source_id": server.id,
                 "destination_id": dst_server.id,
