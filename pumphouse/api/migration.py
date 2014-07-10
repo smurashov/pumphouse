@@ -318,4 +318,7 @@ def migrate_resources(tenant_id):
                 "destination_id": dst_server.id,
             }, namespace="/events")
     update_users_passwords(mapping, events, source, destination)
-    events.emit("tenant migrated", {"id": tenant_id}, namespace="/events")
+    events.emit("tenant migrated", {
+        "id": tenant_id,
+        "new_id": dst_tenant.id,
+    }, namespace="/events")
