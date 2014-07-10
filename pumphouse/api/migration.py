@@ -311,7 +311,8 @@ def migrate_resources(tenant_id):
         if server.tenant_id == tenant_id:
             events.emit("server migrate", {"id": server.id},
                         namespace="/events")
-            migrate_server(mapping, events, source, destination, server)
+            _, dst_server = migrate_server(mapping, events, source,
+                                           destination, server)
             events.emit("server migrated", {
                 "source_id": server.id,
                 "destination_id": dst_server.id,
