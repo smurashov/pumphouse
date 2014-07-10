@@ -6,6 +6,7 @@ import random
 import time
 import urllib
 
+from pumphouse.api import migration as api_migration
 from pumphouse.cloud import Namespace
 from pumphouse import exceptions
 from pumphouse import utils
@@ -574,6 +575,11 @@ def setup(cloud):
             .format(prefix,
                     str(random.randint(1, 0x7fffffff))),
             description="pumphouse test tenant")
+        api_migration.become_admin_in_tenant(cloud,
+                                             cloud.keystone.auth_ref.user_id,
+                                             tenant)
+        tenant_ns = cloud.user_ns.restrict(tenant_name=tenant.name)
+        tenant_cloud = cloud.restrict(tenant_ns)
         test_tenants[tenant.id] = tenant
         LOG.info("Created: %s", tenant._info)
         role = cloud.keystone.roles.create(
@@ -594,7 +600,7 @@ def setup(cloud):
             role,
             tenant=tenant.id)
         LOG.info("Assigned: %s", user_role)
-        net = cloud.nova.networks.create(
+        net = tenant_cloud.nova.networks.create(
             label="{0}-pumphouse-{1}".format(prefix, i),
             cidr="10.10.{0}.0/24".format(i),
             project_id=tenant.id)
