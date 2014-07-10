@@ -667,7 +667,7 @@ def setup(cloud, num_tenants, num_servers):
             test_servers[server.id] = server
             LOG.info("Created: %s", server._info)
             try:
-                floating_addr = FLOATING_IP_STRING.format(155 + len(
+                floating_addr = FLOATING_IP_STRING.format(136 + len(
                     test_servers))
                 floating_range = cloud.nova.floating_ips_bulk.create(
                     floating_addr,
@@ -680,10 +680,13 @@ def setup(cloud, num_tenants, num_servers):
             else:
                 LOG.info("Created: %s", floating_range._info)
             try:
-                server.add_floating_ip(floating_addr)
+                server.add_floating_ip(floating_addr, ip)
             except nova_excs.BadRequest:
                 LOG.execption("No nw_info cache associated with instance: %s",
                               server._info)
+            except Exception as exc:
+                LOG.exception("Cannot create floating ip range: %s",
+                              exc.message)
             else:
                 server = cloud.nova.servers.get(server)
                 LOG.info("Associated: %s", server._info['addresses'])
