@@ -140,17 +140,18 @@ class Server(Resource):
             "addr": floating_ip,
             "OS-EXT-IPS:type": "floating"
         }
+        floating_ip_list = self.cloud.data['nova']['floatingipbulks']
         for server in self.objects:
             for net in server["addresses"]:
                 if not fixed_ip:
                     server['addresses'][net].append(floating_ip_addr)
                     return server
-                for addr in net:
+                for addr in server["addresses"][net]:
                     if addr['addr'] == fixed_ip:
                         server['addresses'][net].append(floating_ip_addr)
                         server._info = server
-                        for ip in self.cloud.data['nova']['floatingipsbulk']:
-                            if ip['addr'] == floating_ip:
+                        for ip in floating_ip_list:
+                            if ip.address == floating_ip:
                                 ip['instance_uuid'] = server["id"]
                         return server
         raise exceptions.NotFound
@@ -272,8 +273,9 @@ class FloatingIPBulk(Resource):
         floating_ip._info = floating_ip
         self.objects.append(floating_ip)
         if 'floatingippools' not in self.cloud.data['nova']:
-            self.cloud.data['nova']['floatingippools'] = AttrDict([])
-        self.cloud.data['nova']['floatingippools'].append({'name': pool})
+            self.cloud.data['nova']['floatingippools'] = []
+        self.cloud.data['nova']['floatingippools'].append(
+            AttrDict({'name': pool}))
         return floating_ip
 
 
