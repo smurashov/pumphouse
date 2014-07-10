@@ -58,9 +58,18 @@ def get_parser():
     migrate_parser.add_argument("--setup",
                                 action="store_true",
                                 help="If present, will add test resources to "
-                                     "the source cloud before start "
+                                     "the source cloud before starting "
                                      "migration, as 'setup' command "
                                      "would do.")
+    migrate_parser.add_argument("--num-tenants",
+                                default='2',
+                                type=int,
+                                help="Number of tenants to create on setup.")
+    migrate_parser.add_argument("--num-servers",
+                                default='1',
+                                type=int,
+                                help="Number of servers per tenant to create "
+                                "on setup.")
     migrate_parser.add_argument("resource",
                                 choices=RESOURCES_MIGRATIONS.keys(),
                                 nargs="?",
@@ -95,6 +104,15 @@ def get_parser():
                                          help="Create resource in a source "
                                               "cloud for the test purposes.")
     setup_parser.set_defaults(action="setup")
+    setup_parser.add_argument("--num-tenants",
+                              default='2',
+                              type=int,
+                              help="Number of tenants to create on setup.")
+    setup_parser.add_argument("--num-servers",
+                              default='1',
+                              type=int,
+                              help="Number of servers per tenant to create "
+                              "on setup.")
     evacuate_parser = subparsers.add_parser("evacuate",
                                             help="Evacuate instances from "
                                                  "the given host.")
@@ -550,7 +568,7 @@ def cleanup(cloud):
             LOG.info("Deleted role: %s", tenant._info)
 
 
-def setup(cloud, num_tenants=2, num_servers=1):
+def setup(cloud, num_tenants, num_servers):
 
     """Prepares test resources in the source cloud
 
@@ -769,12 +787,13 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     Cloud = load_cloud_driver(is_fake=args.fake)
-
     if args.action == "migrate":
         mapping = {}
         src = Cloud.from_dict(**args.config["source"])
         if args.setup:
-            setup(src)
+            setup(src,
+                  args.num_tenants,
+                  args.num_servers)
         dst = Cloud.from_dict(**args.config["destination"])
         migrate_resources = RESOURCES_MIGRATIONS[args.resource]
         if args.ids:
@@ -792,7 +811,9 @@ def main():
         cleanup(cloud)
     elif args.action == "setup":
         src = Cloud.from_dict(**args.config["source"])
-        setup(src)
+        setup(src,
+              args.num_tenants,
+              args.num_servers)
     elif args.action == "evacuate":
         cloud = Cloud.from_dict(**args.config["source"])
         evacuate(cloud, args.host)
