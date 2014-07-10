@@ -54,7 +54,7 @@ class Resource(object):
             for obj in self.objects:
                 if obj[key] == kwargs[key]:
                     return obj
-            raise nova_excs.NotFound("Not found: {}".format(id))
+            raise nova_excs.NotFound("Not found: {}".format(kwargs[key]))
 
     def _get_user_id(self, username):
         for user in self.cloud.data['keystone']['users']:
@@ -128,11 +128,12 @@ class Server(Resource):
             "created": "2014-06-26T12:48:06Z",
             "tenant_id": self.tenant_id,
             "os-extended-volumes:volumes_attached": [],
-            "metadata": {}})
+            "metadata": {}},
+            add_floating_ip=self.add_floating_ip)
         self.objects.append(server)
         return server
 
-    def add_floating_ip(self, floating_ip, fixed_ip):
+    def add_floating_ip(self, floating_ip, fixed_ip=None):
         floating_ip_addr = {
             "OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:c3:d8:d4",
             "version": 4,
@@ -141,9 +142,12 @@ class Server(Resource):
         }
         for server in self.objects:
             for net in server["addresses"]:
+                if not fixed_ip:
+                    server['addresses'][net].append(floating_ip_addr)
+                    return server
                 for addr in net:
                     if addr['addr'] == fixed_ip:
-                        net.append(floating_ip_addr)
+                        server['addresses'][net].append(floating_ip_addr)
                         server._info = server
                         for ip in self.cloud.data['nova']['floatingipsbulk']:
                             if ip['addr'] == floating_ip:
@@ -267,6 +271,7 @@ class FloatingIPBulk(Resource):
                                 'pool': pool})
         floating_ip._info = floating_ip
         self.objects.append(floating_ip)
+        self.cloud.data['nova']['floating_ip_pool'].append({'name': pool})
         return floating_ip
 
 
