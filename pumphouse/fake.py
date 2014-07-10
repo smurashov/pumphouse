@@ -271,7 +271,9 @@ class FloatingIPBulk(Resource):
                                 'pool': pool})
         floating_ip._info = floating_ip
         self.objects.append(floating_ip)
-        self.cloud.data['nova']['floating_ip_pool'].append({'name': pool})
+        if 'floatingippools' not in self.cloud.data['nova']:
+            self.cloud.data['nova']['floatingippools'] = AttrDict([])
+        self.cloud.data['nova']['floatingippools'].append({'name': pool})
         return floating_ip
 
 
