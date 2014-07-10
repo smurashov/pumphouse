@@ -549,7 +549,18 @@ def cleanup(cloud):
             LOG.info("Deleted role: %s", tenant._info)
 
 
-def setup(cloud):
+def setup(cloud, num_tenants=2, num_servers=1):
+
+    """Prepares test resources in the source cloud
+
+    :param cloud:       an instance of Cloud, collection of clients to
+                        OpenStack services.
+    :param num_tenants: a number of tenants to create in the source cloud.
+    :type num_tenants:  int
+    :param num_servers: a number of servers to create per tenant
+    :type servers:      int
+    """
+
     prefix = TEST_RESOURCE_PREFIX
     if not os.path.isfile(TEST_IMAGE_FILE):
         LOG.info("Caching test image: %s", TEST_IMAGE_FILE)
@@ -562,7 +573,7 @@ def setup(cloud):
     test_servers = {}
     test_clouds = {}
     test_roles = {}
-    for i in range(2):
+    for i in range(num_tenants):
         flavor = cloud.nova.flavors.create(
             "{0}-flavor-{1}"
             .format(prefix,
