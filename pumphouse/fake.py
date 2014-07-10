@@ -145,7 +145,8 @@ class Server(Resource):
             for net in server["addresses"]:
                 if not fixed_ip:
                     server['addresses'][net].append(floating_ip_addr)
-                    return server
+                    server._info = server
+                    return
                 for addr in server["addresses"][net]:
                     if addr['addr'] == fixed_ip:
                         server['addresses'][net].append(floating_ip_addr)
