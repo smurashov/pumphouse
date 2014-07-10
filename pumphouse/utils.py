@@ -45,7 +45,7 @@ def wait_for(resource, update_resource,
             LOG.debug("Got resource: %s", resource)
             result = attribute_getter(resource)
             if result == value:
-                break
+                return resource
         time.sleep(check_interval)
         if time.time() - start > timeout:
             raise exceptions.TimeoutException()
