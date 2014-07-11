@@ -255,7 +255,15 @@ class Flavor(Resource):
 
 
 class FloatingIP(Resource):
-    pass
+    def create(self, pool=None):
+        self.objects = self.cloud.data['nova']['floatingipbulks']
+        floating_ips = [obj for obj in self.objects if not obj.project_id]
+        if len(floating_ips) < 1:
+            raise nova_excs.NotFound
+        floating_ip = floating_ips[0]
+        floating_ip['ip'] = floating_ip['address']
+        floating_ip['project_id'] = self.tenant_id
+        return floating_ip
 
 
 class FloatingIPPool(Resource):
