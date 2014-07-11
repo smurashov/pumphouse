@@ -144,8 +144,6 @@ class Server(Resource):
         for server in self.objects:
             for net in server["addresses"]:
                 if not fixed_ip:
-                    LOG.exception("Fake backend cannot add Floating IP "
-                                  "without explicit Fixed IP")
                     raise NotImplementedError
                 for addr in server["addresses"][net]:
                     if addr['addr'] == fixed_ip:
@@ -410,11 +408,11 @@ class Cloud(object):
         self.access_ns = cloud_ns.restrict(user_ns)
         if not data:
             admin_tenant = AttrDict({
-                        'name': self.access_ns.tenant_name,
-                        'id': str(uuid.uuid4())})
+                'name': self.access_ns.tenant_name,
+                'id': str(uuid.uuid4())})
             admin_role = AttrDict({
-                        'name': 'admin',
-                        'id': str(uuid.uuid4())})
+                'name': 'admin',
+                'id': str(uuid.uuid4())})
             self.data = {
                 'glance': {},
                 'keystone': {
@@ -424,8 +422,7 @@ class Cloud(object):
                         'username': self.access_ns.username,
                         'name': self.access_ns.username,
                         'id': str(uuid.uuid4()),
-                        'roles': [admin_role, ]
-                        })],
+                        'roles': [admin_role, ]})],
                 },
                 'nova': {
                     'secgroups': [AttrDict({
