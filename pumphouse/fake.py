@@ -60,7 +60,7 @@ class Resource(object):
         for user in self.cloud.data['keystone']['users']:
             if user['name'] == username:
                 return user['id']
-        raise exceptions.NotFound()
+        return None
 
     def _get_tenant_id(self, tenant_name):
         for tenant in self.cloud.data['keystone']['tenants']:
@@ -313,6 +313,9 @@ class Tenant(Resource):
         self.objects.append(tenant)
         return tenant
 
+    def add_user(self, tenant, user, role):
+        pass
+
 
 class User(Resource):
     def create(self, **kwargs):
@@ -356,6 +359,12 @@ class Role(Resource):
         raise exceptions.NotFound
 
 
+class AuthRef(Resource):
+    def __init__(self, cloud, objects):
+        super(AuthRef, self).__init__(cloud, objects)
+        self.user_id = self._get_user_id(self.cloud.access_ns.username)
+
+
 class Service(object):
     def __init__(self, cloud):
         self.cloud = cloud
@@ -391,6 +400,7 @@ class Keystone(Service):
     tenants = Collection(Tenant)
     users = Collection(User)
     roles = Collection(Role)
+    auth_ref = Collection(AuthRef)
 
 
 class Cloud(object):
@@ -399,23 +409,29 @@ class Cloud(object):
         self.user_ns = user_ns
         self.access_ns = cloud_ns.restrict(user_ns)
         if not data:
-            admin_tenant_id = str(uuid.uuid4())
+            admin_tenant = AttrDict({
+                        'name': self.access_ns.tenant_name,
+                        'id': str(uuid.uuid4())})
+            admin_role = AttrDict({
+                        'name': 'admin',
+                        'id': str(uuid.uuid4())})
             self.data = {
                 'glance': {},
                 'keystone': {
-                    'tenants': [AttrDict({
-                        'name': self.access_ns.tenant_name,
-                        'id': admin_tenant_id})],
+                    'tenants': [admin_tenant, ],
+                    'roles': [admin_role, ],
                     'users': [AttrDict({
                         'username': self.access_ns.username,
                         'name': self.access_ns.username,
-                        'id': str(uuid.uuid4())})]
+                        'id': str(uuid.uuid4()),
+                        'roles': [admin_role, ]
+                        })],
                 },
                 'nova': {
                     'secgroups': [AttrDict({
                         'name': 'default',
                         'description': 'default',
-                        'tenant_id': admin_tenant_id,
+                        'tenant_id': admin_tenant.id,
                         'id': str(uuid.uuid4()),
                         'rules': ''})]
                 },
