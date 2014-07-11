@@ -6,6 +6,7 @@ import random
 import time
 import urllib
 
+from pumphouse.api import migration as api_migration
 from pumphouse.cloud import Namespace
 from pumphouse import exceptions
 from pumphouse import utils
@@ -100,20 +101,6 @@ def get_parser():
     evacuate_parser.add_argument("host",
                                  help="The source host of the evacuation")
     return parser
-
-
-def wait_for_delete(resource, update_resource, timeout=60,
-                    check_interval=1,
-                    expect_excs=(exceptions.NotFound,)):
-    start = time.time()
-    while True:
-        try:
-            resource = update_resource(resource)
-        except expect_excs:
-            break
-        time.sleep(check_interval)
-        if time.time() - start > timeout:
-            raise exceptions.TimeoutException()
 
 
 def migrate_flavor(mapping, src, dst, id):
@@ -520,9 +507,13 @@ def cleanup(cloud):
         if not is_prefixed(server.name):
             continue
         cloud.nova.servers.delete(server)
-        wait_for_delete(server, cloud.nova.servers.get,
-                        expect_excs=(nova_excs.NotFound,))
+        utils.wait_for(server, cloud.nova.servers.get,
+                       expect_excs=(nova_excs.NotFound,))
         LOG.info("Deleted server: %s", server._info)
+    for flavor in cloud.nova.flavors.list():
+        if is_prefixed(flavor.name):
+            cloud.nova.flavors.delete(flavor)
+            LOG.info("Deleted flavor: %s", flavor._info)
     for image in cloud.glance.images.list():
         if not is_prefixed(image.name):
             continue
@@ -584,6 +575,11 @@ def setup(cloud):
             .format(prefix,
                     str(random.randint(1, 0x7fffffff))),
             description="pumphouse test tenant")
+        api_migration.become_admin_in_tenant(cloud,
+                                             cloud.keystone.auth_ref.user_id,
+                                             tenant)
+        tenant_ns = cloud.user_ns.restrict(tenant_name=tenant.name)
+        tenant_cloud = cloud.restrict(tenant_ns)
         test_tenants[tenant.id] = tenant
         LOG.info("Created: %s", tenant._info)
         role = cloud.keystone.roles.create(
@@ -604,7 +600,7 @@ def setup(cloud):
             role,
             tenant=tenant.id)
         LOG.info("Assigned: %s", user_role)
-        net = cloud.nova.networks.create(
+        net = tenant_cloud.nova.networks.create(
             label="{0}-pumphouse-{1}".format(prefix, i),
             cidr="10.10.{0}.0/24".format(i),
             project_id=tenant.id)

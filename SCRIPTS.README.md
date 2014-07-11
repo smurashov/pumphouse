@@ -3,6 +3,10 @@
 To use scripts install pumphouse package. The package contains scripts that
 implement main tasks of the Pumphouse utility.
 
+To perform installation with a third-party user interface the package should be
+prepared. It is a simple action and it require just copy files in the
+pumphouse/api/static directory. A file with the index.html name must be there.
+
 To install the pumphouse package use the command:
 
 ```sh
@@ -13,6 +17,38 @@ Two commands would be avaiable in your environment:
 
 * `pumphouse`
 * `pumphouse-bm`
+
+## `pumphouse-api` - Pumphouse API Server
+
+This script provides API server for Pumphouse with UI. To run the server use
+the following command:
+
+```sh
+$ pumphouse-api [config]
+```
+
+The config file is an YAML file with next structure:
+
+```
+DEBUG: true
+CLOUDS:
+    source:
+        endpoint:
+            auth_url: http://172.18.18.157:5000/v2.0
+            username: admin
+            password: secrete
+            tenant_name: admin
+        identity:
+            connection: mysql+mysqlconnector://root:stackdb@172.18.18.157/keystone
+    destination:
+        endpoint:
+            auth_url: http://172.18.18.132:5000/v2.0
+            username: admin
+            password: secrete
+            tenant_name: admin
+        identity:
+            connection: mysql+mysqlconnector://keystone:secrete@172.18.18.132/keystone
+```
 
 ## `pumphouse` - Simple migration script
 

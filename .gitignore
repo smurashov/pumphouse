@@ -3,3 +3,4 @@
 *.swp
 build
 .tox
+pumphouse/api/static
