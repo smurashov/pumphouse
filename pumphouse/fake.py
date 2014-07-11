@@ -144,9 +144,9 @@ class Server(Resource):
         for server in self.objects:
             for net in server["addresses"]:
                 if not fixed_ip:
-                    server['addresses'][net].append(floating_ip_addr)
-                    server._info = server
-                    return
+                    LOG.exception("Fake backend cannot add Floating IP "
+                                  "without explicit Fixed IP")
+                    raise NotImplementedError
                 for addr in server["addresses"][net]:
                     if addr['addr'] == fixed_ip:
                         server['addresses'][net].append(floating_ip_addr)
