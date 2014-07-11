@@ -31,7 +31,8 @@ class Resource(object):
         self.user_id = self._get_user_id(self.cloud.access_ns.username)
         self.tenant_id = self._get_tenant_id(self.cloud.access_ns.tenant_name)
 
-    def list(self, search_opts=None, filters=None, tenant_id=None):
+    def list(self, search_opts=None, filters=None, tenant_id=None,
+             project_id=None):
         return self.objects
 
     findall = list
