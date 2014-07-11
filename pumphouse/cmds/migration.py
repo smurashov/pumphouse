@@ -695,12 +695,14 @@ def setup(cloud, num_tenants, num_servers):
             test_servers[server.id] = server
             LOG.info("Created: %s", server._info)
             try:
+                pool = "{}-pool-{}".format(prefix, tenant_ref)
                 floating_addr = FLOATING_IP_STRING.format(136 + len(
                     test_servers))
                 floating_range = tenant_cloud.nova.floating_ips_bulk.create(
                     floating_addr,
-                    pool="{}-pool-{}"
-                    .format(prefix, tenant_ref))
+                    pool=pool)
+                floating_ip = cloud.nova.floating_ips.create(
+                    pool=pool)
             except Exception as exc:
                 LOG.exception("Cannot create floating ip range: %s",
                               exc.message)
