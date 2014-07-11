@@ -107,11 +107,11 @@ class Cloud(object):
     :type cloud_ns:     object
     :param user_ns:     a restricted user credentials namespace
     :type user_ns:      object
-    :param identity:    optional dictionary or object containing access
-                        credentials
+    :param identity:    object containing access credentials
     """
 
     def __init__(self, cloud_ns, user_ns, identity):
+        self.identity = identity
         self.cloud_ns = cloud_ns
         self.user_ns = user_ns
         self.access_ns = cloud_ns.restrict(user_ns)
@@ -125,10 +125,6 @@ class Cloud(object):
         self.glance = glance.Client("2",
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
-        if isinstance(identity, Identity):
-            self.identity = identity
-        else:
-            self.identity = Identity(**identity)
 
     def restrict(self, user_ns):
         return Cloud(self.cloud_ns, user_ns, self.identity)
