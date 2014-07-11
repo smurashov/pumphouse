@@ -26,6 +26,7 @@ TEST_IMAGE_URL = ("http://download.cirros-cloud.net/0.3.2/"
                   "cirros-0.3.2-x86_64-disk.img")
 TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
 TEST_RESOURCE_PREFIX = "pumphouse-test"
+FLOATING_IP_STRING = "172.18.167.{}"
 
 
 def load_cloud_driver(is_fake=False):
@@ -57,9 +58,18 @@ def get_parser():
     migrate_parser.add_argument("--setup",
                                 action="store_true",
                                 help="If present, will add test resources to "
-                                     "the source cloud before start "
+                                     "the source cloud before starting "
                                      "migration, as 'setup' command "
                                      "would do.")
+    migrate_parser.add_argument("--num-tenants",
+                                default='2',
+                                type=int,
+                                help="Number of tenants to create on setup.")
+    migrate_parser.add_argument("--num-servers",
+                                default='1',
+                                type=int,
+                                help="Number of servers per tenant to create "
+                                "on setup.")
     migrate_parser.add_argument("resource",
                                 choices=RESOURCES_MIGRATIONS.keys(),
                                 nargs="?",
@@ -94,6 +104,15 @@ def get_parser():
                                          help="Create resource in a source "
                                               "cloud for the test purposes.")
     setup_parser.set_defaults(action="setup")
+    setup_parser.add_argument("--num-tenants",
+                              default='2',
+                              type=int,
+                              help="Number of tenants to create on setup.")
+    setup_parser.add_argument("--num-servers",
+                              default='1',
+                              type=int,
+                              help="Number of servers per tenant to create "
+                              "on setup.")
     evacuate_parser = subparsers.add_parser("evacuate",
                                             help="Evacuate instances from "
                                                  "the given host.")
@@ -549,7 +568,18 @@ def cleanup(cloud):
             LOG.info("Deleted role: %s", tenant._info)
 
 
-def setup(cloud):
+def setup(cloud, num_tenants, num_servers):
+
+    """Prepares test resources in the source cloud
+
+    :param cloud:       an instance of Cloud, collection of clients to
+                        OpenStack services.
+    :param num_tenants: a number of tenants to create in the source cloud.
+    :type num_tenants:  int
+    :param num_servers: a number of servers to create per tenant
+    :type servers:      int
+    """
+
     prefix = TEST_RESOURCE_PREFIX
     if not os.path.isfile(TEST_IMAGE_FILE):
         LOG.info("Caching test image: %s", TEST_IMAGE_FILE)
@@ -562,7 +592,7 @@ def setup(cloud):
     test_servers = {}
     test_clouds = {}
     test_roles = {}
-    for i in range(2):
+    for i in range(num_tenants):
         flavor = cloud.nova.flavors.create(
             "{0}-flavor-{1}"
             .format(prefix,
@@ -621,20 +651,45 @@ def setup(cloud):
         cloud.glance.images.upload(image.id, open(TEST_IMAGE_FILE, "rb"))
         test_images[image.id] = image
         LOG.info("Created: %s", dict(image))
-        (net, _, addr) = test_nets[tenant_ref].dhcp_start.rpartition('.')
-        ip = ".".join((net, str(int(addr) + len(test_servers))))
-        nics = [{
-            "net-id": test_nets[tenant_ref].id,
-            "v4-fixed-ip": ip,
-        }]
-        server = cloud.nova.servers.create(
-            "{0}-{1}".format(prefix,
-                             str(random.randint(1, 0x7fffffff))),
-            image.id,
-            flavor.id,
-            nics=nics)
-        test_servers[server.id] = server
-        LOG.info("Created: %s", server._info)
+        for i in range(num_servers):
+            (net, _, addr) = test_nets[tenant_ref].dhcp_start.rpartition('.')
+            ip = ".".join((net, str(int(addr) + len(test_servers))))
+            nics = [{
+                "net-id": test_nets[tenant_ref].id,
+                "v4-fixed-ip": ip,
+            }]
+            server = cloud.nova.servers.create(
+                "{0}-{1}".format(prefix,
+                                 str(random.randint(1, 0x7fffffff))),
+                image.id,
+                flavor.id,
+                nics=nics)
+            test_servers[server.id] = server
+            LOG.info("Created: %s", server._info)
+            try:
+                floating_addr = FLOATING_IP_STRING.format(136 + len(
+                    test_servers))
+                floating_range = cloud.nova.floating_ips_bulk.create(
+                    floating_addr,
+                    pool="{}-pool-{}"
+                    .format(prefix, tenant_ref))
+            except Exception as exc:
+                LOG.exception("Cannot create floating ip range: %s",
+                              exc.message)
+                break
+            else:
+                LOG.info("Created: %s", floating_range._info)
+            try:
+                server.add_floating_ip(floating_addr, ip)
+            except nova_excs.BadRequest:
+                LOG.execption("No nw_info cache associated with instance: %s",
+                              server._info)
+            except Exception as exc:
+                LOG.exception("Cannot create floating ip range: %s",
+                              exc.message)
+            else:
+                server = cloud.nova.servers.get(server)
+                LOG.info("Associated: %s", server._info['addresses'])
 
 
 def get_ids_by_tenant(cloud, resource_type, tenant_id):
@@ -735,12 +790,13 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     Cloud = load_cloud_driver(is_fake=args.fake)
-
     if args.action == "migrate":
         mapping = {}
         src = Cloud.from_dict(**args.config["source"])
         if args.setup:
-            setup(src)
+            setup(src,
+                  args.num_tenants,
+                  args.num_servers)
         dst = Cloud.from_dict(**args.config["destination"])
         migrate_resources = RESOURCES_MIGRATIONS[args.resource]
         if args.ids:
@@ -758,7 +814,9 @@ def main():
         cleanup(cloud)
     elif args.action == "setup":
         src = Cloud.from_dict(**args.config["source"])
-        setup(src)
+        setup(src,
+              args.num_tenants,
+              args.num_servers)
     elif args.action == "evacuate":
         cloud = Cloud.from_dict(**args.config["source"])
         evacuate(cloud, args.host)
