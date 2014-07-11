@@ -704,22 +704,34 @@ def setup(cloud, num_tenants, num_servers):
                 floating_ip = cloud.nova.floating_ips.create(
                     pool=pool)
             except Exception as exc:
-                LOG.exception("Cannot create floating ip range: %s",
+                LOG.exception("Cannot create floating ip: %s",
                               exc.message)
                 pass
             else:
-                LOG.info("Created: %s", floating_range._info)
-            try:
-                server.add_floating_ip(floating_addr, ip)
-            except nova_excs.BadRequest:
-                LOG.execption("No nw_info cache associated with instance: %s",
-                              server._info)
-            except Exception as exc:
-                LOG.exception("Cannot create floating ip range: %s",
-                              exc.message)
-            else:
-                server = cloud.nova.servers.get(server)
-                LOG.info("Associated: %s", server._info['addresses'])
+                LOG.info("Created: %s", floating_ip._info)
+            while True:
+                try:
+                    server.add_floating_ip(floating_ip.ip, ip)
+                except nova_excs.BadRequest:
+                    LOG.warn("Network info not ready for instance: %s",
+                             server._info)
+                    time.sleep(1)
+                    continue
+                except nova_excs.NotFound:
+                    LOG.warn("Floating IP not found: %s",
+                             floating_ip._info)
+                    time.sleep(1)
+                    continue
+                except Exception as exc:
+                    LOG.exception("Cannot create floating ip range: %s",
+                                  exc.message)
+                    break
+                else:
+                    break
+            server = cloud.nova.servers.get(server)
+            LOG.info("Assigned floating ip %s to server: %s",
+                     floating_ip._info,
+                     server._info)
 
 
 def get_ids_by_tenant(cloud, resource_type, tenant_id):
