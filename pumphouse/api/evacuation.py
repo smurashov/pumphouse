@@ -1,5 +1,7 @@
 import logging
 
+from novaclient import exceptions as nova_excs
+
 from . import hooks
 from pumphouse import utils
 
@@ -30,8 +32,8 @@ def evacuate_servers(hostname):
                                                     True, False)
                     server = utils.wait_for(server_id, cloud.nova.servers.get,
                                             value="ACTIVE")
-                    dst_hostname = getattr(server,
-                        "OS-EXT-SRV-ATTR:hypervisor_hostname")
+                    hostname_attr = "OS-EXT-SRV-ATTR:hypervisor_hostname"
+                    dst_hostname = getattr(server, hostname_attr)
                     events.emit("server live migrated", {
                         "id": server.id,
                         "host_name": dst_hostname,

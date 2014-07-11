@@ -236,8 +236,7 @@ def migrate_server(mapping, events, src, dst, id):
         try:
             s1 = user_dst.nova.servers.create(s0.name, i1, f1, nics=nics)
             s1 = utils.wait_for(s1, dst.nova.servers.get, value="ACTIVE")
-            hostname = getattr(s1,
-                "OS-EXT-SRV-ATTR:hypervisor_hostname")
+            hostname = getattr(s1, "OS-EXT-SRV-ATTR:hypervisor_hostname")
             events.emit("server boot", {
                 "cloud": "destination",
                 "id": s1.id,
