@@ -551,7 +551,7 @@ def cleanup(cloud):
     for floating_ip in cloud.nova.floating_ips_bulk.list():
         if not is_prefixed(floating_ip.pool):
             continue
-        cloud.nova.floating_ips_bulk.delete(floating_ip)
+        cloud.nova.floating_ips_bulk.delete(floating_ip.address)
         LOG.info("Deleted floating ip: %s", floating_ip._info)
     for network in cloud.nova.networks.list():
         if not is_prefixed(network.label):
