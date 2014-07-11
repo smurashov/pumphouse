@@ -591,6 +591,7 @@ def setup(cloud, num_tenants, num_servers):
     test_nets = {}
     test_servers = {}
     test_clouds = {}
+    test_tenant_clouds = {}
     test_roles = {}
     for i in range(num_tenants):
         flavor = cloud.nova.flavors.create(
@@ -610,6 +611,7 @@ def setup(cloud, num_tenants, num_servers):
                                              tenant)
         tenant_ns = cloud.user_ns.restrict(tenant_name=tenant.name)
         tenant_cloud = cloud.restrict(tenant_ns)
+        test_tenant_clouds[tenant.id] = tenant_cloud
         test_tenants[tenant.id] = tenant
         LOG.info("Created: %s", tenant._info)
         role = cloud.keystone.roles.create(
@@ -662,6 +664,7 @@ def setup(cloud, num_tenants, num_servers):
         test_clouds[tenant.id] = cloud.restrict(user_ns)
     for tenant_ref in test_tenants:
         cloud = test_clouds[tenant_ref]
+        tenant_cloud = test_tenant_clouds[tenant_ref]
         image = cloud.glance.images.create(
             disk_format='qcow2',
             container_format='bare',
@@ -689,14 +692,14 @@ def setup(cloud, num_tenants, num_servers):
             try:
                 floating_addr = FLOATING_IP_STRING.format(136 + len(
                     test_servers))
-                floating_range = cloud.nova.floating_ips_bulk.create(
+                floating_range = tenant_cloud.nova.floating_ips_bulk.create(
                     floating_addr,
                     pool="{}-pool-{}"
                     .format(prefix, tenant_ref))
             except Exception as exc:
                 LOG.exception("Cannot create floating ip range: %s",
                               exc.message)
-                break
+                pass
             else:
                 LOG.info("Created: %s", floating_range._info)
             try:
