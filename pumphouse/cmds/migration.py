@@ -548,6 +548,11 @@ def cleanup(cloud):
         else:
             cloud.nova.security_groups.delete(secgroup.id)
             LOG.info("Deleted secgroup: %s", secgroup._info)
+    for floating_ip in cloud.nova.floating_ips_bulk.list():
+        if not is_prefixed(floating_ip.pool):
+            continue
+        cloud.nova.floating_ips_bulk.delete(floating_ip)
+        LOG.info("Deleted floating ip: %s", floating_ip._info)
     for network in cloud.nova.networks.list():
         if not is_prefixed(network.label):
             continue
