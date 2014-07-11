@@ -630,11 +630,31 @@ def setup(cloud, num_tenants, num_servers):
             role,
             tenant=tenant.id)
         LOG.info("Assigned: %s", user_role)
-        net = tenant_cloud.nova.networks.create(
-            label="{0}-pumphouse-{1}".format(prefix, i),
-            cidr="10.10.{0}.0/24".format(i),
-            project_id=tenant.id)
-        test_nets[tenant.id] = net
+        try:
+            net = tenant_cloud.nova.networks.create(
+                label="{0}-pumphouse-{1}".format(prefix, i),
+                cidr="10.10.{}.0/24".format(i),
+                project_id=tenant.id)
+        except nova_excs.Conflict:
+            pass
+        else:
+            test_nets[tenant.id] = net
+        try:
+            net = tenant_cloud.nova.networks.find(
+                project_id=tenant.id)
+        except nova_excs.NotFound:
+            pass
+        else:
+            test_nets[tenant.id] = net
+        try:
+            net = tenant_cloud.nova.networks.findall(
+                project_id=None)[0]
+        except nova_excs.NotFound:
+            LOG.exception("No suitable networks found: %s",
+                          tenant._info)
+            raise exceptions.Error
+        else:
+            test_nets[tenant.id] = net
         LOG.info("Created: %s", net._info)
         user_ns = Namespace(username=user.name,
                             password="default",
