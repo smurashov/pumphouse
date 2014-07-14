@@ -1,9 +1,13 @@
 import collections
+import logging
 import sqlalchemy as sqla
 
 from novaclient.v1_1 import client as nova_client
 from keystoneclient.v2_0 import client as keystone_client
 from glanceclient import client as glance
+
+
+LOG = logging.getLogger(__name__)
 
 
 class Identity(collections.Mapping):
@@ -107,11 +111,11 @@ class Cloud(object):
     :type cloud_ns:     object
     :param user_ns:     a restricted user credentials namespace
     :type user_ns:      object
-    :param identity:    optional dictionary or object containing access
-                        credentials
+    :param identity:    object containing access credentials
     """
 
     def __init__(self, cloud_ns, user_ns, identity):
+        self.identity = identity
         self.cloud_ns = cloud_ns
         self.user_ns = user_ns
         self.access_ns = cloud_ns.restrict(user_ns)
@@ -125,10 +129,6 @@ class Cloud(object):
         self.glance = glance.Client("2",
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
-        if isinstance(identity, Identity):
-            self.identity = identity
-        else:
-            self.identity = Identity(**identity)
 
     def restrict(self, user_ns):
         return Cloud(self.cloud_ns, user_ns, self.identity)
@@ -145,3 +145,12 @@ class Cloud(object):
 
     def __repr__(self):
         return "<Cloud(namespace={!r})>".format(self.access_ns)
+
+
+def make_client(config, target, cloud_driver, identity_driver):
+    identity = identity_driver(**config["identity"])
+    cloud = cloud_driver.from_dict(endpoint=config["endpoint"],
+                                   identity=identity)
+    LOG.info("Cloud client initialized for endpoint: %s",
+             config["endpoint"]["auth_url"])
+    return cloud

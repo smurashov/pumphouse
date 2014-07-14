@@ -20,6 +20,7 @@ def create_app():
         "CLOUDS": None,
         "CLOUD_DRIVER": "pumphouse.cloud.Cloud",
         "IDENTITY_DRIVER": "pumphouse.cloud.Identity",
+        "CLIENT_MAKER": "pumphouse.cloud.make_client",
     })
     return app
 
