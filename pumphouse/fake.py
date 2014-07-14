@@ -96,10 +96,10 @@ class Server(Resource):
 
     def _update_status(self, server, status=None):
         if server.status == "BUILDING":
-            updated = datetime.strptime(server.updated,
-                                        "%Y-%m-%dT%H:%M:%S.%f")
+            updated = datetime.datetime.strptime(
+                server.updated, "%Y-%m-%dT%H:%M:%S.%f")
             delta = datetime.datetime.now() - updated
-            if delta > 30:
+            if delta.total_seconds() > 30:
                 server.updated = datetime.datetime.now().isoformat()
                 server.status = "ACTIVE"
         return server
