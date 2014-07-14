@@ -87,6 +87,16 @@ class Server(Resource):
                random.randint(0x00, 0xff)]
         return ':'.join(map(lambda x: "%02x" % x, mac))
 
+    def _update_status(self, server, status=None):
+        if server.status == "BUILDING":
+            updated = datetime.strptime(server.updated,
+                                        "%Y-%m-%dT%H:%M:%S.%f")
+            delta = datetime.datetime.now() - updated
+            if delta > 30:
+                server.updated = datetime.datetime.now().isoformat()
+                server.status = "ACTIVE"
+        return server
+
     def create(self, name, image, flavor, nics=[]):
         addresses = {}
         server_uuid = uuid.uuid4()
@@ -114,7 +124,7 @@ class Server(Resource):
             "image": {"id": image_id, },
             "OS-EXT-STS:vm_state": "active",
             "OS-EXT-SRV-ATTR:instance_name": "instance-00000004",
-            "OS-SRV-USG:launched_at": str(datetime.datetime.now()),
+            "OS-SRV-USG:launched_at": datetime.datetime.now().isoformat(),
             "flavor": {"id": flavor_id, },
             "id": str(server_uuid),
             "security_groups": [{"name": "default"}],
@@ -127,7 +137,7 @@ class Server(Resource):
             "OS-EXT-AZ:availability_zone": "nova",
             "config_drive": "",
             "status": "ACTIVE",
-            "updated": "2014-06-26T12:48:18Z",
+            "updated": datetime.datetime.now().isoformat(),
             "hostId": server_uuid.hex,
             "OS-EXT-SRV-ATTR:host": "ubuntu-1204lts-server-x86",
             "OS-SRV-USG:terminated_at": None,
@@ -135,7 +145,7 @@ class Server(Resource):
             "OS-EXT-SRV-ATTR:hypervisor_hostname":
                 self.cloud.nova.schedule_server().name,
             "name": name,
-            "created": "2014-06-26T12:48:06Z",
+            "created": str(datetime.datetime.now()),
             "tenant_id": self.tenant_id,
             "os-extended-volumes:volumes_attached": [],
             "metadata": {}},
