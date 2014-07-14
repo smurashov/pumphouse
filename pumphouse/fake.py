@@ -31,7 +31,8 @@ class Resource(object):
         self.user_id = self._get_user_id(self.cloud.access_ns.username)
         self.tenant_id = self._get_tenant_id(self.cloud.access_ns.tenant_name)
 
-    def list(self, search_opts=None, filters=None, tenant_id=None):
+    def list(self, search_opts=None, filters=None, tenant_id=None,
+             project_id=None):
         return self.objects
 
     findall = list
@@ -144,9 +145,7 @@ class Server(Resource):
         for server in self.objects:
             for net in server["addresses"]:
                 if not fixed_ip:
-                    server['addresses'][net].append(floating_ip_addr)
-                    server._info = server
-                    return
+                    raise NotImplementedError
                 for addr in server["addresses"][net]:
                     if addr['addr'] == fixed_ip:
                         server['addresses'][net].append(floating_ip_addr)
@@ -256,7 +255,15 @@ class Flavor(Resource):
 
 
 class FloatingIP(Resource):
-    pass
+    def create(self, pool=None):
+        self.objects = self.cloud.data['nova']['floatingipbulks']
+        floating_ips = [obj for obj in self.objects if not obj.project_id]
+        if len(floating_ips) < 1:
+            raise nova_excs.NotFound
+        floating_ip = floating_ips[0]
+        floating_ip['ip'] = floating_ip['address']
+        floating_ip['project_id'] = self.tenant_id
+        return floating_ip
 
 
 class FloatingIPPool(Resource):
@@ -410,11 +417,11 @@ class Cloud(object):
         self.access_ns = cloud_ns.restrict(user_ns)
         if not data:
             admin_tenant = AttrDict({
-                        'name': self.access_ns.tenant_name,
-                        'id': str(uuid.uuid4())})
+                'name': self.access_ns.tenant_name,
+                'id': str(uuid.uuid4())})
             admin_role = AttrDict({
-                        'name': 'admin',
-                        'id': str(uuid.uuid4())})
+                'name': 'admin',
+                'id': str(uuid.uuid4())})
             self.data = {
                 'glance': {},
                 'keystone': {
@@ -424,8 +431,7 @@ class Cloud(object):
                         'username': self.access_ns.username,
                         'name': self.access_ns.username,
                         'id': str(uuid.uuid4()),
-                        'roles': [admin_role, ]
-                        })],
+                        'roles': [admin_role, ]})],
                 },
                 'nova': {
                     'secgroups': [AttrDict({

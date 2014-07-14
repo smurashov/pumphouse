@@ -548,6 +548,11 @@ def cleanup(cloud):
         else:
             cloud.nova.security_groups.delete(secgroup.id)
             LOG.info("Deleted secgroup: %s", secgroup._info)
+    for floating_ip in cloud.nova.floating_ips_bulk.list():
+        if not is_prefixed(floating_ip.pool):
+            continue
+        cloud.nova.floating_ips_bulk.delete(floating_ip.address)
+        LOG.info("Deleted floating ip: %s", floating_ip._info)
     for network in cloud.nova.networks.list():
         if not is_prefixed(network.label):
             continue
@@ -591,6 +596,7 @@ def setup(cloud, num_tenants, num_servers):
     test_nets = {}
     test_servers = {}
     test_clouds = {}
+    test_tenant_clouds = {}
     test_roles = {}
     for i in range(num_tenants):
         flavor = cloud.nova.flavors.create(
@@ -610,6 +616,7 @@ def setup(cloud, num_tenants, num_servers):
                                              tenant)
         tenant_ns = cloud.user_ns.restrict(tenant_name=tenant.name)
         tenant_cloud = cloud.restrict(tenant_ns)
+        test_tenant_clouds[tenant.id] = tenant_cloud
         test_tenants[tenant.id] = tenant
         LOG.info("Created: %s", tenant._info)
         role = cloud.keystone.roles.create(
@@ -630,11 +637,31 @@ def setup(cloud, num_tenants, num_servers):
             role,
             tenant=tenant.id)
         LOG.info("Assigned: %s", user_role)
-        net = tenant_cloud.nova.networks.create(
-            label="{0}-pumphouse-{1}".format(prefix, i),
-            cidr="10.10.{0}.0/24".format(i),
-            project_id=tenant.id)
-        test_nets[tenant.id] = net
+        try:
+            net = tenant_cloud.nova.networks.create(
+                label="{0}-pumphouse-{1}".format(prefix, i),
+                cidr="10.10.{}.0/24".format(i),
+                project_id=tenant.id)
+        except nova_excs.Conflict:
+            pass
+        else:
+            test_nets[tenant.id] = net
+        try:
+            net = tenant_cloud.nova.networks.find(
+                project_id=tenant.id)
+        except nova_excs.NotFound:
+            pass
+        else:
+            test_nets[tenant.id] = net
+        try:
+            net = tenant_cloud.nova.networks.findall(
+                project_id=None)[0]
+        except nova_excs.NotFound:
+            LOG.exception("No suitable networks found: %s",
+                          tenant._info)
+            raise exceptions.Error
+        else:
+            test_nets[tenant.id] = net
         LOG.info("Created: %s", net._info)
         user_ns = Namespace(username=user.name,
                             password="default",
@@ -642,6 +669,7 @@ def setup(cloud, num_tenants, num_servers):
         test_clouds[tenant.id] = cloud.restrict(user_ns)
     for tenant_ref in test_tenants:
         cloud = test_clouds[tenant_ref]
+        tenant_cloud = test_tenant_clouds[tenant_ref]
         image = cloud.glance.images.create(
             disk_format='qcow2',
             container_format='bare',
@@ -667,29 +695,43 @@ def setup(cloud, num_tenants, num_servers):
             test_servers[server.id] = server
             LOG.info("Created: %s", server._info)
             try:
+                pool = "{}-pool-{}".format(prefix, tenant_ref)
                 floating_addr = FLOATING_IP_STRING.format(136 + len(
                     test_servers))
-                floating_range = cloud.nova.floating_ips_bulk.create(
+                floating_range = tenant_cloud.nova.floating_ips_bulk.create(
                     floating_addr,
-                    pool="{}-pool-{}"
-                    .format(prefix, tenant_ref))
+                    pool=pool)
+                floating_ip = cloud.nova.floating_ips.create(
+                    pool=pool)
             except Exception as exc:
-                LOG.exception("Cannot create floating ip range: %s",
+                LOG.exception("Cannot create floating ip: %s",
                               exc.message)
-                break
+                pass
             else:
-                LOG.info("Created: %s", floating_range._info)
-            try:
-                server.add_floating_ip(floating_addr, ip)
-            except nova_excs.BadRequest:
-                LOG.execption("No nw_info cache associated with instance: %s",
-                              server._info)
-            except Exception as exc:
-                LOG.exception("Cannot create floating ip range: %s",
-                              exc.message)
-            else:
-                server = cloud.nova.servers.get(server)
-                LOG.info("Associated: %s", server._info['addresses'])
+                LOG.info("Created: %s", floating_ip._info)
+            while True:
+                try:
+                    server.add_floating_ip(floating_ip.ip, ip)
+                except nova_excs.BadRequest:
+                    LOG.warn("Network info not ready for instance: %s",
+                             server._info)
+                    time.sleep(1)
+                    continue
+                except nova_excs.NotFound:
+                    LOG.warn("Floating IP not found: %s",
+                             floating_ip._info)
+                    time.sleep(1)
+                    continue
+                except Exception as exc:
+                    LOG.exception("Cannot create floating ip range: %s",
+                                  exc.message)
+                    break
+                else:
+                    break
+            server = cloud.nova.servers.get(server)
+            LOG.info("Assigned floating ip %s to server: %s",
+                     floating_ip._info,
+                     server._info)
 
 
 def get_ids_by_tenant(cloud, resource_type, tenant_id):
