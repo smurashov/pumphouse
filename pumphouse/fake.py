@@ -202,7 +202,8 @@ class Image(Resource):
         return data
 
     def upload(self, image_id, data):
-        time.sleep(random.randint(15, 45))
+        if self.cloud.delays:
+            time.sleep(random.randint(15, 45))
 
     def create(self, **kwargs):
         image_uuid = uuid.uuid4()
@@ -459,6 +460,7 @@ class Keystone(BaseService):
 
 class Cloud(object):
     def __init__(self, cloud_ns, user_ns, identity, data=None):
+        self.delays = False
         self.cloud_ns = cloud_ns
         self.user_ns = user_ns
         self.access_ns = cloud_ns.restrict(user_ns)
@@ -581,4 +583,6 @@ def make_client(config, target, cloud_driver, identity_driver):
         num_tenants = parameters.get("num_tenants", 2)
         num_servers = parameters.get("num_servers", 2)
         management.setup(cloud, num_tenants, num_servers)
+        delays = parameters.get("delays", False)
+        cloud.delays = delays
     return cloud
