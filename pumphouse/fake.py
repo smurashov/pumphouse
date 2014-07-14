@@ -36,9 +36,14 @@ class Resource(object):
 
     def list(self, search_opts=None, filters=None, tenant_id=None,
              project_id=None):
+        for obj in self.objects:
+            obj = self._update_status(obj)
         return self.objects
 
     findall = list
+
+    def _update_status(self, obj):
+        return obj
 
     def create(self, obj):
         self.objects.append(obj)
@@ -50,6 +55,7 @@ class Resource(object):
             real_id = id
         for obj in self.objects:
             if obj.id == real_id:
+                obj = self._update_status(obj)
                 return obj
         raise nova_excs.NotFound("Not found: {}".format(id))
 
