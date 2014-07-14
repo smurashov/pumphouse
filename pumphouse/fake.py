@@ -209,14 +209,14 @@ class Image(Resource):
         image = AttrDict({
             "status": "active",
             "tags": [],
-            "updated_at": str(datetime.datetime.now()),
+            "updated_at": datetime.datetime.now().isoformat(),
             "file": "/v2/images/{}/file"
             .format(str(image_uuid)),
             "owner": self.tenant_id,
             "id": str(image_uuid),
             "size": 13167616,
             "checksum": image_uuid.hex,
-            "created_at": "2014-06-26T12:48:04Z",
+            "created_at": datetime.datetime.now().isoformat(),
             "schema": "/v2/schemas/image",
             "visibility": '',
             "min_ram": 0,
