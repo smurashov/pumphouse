@@ -66,6 +66,12 @@ class Resource(object):
                     return obj
             raise nova_excs.NotFound("Not found: {}".format(kwargs[key]))
 
+    def delete(self, id):
+        deleted = self.get(id)
+        objects = [obj for obj in self.objects
+                   if not obj.id == deleted.id]
+        self.objects = objects
+
     def _get_user_id(self, username):
         for user in self.cloud.data['keystone']['users']:
             if user['name'] == username:
@@ -175,14 +181,17 @@ class Server(Resource):
                         return server
         raise exceptions.NotFound
 
-    def suspend(self, id):
-        pass
+    def suspend(self, obj_id):
+        server = self.get(obj_id)
+        server.status = "SUSPENDED"
+        server.update = datetime.datetime.now().isoformat()
+        return server
 
-    def delete(self, id):
-        pass
-
-    def resume(self, id):
-        pass
+    def resume(self, obj_id):
+        server = self.get(obj_id)
+        server.status = "ACTIVE"
+        server.update = datetime.datetime.now().isoformat()
+        return server
 
 
 class Image(Resource):
