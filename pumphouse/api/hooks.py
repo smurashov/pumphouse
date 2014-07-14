@@ -24,19 +24,17 @@ def setup_cloud(cloud_name):
         cloud = getattr(flask.g, attribute_name, None)
         if cloud is None:
             config = flask.current_app.config
+            LOG.info("Identity driver will be used: %s",
+                     config["IDENTITY_DRIVER"])
+            identity_driver = utils.load_class(config["IDENTITY_DRIVER"])
+            LOG.info("Cloud driver will be used: %s", config["CLOUD_DRIVER"])
+            cloud_driver = utils.load_class(config["CLOUD_DRIVER"])
+            LOG.info("Cloud initializer will be used: %s",
+                     config["CLIENT_MAKER"])
+            make_client = utils.load_class(config["CLIENT_MAKER"])
             cloud_config = config["CLOUDS"][cloud_name]
-
-            LOG.debug("Cloud driver will be used: %s", config["CLOUD_DRIVER"])
-            Cloud = utils.load_class(config["CLOUD_DRIVER"])
-            LOG.debug("Identity driver will be used: %s",
-                      config["IDENTITY_DRIVER"])
-            Identity = utils.load_class(config["IDENTITY_DRIVER"])
-
-            identity = Identity(**cloud_config["identity"])
-            cloud = Cloud.from_dict(endpoint=cloud_config["endpoint"],
-                                    identity=identity)
-            LOG.info("Cloud client initialized for endpoint: %s",
-                     cloud_config["endpoint"]["auth_url"])
+            cloud = make_client(cloud_config, cloud_name, cloud_driver,
+                                identity_driver)
             setattr(flask.g, attribute_name, cloud)
         return cloud
     return setup_selected_cloud

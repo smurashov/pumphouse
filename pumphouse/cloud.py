@@ -1,9 +1,13 @@
 import collections
+import logging
 import sqlalchemy as sqla
 
 from novaclient.v1_1 import client as nova_client
 from keystoneclient.v2_0 import client as keystone_client
 from glanceclient import client as glance
+
+
+LOG = logging.getLogger(__name__)
 
 
 class Identity(collections.Mapping):
@@ -141,3 +145,12 @@ class Cloud(object):
 
     def __repr__(self):
         return "<Cloud(namespace={!r})>".format(self.access_ns)
+
+
+def make_client(config, target, cloud_driver, identity_driver):
+    identity = identity_driver(**config["identity"])
+    cloud = cloud_driver.from_dict(endpoint=config["endpoint"],
+                                   identity=identity)
+    LOG.info("Cloud client initialized for endpoint: %s",
+             config["endpoint"]["auth_url"])
+    return cloud
