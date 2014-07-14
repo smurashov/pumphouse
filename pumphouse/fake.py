@@ -3,6 +3,7 @@ import datetime
 import random
 import six
 import string
+import time
 import uuid
 
 from novaclient import exceptions as nova_excs
@@ -201,7 +202,7 @@ class Image(Resource):
         return data
 
     def upload(self, image_id, data):
-        pass
+        time.sleep(random.randint(15, 45))
 
     def create(self, **kwargs):
         image_uuid = uuid.uuid4()
