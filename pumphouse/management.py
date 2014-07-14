@@ -132,11 +132,11 @@ def setup(cloud, num_tenants, num_servers):
             '1', '1', '2', is_public='True')
         test_flavors[flavor.id] = flavor
         LOG.info("Created: %s", flavor._info)
+        tenant_id = str(random.randint(1, 0x7fffffff))
         tenant = cloud.keystone.tenants.create(
             "{0}-tenant-{1}"
-            .format(prefix,
-                    str(random.randint(1, 0x7fffffff))),
-            description="pumphouse test tenant")
+            .format(prefix, tenant_id),
+            description="pumphouse test tenant {0}".format(tenant_id))
         become_admin_in_tenant(cloud, cloud.keystone.auth_ref.user_id, tenant)
         tenant_ns = cloud.user_ns.restrict(tenant_name=tenant.name)
         tenant_cloud = cloud.restrict(tenant_ns)

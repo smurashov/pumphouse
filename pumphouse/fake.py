@@ -420,7 +420,8 @@ class Cloud(object):
         if not data:
             admin_tenant = AttrDict({
                 'name': self.access_ns.tenant_name,
-                'id': str(uuid.uuid4())})
+                'id': str(uuid.uuid4())},
+                description="admin")
             admin_role = AttrDict({
                 'name': 'admin',
                 'id': str(uuid.uuid4())})
