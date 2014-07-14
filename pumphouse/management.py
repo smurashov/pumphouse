@@ -4,9 +4,10 @@ import random
 import time
 import urllib
 
+from keystoneclient.openstack.common.apiclient import exceptions \
+    as keystone_excs
 from novaclient import exceptions as nova_excs
 
-from pumphouse.api import migration as api_migration
 from . import cloud as pump_cloud
 from . import exceptions
 from . import utils
@@ -20,6 +21,27 @@ TEST_IMAGE_URL = ("http://download.cirros-cloud.net/0.3.2/"
 TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
 TEST_RESOURCE_PREFIX = "pumphouse-test"
 FLOATING_IP_STRING = "172.18.167.{}"
+
+
+def become_admin_in_tenant(cloud, user, tenant):
+    """Adds the user into the tenant with an admin role.
+
+    :param cloud: the instance of :class:`pumphouse.cloud.Cloud`
+    :param user: the user's unique identifier
+    :param tenant: an unique identifier of the tenant
+    :raises: exceptions.NotFound
+    """
+    admin_roles = [r
+                   for r in cloud.keystone.roles.list()
+                   if r.name == "admin"]
+    if not admin_roles:
+        raise exceptions.NotFound()
+    admin_role = admin_roles[0]
+    try:
+        cloud.keystone.tenants.add_user(tenant, user, admin_role)
+    except keystone_excs.Conflict:
+        LOG.warning("User %r already in %r tenant with 'admin' role",
+                    user, tenant)
 
 
 def cleanup(cloud):
@@ -115,9 +137,7 @@ def setup(cloud, num_tenants, num_servers):
             .format(prefix,
                     str(random.randint(1, 0x7fffffff))),
             description="pumphouse test tenant")
-        api_migration.become_admin_in_tenant(cloud,
-                                             cloud.keystone.auth_ref.user_id,
-                                             tenant)
+        become_admin_in_tenant(cloud, cloud.keystone.auth_ref.user_id, tenant)
         tenant_ns = cloud.user_ns.restrict(tenant_name=tenant.name)
         tenant_cloud = cloud.restrict(tenant_ns)
         test_tenant_clouds[tenant.id] = tenant_cloud

@@ -1,14 +1,14 @@
 import logging
 
-from pumphouse import cloud
-from pumphouse import exceptions
-from pumphouse import utils
-
-from . import hooks
-
 from keystoneclient.openstack.common.apiclient import exceptions \
     as keystone_excs
 from novaclient import exceptions as nova_excs
+
+from pumphouse import cloud
+from pumphouse import exceptions
+from pumphouse import management
+from pumphouse import utils
+from . import hooks
 
 
 LOG = logging.getLogger(__name__)
@@ -263,27 +263,6 @@ def migrate_server(mapping, events, src, dst, id):
     return s0, s1
 
 
-def become_admin_in_tenant(cloud, user, tenant):
-    """Adds the user into the tenant with an admin role.
-
-    :param cloud: the instance of :class:`pumphouse.cloud.Cloud`
-    :param user: the user's unique identifier
-    :param tenant: an unique identifier of the tenant
-    :raises: exceptions.NotFound
-    """
-    admin_roles = [r
-                   for r in cloud.keystone.roles.list()
-                   if r.name == "admin"]
-    if not admin_roles:
-        raise exceptions.NotFound()
-    admin_role = admin_roles[0]
-    try:
-        cloud.keystone.tenants.add_user(tenant, user, admin_role)
-    except keystone_excs.Conflict:
-        LOG.warning("User %r already in %r tenant with 'admin' role",
-                    user, tenant)
-
-
 def migrate_resources(tenant_id):
     events, source, destination = (hooks.events, hooks.source,
                                    hooks.destination)
@@ -296,8 +275,9 @@ def migrate_resources(tenant_id):
         "source_id": src_tenant.id,
         "cloud": "destination",
     }, namespace="/events")
-    become_admin_in_tenant(destination, destination.keystone.auth_ref.user_id,
-                           dst_tenant.id)
+    management.become_admin_in_tenant(destination,
+                                      destination.keystone.auth_ref.user_id,
+                                      dst_tenant.id)
     for user in src_tenant.list_users():
         migrate_user(mapping, events, source, destination, user.id)
     servers = source.nova.servers.list(search_opts={
