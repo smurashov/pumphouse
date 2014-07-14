@@ -143,7 +143,7 @@ class Server(Resource):
             "OS-EXT-STS:power_state": 1,
             "OS-EXT-AZ:availability_zone": "nova",
             "config_drive": "",
-            "status": "ACTIVE",
+            "status": "BUILDING",
             "updated": datetime.datetime.now().isoformat(),
             "hostId": server_uuid.hex,
             "OS-EXT-SRV-ATTR:host": "ubuntu-1204lts-server-x86",
