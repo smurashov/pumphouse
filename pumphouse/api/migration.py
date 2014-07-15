@@ -264,8 +264,8 @@ def migrate_server(mapping, events, src, dst, id):
 
 
 def migrate_resources(tenant_id):
-    events, source, destination = (hooks.events, hooks.source,
-                                   hooks.destination)
+    events, source, destination = (hooks.events, hooks.source.client,
+                                   hooks.destination.client)
     mapping = {}
     events.emit("tenant migrate", {"id": tenant_id}, namespace="/events")
     src_tenant, dst_tenant = migrate_tenant(mapping, events, source,

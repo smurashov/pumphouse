@@ -9,19 +9,12 @@ from . import hooks
 def create_app():
     """Creates a WSGI application.
 
-    Configuration of the application initialized with default extra
-    values. Registered the Pumphouse blueprints.
+    Registers all blueprints for created application.
 
     :returns: a :class:`flask.Fask` instance
     """
     app = flask.Flask(__name__)
     app.register_blueprint(handlers.pump)
-    app.config.update({
-        "CLOUDS": None,
-        "CLOUD_DRIVER": "pumphouse.cloud.Cloud",
-        "IDENTITY_DRIVER": "pumphouse.cloud.Identity",
-        "CLIENT_MAKER": "pumphouse.cloud.make_client",
-    })
     return app
 
 
@@ -35,6 +28,8 @@ def start_app(config=None, **kwargs):
     if config is not None:
         app.config.update(config)
     hooks.events.init_app(app)
+    hooks.source.init_app(app)
+    hooks.destination.init_app(app)
     hooks.events.run(app)
 
 

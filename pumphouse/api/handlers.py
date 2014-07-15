@@ -70,8 +70,8 @@ def index():
 @pump.route("/resources")
 def resources():
     return flask.jsonify(
-        source=cloud_resources(hooks.source),
-        destination=cloud_resources(hooks.destination),
+        source=cloud_resources(hooks.source.client),
+        destination=cloud_resources(hooks.destination.client),
         # TODO(akscram): A set of hosts that don't belong to any cloud.
         hosts=[],
         # TODO(akscram): A set of current events.
