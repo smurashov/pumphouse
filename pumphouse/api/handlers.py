@@ -36,7 +36,7 @@ def cloud_resources(cloud):
             "id": server.id,
             "type": "server",
             "name": server.name,
-            "status": "error" if server.status != "ACTIVE" else "",
+            "status": server.status.lower(),
             "tenant_id": server.tenant_id,
             "image_id": server.image["id"],
             # TODO(akscram): Mapping of real hardware servers to
