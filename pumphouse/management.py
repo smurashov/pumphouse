@@ -157,8 +157,8 @@ def setup(cloud, num_tenants, num_servers):
         test_users[tenant.id] = user
         LOG.info("Created: %s", user._info)
         user_role = cloud.keystone.roles.add_user_role(
-            user,
-            role,
+            user.id,
+            role.id,
             tenant=tenant.id)
         LOG.info("Assigned: %s", user_role)
         try:
