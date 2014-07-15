@@ -2,6 +2,7 @@ import collections
 import datetime
 import random
 import six
+import string
 import uuid
 
 from novaclient import exceptions as nova_excs
@@ -126,7 +127,7 @@ class Server(Resource):
             "OS-SRV-USG:terminated_at": None,
             "key_name": None,
             "OS-EXT-SRV-ATTR:hypervisor_hostname":
-            "ubuntu-1204lts-server-x86",
+                self.cloud.nova.schedule_server().name,
             "name": name,
             "created": "2014-06-26T12:48:06Z",
             "tenant_id": self.tenant_id,
@@ -312,6 +313,19 @@ class SecGroupRule(Resource):
         return rule
 
 
+class Hypervisor(Resource):
+    pass
+
+
+class Service(Resource):
+    def list(self, host=None, binary=None):
+        objects = [obj
+                   for obj in self.objects
+                   if host is not None and obj.host == host or
+                      binary is not None and obj.binary == binary]
+        return objects
+
+
 class Tenant(Resource):
     def create(self, name, **kwargs):
         tenant_uuid = uuid.uuid4()
@@ -374,7 +388,7 @@ class AuthRef(Resource):
         self.user_id = self._get_user_id(self.cloud.access_ns.username)
 
 
-class Service(object):
+class BaseService(object):
     def __init__(self, cloud):
         self.cloud = cloud
         service_name = self.__class__.__name__.lower()
@@ -391,7 +405,7 @@ class Service(object):
         return resource
 
 
-class Nova(Service):
+class Nova(BaseService):
     servers = Collection(Server)
     flavors = Collection(Flavor)
     networks = Collection(Network)
@@ -399,13 +413,18 @@ class Nova(Service):
     floating_ips_bulk = Collection(FloatingIPBulk)
     floating_ip_pools = Collection(FloatingIPPool)
     security_groups = Collection(SecGroup)
+    hypervisors = Collection(Hypervisor)
+    services = Collection(Service)
+
+    def schedule_server(self):
+        return random.choice(self.hypervisors.list())
 
 
-class Glance(Service):
+class Glance(BaseService):
     images = Collection(Image)
 
 
-class Keystone(Service):
+class Keystone(BaseService):
     tenants = Collection(Tenant)
     users = Collection(User)
     roles = Collection(Role)
@@ -425,6 +444,14 @@ class Cloud(object):
             admin_role = AttrDict({
                 'name': 'admin',
                 'id': str(uuid.uuid4())})
+            hostname_prefix = "".join(random.choice(string.ascii_uppercase)
+                                      for i in (0, 0))
+            services = [AttrDict({
+                "host": "pumphouse-{0}-{1}".format(hostname_prefix, i),
+                "binary": "nova-compute",
+                "state": "up",
+                "status": "enabled",
+            }) for i in range(2)]
             self.data = {
                 'glance': {},
                 'keystone': {
@@ -442,7 +469,12 @@ class Cloud(object):
                         'description': 'default',
                         'tenant_id': admin_tenant.id,
                         'id': str(uuid.uuid4()),
-                        'rules': ''})]
+                        'rules': ''})],
+                    "hypervisors": [AttrDict({
+                        "name": s.host,
+                        "service": s,
+                    }) for s in services],
+                    "services": services,
                 },
             }
         else:
