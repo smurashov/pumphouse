@@ -7,6 +7,8 @@ import time
 import uuid
 
 from novaclient import exceptions as nova_excs
+from keystoneclient.openstack.common.apiclient import exceptions \
+    as keystone_excs
 
 from . import cloud as pump_cloud
 from . import exceptions
@@ -29,6 +31,8 @@ class Collection(object):
 
 
 class Resource(object):
+    NotFound = Exception
+
     def __init__(self, cloud, objects):
         self.cloud = cloud
         self.objects = objects
@@ -58,14 +62,18 @@ class Resource(object):
             if obj.id == real_id:
                 obj = self._update_status(obj)
                 return obj
-        raise nova_excs.NotFound("Not found: {}".format(id))
+        raise self.NotFound("Not found: {}".format(id))
 
     def find(self, **kwargs):
-        for key in kwargs:
-            for obj in self.objects:
-                if obj[key] == kwargs[key]:
-                    return obj
-            raise nova_excs.NotFound("Not found: {}".format(kwargs[key]))
+        for obj in self.objects:
+            for key, value in kwargs.iteritems():
+                if obj[key] != value:
+                    break
+            else:
+                return obj
+        filter_str = ", ".join("{}={}".format(k, v)
+                               for k, v in kwargs.iteritems())
+        raise self.NotFound("Not found: {}".format(filter_str))
 
     def delete(self, id):
         deleted = self.get(id)
@@ -86,7 +94,11 @@ class Resource(object):
         raise exceptions.NotFound()
 
 
-class Server(Resource):
+class NovaResource(Resource):
+    NotFound = nova_excs.NotFound
+
+
+class Server(NovaResource):
     def random_mac(self):
         mac = [0x00, 0x16, 0x3e,
                random.randint(0x00, 0x7f),
@@ -228,7 +240,7 @@ class Image(Resource):
         return image
 
 
-class Network(Resource):
+class Network(NovaResource):
     def create(self, **kwargs):
         net_uuid = uuid.uuid4()
         network = AttrDict({"bridge": "br100",
@@ -264,7 +276,7 @@ class Network(Resource):
         return network
 
 
-class Flavor(Resource):
+class Flavor(NovaResource):
     def create(self, name, ram, vcpus, disk, **kwargs):
         flavor_id = random.randint(0, 100)
         flavor = AttrDict({
@@ -284,23 +296,23 @@ class Flavor(Resource):
         return flavor
 
 
-class FloatingIP(Resource):
+class FloatingIP(NovaResource):
     def create(self, pool=None):
         self.objects = self.cloud.data['nova']['floatingipbulks']
         floating_ips = [obj for obj in self.objects if not obj.project_id]
         if len(floating_ips) < 1:
-            raise nova_excs.NotFound
+            raise self.NotFound()
         floating_ip = floating_ips[0]
         floating_ip['ip'] = floating_ip['address']
         floating_ip['project_id'] = self.tenant_id
         return floating_ip
 
 
-class FloatingIPPool(Resource):
+class FloatingIPPool(NovaResource):
     pass
 
 
-class FloatingIPBulk(Resource):
+class FloatingIPBulk(NovaResource):
     def create(self, address, pool=None):
         floating_ip_uuid = uuid.uuid4()
         floating_ip = AttrDict({'address': address,
@@ -317,7 +329,7 @@ class FloatingIPBulk(Resource):
         return floating_ip
 
 
-class SecGroup(Resource):
+class SecGroup(NovaResource):
     def create(self, name, description):
         secgroup_uuid = uuid.uuid4()
         secgroup = AttrDict({'name': name,
@@ -340,11 +352,11 @@ class SecGroupRule(Resource):
         return rule
 
 
-class Hypervisor(Resource):
+class Hypervisor(NovaResource):
     pass
 
 
-class Service(Resource):
+class Service(NovaResource):
     def list(self, host=None, binary=None):
         objects = [obj
                    for obj in self.objects
@@ -353,7 +365,11 @@ class Service(Resource):
         return objects
 
 
-class Tenant(Resource):
+class KeystoneResource(Resource):
+    NotFound = keystone_excs.NotFound
+
+
+class Tenant(KeystoneResource):
     def create(self, name, **kwargs):
         tenant_uuid = uuid.uuid4()
         tenant = AttrDict({'name': name,
@@ -367,7 +383,8 @@ class Tenant(Resource):
         pass
 
 
-class User(Resource):
+
+class User(KeystoneResource):
     def create(self, **kwargs):
         user_uuid = uuid.uuid4()
         user = AttrDict({'id': str(user_uuid),
@@ -379,7 +396,7 @@ class User(Resource):
         return user
 
 
-class Role(Resource):
+class Role(KeystoneResource):
     def create(self, name):
         role_uuid = uuid.uuid4()
         role = AttrDict({'id': str(role_uuid), 'name': name})
@@ -398,21 +415,17 @@ class Role(Resource):
                 else:
                     user['roles'] = [role, ]
                 return
-        print user_id
-        print role_id
-        raise exceptions.NotFound
+        raise exceptions.NotFound()
 
     def roles_for_user(self, user_id, **kwargs):
         for user in self.cloud.data['keystone']['users']:
             if user['id'] == user_id:
                 return user['roles']
-        raise exceptions.NotFound
+        raise exceptions.NotFound()
 
 
-class AuthRef(Resource):
-    def __init__(self, cloud, objects):
-        super(AuthRef, self).__init__(cloud, objects)
-        self.user_id = self._get_user_id(self.cloud.access_ns.username)
+class AuthRef(KeystoneResource):
+    pass
 
 
 class BaseService(object):
