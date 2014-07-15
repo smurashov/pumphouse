@@ -1,4 +1,4 @@
-DEBUG: true
+DEBUG: false
 CLOUD_DRIVER: pumphouse.fake.Cloud
 IDENTITY_DRIVER: pumphouse.fake.Identity
 CLIENT_MAKER: pumphouse.fake.make_client
