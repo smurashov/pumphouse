@@ -548,44 +548,21 @@ class Cloud(object):
         return "<Cloud(namespace={!r})>".format(self.access_ns)
 
 
-class Identity(collections.Mapping):
+class Identity(object):
     def __init__(self, connection):
-        self.hashes = {
-            "83f8d6ed75c2468e9c469bd2afb1458e":
-                ("$6$rounds=40000$Q4G5USdnoMc1QEAL$ZTnaXlsojr6Ax5wmKT3"
-                 "RNmlRMFkoJ3ZpWRr2fYVC2b1RC61N03/AgmW4OhoP0ugSdz70XlM"
-                 "PZ5sw80ivgAAcO1"),
-            "97e9a411cc204cf48cc885579e8090f8":
-                ("$6$rounds=40000$9WoWkC9aFenmPmQp$KVd/Sm2CIVSmaG.DmUC"
-                 "JQcVVysCArDKDq8FJwAQ.csAktmCtJ4GBa9bCDP/p/Ydaf0vjQFm"
-                 "Sku13fPBXmlcxW.")
-        }
+        pass
 
     def fetch(self, user_id):
-        """Fetch a hash of user's password."""
-        return self.hashes[user_id]
+        pass
 
     def push(self):
-        """Push hashes of users' passwords."""
-        return
-
-    def __len__(self):
-        return len(self.hashes)
+        pass
 
     def __iter__(self):
-        return iter(self.hashes)
-
-    def __getitem__(self, user_id):
-        if user_id not in self.hashes:
-            password = self.fetch(user_id)
-            self.hashes[user_id] = password
-        else:
-            password = self.hashes[user_id]
-        return password
+        return iter(())
 
     def update(self, iterable):
-        for user_id, password in iterable:
-            self.hashes[user_id] = password
+        pass
 
 
 def make_client(config, target, cloud_driver, identity_driver):
