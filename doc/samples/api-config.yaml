@@ -1,0 +1,25 @@
+DEBUG: true
+CLOUD_DRIVER: pumphouse.fake.Cloud
+IDENTITY_DRIVER: pumphouse.fake.Identity
+CLIENT_MAKER: pumphouse.fake.make_client
+CLOUDS:
+    source:
+        endpoint:
+            auth_url:    http://127.0.0.1:5000/v2.0
+            username:    admin
+            password:    nomoresecrete
+            tenant_name: admin
+        identity:
+            connection:  mysql+mysqlconnector://root:root@127.0.0.1/keystone
+        fake:
+            num_servers: 5
+            num_tenants: 2
+            delays:      True
+    destination:
+        endpoint:
+            auth_url: http://127.0.0.1:5000/v2.0
+            username: admin
+            password: secrete
+            tenant_name: admin
+        identity:
+            connection: mysql+mysqlconnector://keystone:keystone@127.0.0.1/keystone
