@@ -13,5 +13,6 @@ api:
 	else \
 		git clone $(UI_URL); \
 	fi;
+	test -d pumphouse/api/static || mkdir pumphouse/api/static
 	cp -r pumphouse-ui/static/ajs pumphouse/api/static/
 	cp pumphouse/api/static/ajs/index.html pumphouse/api/static/
