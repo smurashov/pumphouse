@@ -1,4 +1,3 @@
-import collections
 import datetime
 import random
 import six
@@ -7,6 +6,8 @@ import time
 import uuid
 
 from novaclient import exceptions as nova_excs
+from keystoneclient.openstack.common.apiclient import exceptions \
+    as keystone_excs
 
 from . import cloud as pump_cloud
 from . import exceptions
@@ -14,10 +15,16 @@ from . import management
 
 
 class AttrDict(dict):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, manager, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
         self._info = self
+        self.manager = manager
+
+
+class TenantAttrDict(AttrDict):
+    def list_users(self):
+        return self.manager.list_users(self)
 
 
 class Collection(object):
@@ -29,6 +36,8 @@ class Collection(object):
 
 
 class Resource(object):
+    NotFound = Exception
+
     def __init__(self, cloud, objects):
         self.cloud = cloud
         self.objects = objects
@@ -58,14 +67,18 @@ class Resource(object):
             if obj.id == real_id:
                 obj = self._update_status(obj)
                 return obj
-        raise nova_excs.NotFound("Not found: {}".format(id))
+        raise self.NotFound("Not found: {}".format(id))
 
     def find(self, **kwargs):
-        for key in kwargs:
-            for obj in self.objects:
-                if obj[key] == kwargs[key]:
-                    return obj
-            raise nova_excs.NotFound("Not found: {}".format(kwargs[key]))
+        for obj in self.objects:
+            for key, value in kwargs.iteritems():
+                if obj[key] != value:
+                    break
+            else:
+                return obj
+        filter_str = ", ".join("{}={}".format(k, v)
+                               for k, v in kwargs.iteritems())
+        raise self.NotFound("Not found: {}".format(filter_str))
 
     def delete(self, id):
         deleted = self.get(id)
@@ -86,7 +99,11 @@ class Resource(object):
         raise exceptions.NotFound()
 
 
-class Server(Resource):
+class NovaResource(Resource):
+    NotFound = nova_excs.NotFound
+
+
+class Server(NovaResource):
     def random_mac(self):
         mac = [0x00, 0x16, 0x3e,
                random.randint(0x00, 0x7f),
@@ -125,7 +142,7 @@ class Server(Resource):
                 "addr": nic["v4-fixed-ip"],
                 "OS-EXT-IPS:type": "fixed"
             })
-        server = AttrDict({
+        server = AttrDict(self, {
             "OS-EXT-STS:task_state": None,
             "addresses": addresses,
             "image": {"id": image_id, },
@@ -197,7 +214,7 @@ class Server(Resource):
 
 class Image(Resource):
     def data(self, id):
-        data = AttrDict()
+        data = AttrDict(self)
         data._resp = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
         return data
 
@@ -207,7 +224,7 @@ class Image(Resource):
 
     def create(self, **kwargs):
         image_uuid = uuid.uuid4()
-        image = AttrDict({
+        image = AttrDict(self, {
             "status": "active",
             "tags": [],
             "updated_at": datetime.datetime.now().isoformat(),
@@ -228,46 +245,47 @@ class Image(Resource):
         return image
 
 
-class Network(Resource):
+class Network(NovaResource):
     def create(self, **kwargs):
         net_uuid = uuid.uuid4()
-        network = AttrDict({"bridge": "br100",
-                            "vpn_public_port": None,
-                            "dhcp_start": "10.10.0.2",
-                            "bridge_interface": "eth0",
-                            "updated_at": str(datetime.datetime.now()),
-                            "id": str(net_uuid),
-                            "cidr_v6": None,
-                            "deleted_at": None,
-                            "gateway": "10.10.0.1",
-                            "rxtx_base": None,
-                            "priority": None,
-                            "project_id": self.tenant_id,
-                            "vpn_private_address": None,
-                            "deleted": 0,
-                            "vlan": 390,
-                            "broadcast": "10.10.0.255",
-                            "netmask": "255.255.255.0",
-                            "injected": False,
-                            "cidr": "10.10.0.0/24",
-                            "vpn_public_address": None,
-                            "multi_host": False,
-                            "dns2": None,
-                            "created_at": str(datetime.datetime.now()),
-                            "host": "ubuntu-1204lts-server-x86",
-                            "gateway_v6": None,
-                            "netmask_v6": None,
-                            "dns1": "8.8.4.4"},
-                           **kwargs)
+        network = AttrDict(self, {
+            "bridge": "br100",
+            "vpn_public_port": None,
+            "dhcp_start": "10.10.0.2",
+            "bridge_interface": "eth0",
+            "updated_at": str(datetime.datetime.now()),
+            "id": str(net_uuid),
+            "cidr_v6": None,
+            "deleted_at": None,
+            "gateway": "10.10.0.1",
+            "rxtx_base": None,
+            "priority": None,
+            "project_id": self.tenant_id,
+            "vpn_private_address": None,
+            "deleted": 0,
+            "vlan": 390,
+            "broadcast": "10.10.0.255",
+            "netmask": "255.255.255.0",
+            "injected": False,
+            "cidr": "10.10.0.0/24",
+            "vpn_public_address": None,
+            "multi_host": False,
+            "dns2": None,
+            "created_at": str(datetime.datetime.now()),
+            "host": "ubuntu-1204lts-server-x86",
+            "gateway_v6": None,
+            "netmask_v6": None,
+            "dns1": "8.8.4.4",
+        }, **kwargs)
         network._info = network
         self.objects.append(network)
         return network
 
 
-class Flavor(Resource):
+class Flavor(NovaResource):
     def create(self, name, ram, vcpus, disk, **kwargs):
         flavor_id = random.randint(0, 100)
-        flavor = AttrDict({
+        flavor = AttrDict(self, {
             "name": name,
             "ram": ram,
             "OS-FLV-DISABLED:disabled": False,
@@ -284,47 +302,51 @@ class Flavor(Resource):
         return flavor
 
 
-class FloatingIP(Resource):
+class FloatingIP(NovaResource):
     def create(self, pool=None):
         self.objects = self.cloud.data['nova']['floatingipbulks']
         floating_ips = [obj for obj in self.objects if not obj.project_id]
         if len(floating_ips) < 1:
-            raise nova_excs.NotFound
+            raise self.NotFound()
         floating_ip = floating_ips[0]
         floating_ip['ip'] = floating_ip['address']
         floating_ip['project_id'] = self.tenant_id
         return floating_ip
 
 
-class FloatingIPPool(Resource):
+class FloatingIPPool(NovaResource):
     pass
 
 
-class FloatingIPBulk(Resource):
+class FloatingIPBulk(NovaResource):
     def create(self, address, pool=None):
         floating_ip_uuid = uuid.uuid4()
-        floating_ip = AttrDict({'address': address,
-                                'id': str(floating_ip_uuid),
-                                'instance_uuid': None,
-                                'project_id': None,
-                                'pool': pool})
+        floating_ip = AttrDict(self, {
+            "address": address,
+            "id": str(floating_ip_uuid),
+            "instance_uuid": None,
+            "project_id": None,
+            "pool": pool,
+        })
         floating_ip._info = floating_ip
         self.objects.append(floating_ip)
-        if 'floatingippools' not in self.cloud.data['nova']:
-            self.cloud.data['nova']['floatingippools'] = []
-        self.cloud.data['nova']['floatingippools'].append(
-            AttrDict({'name': pool}))
+        if "floatingippools" not in self.cloud.data["nova"]:
+            self.cloud.data["nova"]["floatingippools"] = []
+        self.cloud.data["nova"]["floatingippools"].append(
+            AttrDict(self, {"name": pool}))
         return floating_ip
 
 
-class SecGroup(Resource):
+class SecGroup(NovaResource):
     def create(self, name, description):
         secgroup_uuid = uuid.uuid4()
-        secgroup = AttrDict({'name': name,
-                             'description': description,
-                             'id': str(secgroup_uuid),
-                             'rules': '',
-                             'tenant_id': self.tenant_id})
+        secgroup = AttrDict(self, {
+            "name": name,
+            "description": description,
+            "id": str(secgroup_uuid),
+            "rules": "",
+            "tenant_id": self.tenant_id,
+        })
         secgroup._info = secgroup
         self.objects.append(secgroup)
         return secgroup
@@ -332,87 +354,99 @@ class SecGroup(Resource):
 
 class SecGroupRule(Resource):
     def create(self, id, **kwargs):
-        rule = AttrDict({'id': id,
-                         'ip_range': {'cidr': kwargs['cidr']}},
-                        **kwargs)
+        rule = AttrDict(self, {
+            "id": id,
+            "ip_range": {
+                "cidr": kwargs["cidr"],
+            },
+        }, **kwargs)
         rule._info = rule
         self.objects.append(rule)
         return rule
 
 
-class Hypervisor(Resource):
+class Hypervisor(NovaResource):
     pass
 
 
-class Service(Resource):
+class Service(NovaResource):
     def list(self, host=None, binary=None):
         objects = [obj
                    for obj in self.objects
-                   if host is not None and obj.host == host or
-                   binary is not None and obj.binary == binary]
+                   if (host is not None and obj.host == host or
+                       binary is not None and obj.binary == binary)]
         return objects
 
 
-class Tenant(Resource):
+class KeystoneResource(Resource):
+    NotFound = keystone_excs.NotFound
+
+
+class Tenant(KeystoneResource):
     def create(self, name, **kwargs):
         tenant_uuid = uuid.uuid4()
-        tenant = AttrDict({'name': name,
-                           'id': str(tenant_uuid)},
-                          **kwargs)
-        tenant._info = tenant
+        tenant = TenantAttrDict(self, {
+            "name": name,
+            "id": str(tenant_uuid),
+            "enabled": True,
+        }, **kwargs)
         self.objects.append(tenant)
         return tenant
 
     def add_user(self, tenant, user, role):
         pass
 
+    def list_users(self, tenant):
+        return [user
+                for user in self.cloud.keystone.users.list()
+                if user.tenantId == tenant.id]
 
-class User(Resource):
+
+class User(KeystoneResource):
     def create(self, **kwargs):
         user_uuid = uuid.uuid4()
-        user = AttrDict({'id': str(user_uuid),
-                         'tenantId': kwargs['tenant_id'],
-                         'username': kwargs['name']},
-                        **kwargs)
-        user._info = user
+        user = AttrDict(self, {
+            "id": str(user_uuid),
+            "tenantId": kwargs["tenant_id"],
+            "username": kwargs["name"],
+            "enabled": True
+        }, **kwargs)
         self.objects.append(user)
         return user
 
 
-class Role(Resource):
+class Role(KeystoneResource):
     def create(self, name):
         role_uuid = uuid.uuid4()
-        role = AttrDict({'id': str(role_uuid), 'name': name})
-        role._info = role
+        role = AttrDict(self, {
+            "id": str(role_uuid),
+            "name": name,
+        })
         self.objects.append(role)
         return role
 
     def add_user_role(self, user_id, role_id, tenant):
         for role in self.objects:
-            if role['id'] == role_id['id']:
+            if role["id"] == role_id:
                 break
         for user in self.cloud.data['keystone']['users']:
-            if user['id'] == user_id['id']:
+            if user["id"] == user_id:
                 if 'roles' in user:
                     user['roles'].append(role)
                 else:
-                    user['roles'] = [role, ]
+                    user['roles'] = [role]
                 return
-        print user_id
-        print role_id
-        raise exceptions.NotFound
+        raise exceptions.NotFound()
 
     def roles_for_user(self, user_id, **kwargs):
         for user in self.cloud.data['keystone']['users']:
             if user['id'] == user_id:
                 return user['roles']
-        raise exceptions.NotFound
+        raise exceptions.NotFound()
 
 
-class AuthRef(Resource):
-    def __init__(self, cloud, objects):
-        super(AuthRef, self).__init__(cloud, objects)
-        self.user_id = self._get_user_id(self.cloud.access_ns.username)
+class AuthRef(KeystoneResource):
+    pass
 
 
 class BaseService(object):
@@ -464,52 +498,52 @@ class Cloud(object):
         self.cloud_ns = cloud_ns
         self.user_ns = user_ns
         self.access_ns = cloud_ns.restrict(user_ns)
+        self.data = data or {}
+        self.nova = Nova(self)
+        self.keystone = Keystone(self)
+        self.glance = Glance(self)
         if not data:
-            admin_tenant = AttrDict({
-                'name': self.access_ns.tenant_name,
-                'id': str(uuid.uuid4())},
-                description="admin")
-            admin_role = AttrDict({
-                'name': 'admin',
-                'id': str(uuid.uuid4())})
+            admin_tenant = AttrDict(self.keystone, {
+                "name": self.access_ns.tenant_name,
+                "id": str(uuid.uuid4()),
+            }, description="admin")
+            admin_role = AttrDict(self.keystone, {
+                "name": "admin",
+                "id": str(uuid.uuid4()),
+            })
+            admin_user = AttrDict(self.keystone, {
+                "username": self.access_ns.username,
+                "name": self.access_ns.username,
+                "id": str(uuid.uuid4()),
+                "roles": [admin_role],
+                "tenantId": admin_tenant.id,
+                "enabled": True,
+            })
+            self.data["keystone"]["tenants"] = [admin_tenant]
+            self.data["keystone"]["roles"] = [admin_role]
+            self.data["keystone"]["users"] = [admin_user]
             hostname_prefix = "".join(random.choice(string.ascii_uppercase)
                                       for i in (0, 0))
-            services = [AttrDict({
+            services = [AttrDict(self.nova, {
                 "host": "pumphouse-{0}-{1}".format(hostname_prefix, i),
                 "binary": "nova-compute",
                 "state": "up",
                 "status": "enabled",
             }) for i in range(2)]
-            self.data = {
-                'glance': {},
-                'keystone': {
-                    'tenants': [admin_tenant, ],
-                    'roles': [admin_role, ],
-                    'users': [AttrDict({
-                        'username': self.access_ns.username,
-                        'name': self.access_ns.username,
-                        'id': str(uuid.uuid4()),
-                        'roles': [admin_role, ]})],
-                },
-                'nova': {
-                    'secgroups': [AttrDict({
-                        'name': 'default',
-                        'description': 'default',
-                        'tenant_id': admin_tenant.id,
-                        'id': str(uuid.uuid4()),
-                        'rules': ''})],
-                    "hypervisors": [AttrDict({
-                        "name": s.host,
-                        "service": s,
-                    }) for s in services],
-                    "services": services,
-                },
-            }
-        else:
-            self.data = data
-        self.nova = Nova(self)
-        self.keystone = Keystone(self)
-        self.glance = Glance(self)
+            hypervs = [AttrDict(self.nova, {
+                "name": s.host,
+                "service": s,
+            }) for s in services]
+            secgroups = [AttrDict(self.nova, {
+                "name": "default",
+                "description": "default",
+                "tenant_id": admin_tenant.id,
+                "id": str(uuid.uuid4()),
+                "rules": "",
+            })]
+            self.data["nova"]["services"] = services
+            self.data["nova"]["hypervisors"] = hypervs
+            self.data["nova"]["secgroups"] = secgroups
         if isinstance(identity, Identity):
             self.identity = identity
         else:
@@ -535,44 +569,21 @@ class Cloud(object):
         return "<Cloud(namespace={!r})>".format(self.access_ns)
 
 
-class Identity(collections.Mapping):
+class Identity(object):
     def __init__(self, connection):
-        self.hashes = {
-            "83f8d6ed75c2468e9c469bd2afb1458e":
-                ("$6$rounds=40000$Q4G5USdnoMc1QEAL$ZTnaXlsojr6Ax5wmKT3"
-                 "RNmlRMFkoJ3ZpWRr2fYVC2b1RC61N03/AgmW4OhoP0ugSdz70XlM"
-                 "PZ5sw80ivgAAcO1"),
-            "97e9a411cc204cf48cc885579e8090f8":
-                ("$6$rounds=40000$9WoWkC9aFenmPmQp$KVd/Sm2CIVSmaG.DmUC"
-                 "JQcVVysCArDKDq8FJwAQ.csAktmCtJ4GBa9bCDP/p/Ydaf0vjQFm"
-                 "Sku13fPBXmlcxW.")
-        }
+        pass
 
     def fetch(self, user_id):
-        """Fetch a hash of user's password."""
-        return self.hashes[user_id]
+        pass
 
     def push(self):
-        """Push hashes of users' passwords."""
-        return
-
-    def __len__(self):
-        return len(self.hashes)
+        pass
 
     def __iter__(self):
-        return iter(self.hashes)
-
-    def __getitem__(self, user_id):
-        if user_id not in self.hashes:
-            password = self.fetch(user_id)
-            self.hashes[user_id] = password
-        else:
-            password = self.hashes[user_id]
-        return password
+        return iter(())
 
     def update(self, iterable):
-        for user_id, password in iterable:
-            self.hashes[user_id] = password
+        pass
 
 
 def make_client(config, target, cloud_driver, identity_driver):
