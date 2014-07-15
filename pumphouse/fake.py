@@ -3,6 +3,7 @@ import datetime
 import random
 import six
 import string
+import time
 import uuid
 
 from novaclient import exceptions as nova_excs
@@ -36,9 +37,14 @@ class Resource(object):
 
     def list(self, search_opts=None, filters=None, tenant_id=None,
              project_id=None):
+        for obj in self.objects:
+            obj = self._update_status(obj)
         return self.objects
 
     findall = list
+
+    def _update_status(self, obj):
+        return obj
 
     def create(self, obj):
         self.objects.append(obj)
@@ -50,6 +56,7 @@ class Resource(object):
             real_id = id
         for obj in self.objects:
             if obj.id == real_id:
+                obj = self._update_status(obj)
                 return obj
         raise nova_excs.NotFound("Not found: {}".format(id))
 
@@ -59,6 +66,12 @@ class Resource(object):
                 if obj[key] == kwargs[key]:
                     return obj
             raise nova_excs.NotFound("Not found: {}".format(kwargs[key]))
+
+    def delete(self, id):
+        deleted = self.get(id)
+        objects = [obj for obj in self.objects
+                   if not obj.id == deleted.id]
+        self.objects = objects
 
     def _get_user_id(self, username):
         for user in self.cloud.data['keystone']['users']:
@@ -80,6 +93,16 @@ class Server(Resource):
                random.randint(0x00, 0xff),
                random.randint(0x00, 0xff)]
         return ':'.join(map(lambda x: "%02x" % x, mac))
+
+    def _update_status(self, server, status=None):
+        if server.status == "BUILDING":
+            updated = datetime.datetime.strptime(
+                server.updated, "%Y-%m-%dT%H:%M:%S.%f")
+            delta = datetime.datetime.now() - updated
+            if delta.total_seconds() > 30:
+                server.updated = datetime.datetime.now().isoformat()
+                server.status = "ACTIVE"
+        return server
 
     def create(self, name, image, flavor, nics=[]):
         addresses = {}
@@ -108,7 +131,7 @@ class Server(Resource):
             "image": {"id": image_id, },
             "OS-EXT-STS:vm_state": "active",
             "OS-EXT-SRV-ATTR:instance_name": "instance-00000004",
-            "OS-SRV-USG:launched_at": str(datetime.datetime.now()),
+            "OS-SRV-USG:launched_at": datetime.datetime.now().isoformat(),
             "flavor": {"id": flavor_id, },
             "id": str(server_uuid),
             "security_groups": [{"name": "default"}],
@@ -120,8 +143,8 @@ class Server(Resource):
             "OS-EXT-STS:power_state": 1,
             "OS-EXT-AZ:availability_zone": "nova",
             "config_drive": "",
-            "status": "ACTIVE",
-            "updated": "2014-06-26T12:48:18Z",
+            "status": "BUILDING",
+            "updated": datetime.datetime.now().isoformat(),
             "hostId": server_uuid.hex,
             "OS-EXT-SRV-ATTR:host": "ubuntu-1204lts-server-x86",
             "OS-SRV-USG:terminated_at": None,
@@ -129,7 +152,7 @@ class Server(Resource):
             "OS-EXT-SRV-ATTR:hypervisor_hostname":
                 self.cloud.nova.schedule_server().name,
             "name": name,
-            "created": "2014-06-26T12:48:06Z",
+            "created": str(datetime.datetime.now()),
             "tenant_id": self.tenant_id,
             "os-extended-volumes:volumes_attached": [],
             "metadata": {}},
@@ -159,14 +182,17 @@ class Server(Resource):
                         return server
         raise exceptions.NotFound
 
-    def suspend(self, id):
-        pass
+    def suspend(self, obj_id):
+        server = self.get(obj_id)
+        server.status = "SUSPENDED"
+        server.update = datetime.datetime.now().isoformat()
+        return server
 
-    def delete(self, id):
-        pass
-
-    def resume(self, id):
-        pass
+    def resume(self, obj_id):
+        server = self.get(obj_id)
+        server.status = "ACTIVE"
+        server.update = datetime.datetime.now().isoformat()
+        return server
 
 
 class Image(Resource):
@@ -176,21 +202,22 @@ class Image(Resource):
         return data
 
     def upload(self, image_id, data):
-        pass
+        if self.cloud.delays:
+            time.sleep(random.randint(15, 45))
 
     def create(self, **kwargs):
         image_uuid = uuid.uuid4()
         image = AttrDict({
             "status": "active",
             "tags": [],
-            "updated_at": str(datetime.datetime.now()),
+            "updated_at": datetime.datetime.now().isoformat(),
             "file": "/v2/images/{}/file"
             .format(str(image_uuid)),
             "owner": self.tenant_id,
             "id": str(image_uuid),
             "size": 13167616,
             "checksum": image_uuid.hex,
-            "created_at": "2014-06-26T12:48:04Z",
+            "created_at": datetime.datetime.now().isoformat(),
             "schema": "/v2/schemas/image",
             "visibility": '',
             "min_ram": 0,
@@ -322,7 +349,7 @@ class Service(Resource):
         objects = [obj
                    for obj in self.objects
                    if host is not None and obj.host == host or
-                      binary is not None and obj.binary == binary]
+                   binary is not None and obj.binary == binary]
         return objects
 
 
@@ -433,6 +460,7 @@ class Keystone(BaseService):
 
 class Cloud(object):
     def __init__(self, cloud_ns, user_ns, identity, data=None):
+        self.delays = False
         self.cloud_ns = cloud_ns
         self.user_ns = user_ns
         self.access_ns = cloud_ns.restrict(user_ns)
@@ -555,4 +583,6 @@ def make_client(config, target, cloud_driver, identity_driver):
         num_tenants = parameters.get("num_tenants", 2)
         num_servers = parameters.get("num_servers", 2)
         management.setup(cloud, num_tenants, num_servers)
+        delays = parameters.get("delays", False)
+        cloud.delays = delays
     return cloud
