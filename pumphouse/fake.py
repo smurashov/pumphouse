@@ -349,7 +349,7 @@ class Service(Resource):
         objects = [obj
                    for obj in self.objects
                    if host is not None and obj.host == host or
-                      binary is not None and obj.binary == binary]
+                   binary is not None and obj.binary == binary]
         return objects
 
 
