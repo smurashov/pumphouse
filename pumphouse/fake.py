@@ -80,6 +80,16 @@ class Resource(object):
                                for k, v in kwargs.iteritems())
         raise self.NotFound("Not found: {}".format(filter_str))
 
+    def _findall(self, **kwargs):
+        objects = []
+        for obj in self.objects:
+            for key, value in kwargs.iteritems():
+                if obj[key] != value:
+                    break
+            else:
+                objects.append(obj)
+        return objects
+
     def delete(self, id):
         deleted = self.get(id)
         objects = [obj for obj in self.objects
@@ -167,7 +177,7 @@ class Server(NovaResource):
             "OS-SRV-USG:terminated_at": None,
             "key_name": None,
             "OS-EXT-SRV-ATTR:hypervisor_hostname":
-                self.cloud.nova.schedule_server().name,
+                self.cloud.nova.schedule_server(),
             "name": name,
             "created": str(datetime.datetime.now()),
             "tenant_id": self.tenant_id,
@@ -366,7 +376,19 @@ class SecGroupRule(Resource):
 
 
 class Hypervisor(NovaResource):
-    pass
+    def search(self, hostname, servers=False):
+        hypervs = []
+        for hyperv in self.objects:
+            if hyperv.name == hostname:
+                hyperv = AttrDict(hyperv)
+                if servers:
+                    hyperv["servers"] = [
+                        {"uuid": s.id}
+                        for s in self.cloud.nova.servers.list()
+                        if s["OS-EXT-SRV-ATTR:hypervisor_hostname"] == hostname
+                    ]
+                hypervs.append(hyperv)
+        return hypervs
 
 
 class Service(NovaResource):
@@ -376,6 +398,16 @@ class Service(NovaResource):
                    if (host is not None and obj.host == host or
                        binary is not None and obj.binary == binary)]
         return objects
+
+    def disable(self, hostname, binary):
+        service = self.find(host=hostname, binary=binary)
+        service.status = "disbled"
+        return service
+
+    def enable(self, hostname, binary):
+        service = self.find(host=hostname, binary=binary)
+        service.status = "enabled"
+        return service
 
 
 class KeystoneResource(Resource):
@@ -478,7 +510,11 @@ class Nova(BaseService):
     services = Collection(Service)
 
     def schedule_server(self):
-        return random.choice(self.hypervisors.list())
+        services = self.services._findall(status="enabled",
+                                          state="up",
+                                          binary="nova-compute")
+        service = random.choice(services)
+        return service.host
 
 
 class Glance(BaseService):
