@@ -222,6 +222,17 @@ class Server(NovaResource):
         return server
 
 
+    def live_migrate(self, server_id, host, block_migration, disk_over_commit):
+        if self.cloud.delays:
+            time.sleep(random.randint(5, 10))
+        server = self.get(server_id)
+        server.status = "ACTIVE"
+        server["OS-EXT-SRV-ATTR:hypervisor_hostname"] = \
+            self.cloud.nova.schedule_server()
+        server.update = datetime.datetime.now().isoformat()
+        return server
+
+
 class Image(Resource):
     def data(self, id):
         data = AttrDict(self)
@@ -238,8 +249,7 @@ class Image(Resource):
             "status": "active",
             "tags": [],
             "updated_at": datetime.datetime.now().isoformat(),
-            "file": "/v2/images/{}/file"
-            .format(str(image_uuid)),
+            "file": "/v2/images/{}/file".format(str(image_uuid)),
             "owner": self.tenant_id,
             "id": str(image_uuid),
             "size": 13167616,
