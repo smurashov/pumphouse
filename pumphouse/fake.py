@@ -92,9 +92,9 @@ class Resource(object):
 
     def delete(self, id):
         deleted = self.get(id)
-        objects = [obj for obj in self.objects
-                   if not obj.id == deleted.id]
-        self.objects = objects
+        for obj in list(self.objects):
+            if obj.id == deleted.id:
+                self.objects.remove(obj)
 
     def _get_user_id(self, username):
         for user in self.cloud.data['keystone']['users']:
@@ -300,6 +300,9 @@ class Network(NovaResource):
         self.objects.append(network)
         return network
 
+    def disassociate(self, network):
+        pass
+
 
 class Flavor(NovaResource):
     def create(self, name, ram, vcpus, disk, **kwargs):
@@ -354,6 +357,11 @@ class FloatingIPBulk(NovaResource):
         self.cloud.data["nova"]["floatingippools"].append(
             AttrDict(self, {"name": pool}))
         return floating_ip
+
+    def delete(self, ip_range):
+        for obj in list(self.objects):
+            if obj.address == ip_range:
+                self.objects.remove(obj)
 
 
 class SecGroup(NovaResource):
