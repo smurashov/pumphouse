@@ -221,7 +221,6 @@ class Server(NovaResource):
         server.update = datetime.datetime.now().isoformat()
         return server
 
-
     def live_migrate(self, server_id, host, block_migration, disk_over_commit):
         if self.cloud.delays:
             time.sleep(random.randint(5, 10))
