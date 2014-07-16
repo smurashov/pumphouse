@@ -62,6 +62,12 @@ class Cloud(object):
                             identity_driver)
         return cloud
 
+    def reset(self):
+        app = flask.current_app
+        clouds = self.register_extension(app)
+        client = self.make_client(app)
+        clouds.set(self.target, client)
+
     @property
     def client(self):
         ctx = flask._app_ctx_stack.top
