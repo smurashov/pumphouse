@@ -404,13 +404,13 @@ class Service(NovaResource):
     def list(self, host=None, binary=None):
         objects = [obj
                    for obj in self.objects
-                   if (host is not None and obj.host == host or
+                   if (host is not None and obj.host == host and
                        binary is not None and obj.binary == binary)]
         return objects
 
     def disable(self, hostname, binary):
         service = self.find(host=hostname, binary=binary)
-        service.status = "disbled"
+        service.status = "disabled"
         return service
 
     def enable(self, hostname, binary):
