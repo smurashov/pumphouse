@@ -112,9 +112,11 @@ class Cloud(object):
     :param user_ns:     a restricted user credentials namespace
     :type user_ns:      object
     :param identity:    object containing access credentials
+    :param urls:        additional urls to a horizon or another stuff
+    :type urls:         a dict
     """
 
-    def __init__(self, cloud_ns, user_ns, identity):
+    def __init__(self, cloud_ns, user_ns, identity, urls):
         self.identity = identity
         self.cloud_ns = cloud_ns
         self.user_ns = user_ns
@@ -129,19 +131,20 @@ class Cloud(object):
         self.glance = glance.Client("2",
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
+        self.urls = urls
 
     def restrict(self, user_ns):
-        return Cloud(self.cloud_ns, user_ns, self.identity)
+        return Cloud(self.cloud_ns, user_ns, self.identity, self.urls)
 
     @classmethod
-    def from_dict(cls, endpoint, identity):
+    def from_dict(cls, endpoint, identity, urls):
         cloud_ns = Namespace(auth_url=endpoint["auth_url"])
         user_ns = Namespace(
             username=endpoint["username"],
             password=endpoint["password"],
             tenant_name=endpoint["tenant_name"],
         )
-        return cls(cloud_ns, user_ns, identity)
+        return cls(cloud_ns, user_ns, identity, urls)
 
     def __repr__(self):
         return "<Cloud(namespace={!r})>".format(self.access_ns)
@@ -150,7 +153,8 @@ class Cloud(object):
 def make_client(config, target, cloud_driver, identity_driver):
     identity = identity_driver(**config["identity"])
     cloud = cloud_driver.from_dict(endpoint=config["endpoint"],
-                                   identity=identity)
+                                   identity=identity,
+                                   urls=config["urls"])
     LOG.info("Cloud client initialized for endpoint: %s",
              config["endpoint"]["auth_url"])
     return cloud
