@@ -23,14 +23,23 @@ def start_app(config=None, **kwargs):
 
     :param config: a dict with configuration values
     """
+    def get_bind_host():
+        bind_host = app.config["BIND_HOST"]
+        if bind_host is None:
+            server_name = app.config["SERVER_NAME"]
+            if server_name is not None:
+                bind_host, _, _ = server_name.partition(":")
+        return bind_host
+
     logging.basicConfig(level=logging.INFO)
     app = create_app()
+    app.config.setdefault("BIND_HOST", None)
     if config is not None:
         app.config.update(config)
     hooks.events.init_app(app)
     hooks.source.init_app(app)
     hooks.destination.init_app(app)
-    hooks.events.run(app)
+    hooks.events.run(app, host=get_bind_host())
 
 
 if __name__ == "__main__":
