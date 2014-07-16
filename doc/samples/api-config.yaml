@@ -17,6 +17,8 @@ CLOUDS:
             num_servers: 5
             num_tenants: 2
             delays:      True
+        urls:
+            horizon:        http://10.0.0.1/
     destination:
         endpoint:
             auth_url: http://127.0.0.1:5000/v2.0
@@ -25,3 +27,6 @@ CLOUDS:
             tenant_name: admin
         identity:
             connection: mysql+mysqlconnector://keystone:keystone@127.0.0.1/keystone
+        urls:
+            horizon:        http://horizon.endpoint.com/
+            mos:            http://127.0.0.1:8000/

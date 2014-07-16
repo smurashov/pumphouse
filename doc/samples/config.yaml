@@ -6,6 +6,8 @@ source:
     tenant_name:    admin
   identity:
     connection:     mysql+mysqlconnector://root:pass@10.0.0.1:3607/keystone
+  urls:
+    horizon:        http://10.0.0.1/
 destination:
   endpoint:
     auth_url:       http://api.endpoint.com:5000/v2.0/
@@ -14,3 +16,6 @@ destination:
     tenant_name:    admin
   identity:
     connection:     mysql+mysqlconnector://root:pass@127.0.0.1:3607/keystone
+  urls:
+    horizon:        http://horizon.endpoint.com/
+    mos:            http://127.0.0.1:8000/
