@@ -26,6 +26,7 @@ def cloud_resources(cloud):
         return "error"
 
     resources = {
+        "urls": cloud.urls,
         "tenants": [{
             "id": tenant.id,
             "name": tenant.name,

@@ -538,7 +538,8 @@ class Keystone(BaseService):
 
 
 class Cloud(object):
-    def __init__(self, cloud_ns, user_ns, identity, data=None):
+    def __init__(self, cloud_ns, user_ns, identity, urls, data=None):
+        self.urls = urls
         self.delays = False
         self.cloud_ns = cloud_ns
         self.user_ns = user_ns
@@ -598,17 +599,18 @@ class Cloud(object):
         return self.data.setdefault(service_name, {})
 
     def restrict(self, user_ns):
-        return Cloud(self.cloud_ns, user_ns, self.identity, self.data)
+        return Cloud(self.cloud_ns, user_ns, self.identity, self.urls,
+                     data=self.data)
 
     @classmethod
-    def from_dict(cls, endpoint, identity):
+    def from_dict(cls, endpoint, identity, urls):
         cloud_ns = pump_cloud.Namespace(auth_url=endpoint["auth_url"])
         user_ns = pump_cloud.Namespace(
             username=endpoint["username"],
             password=endpoint["password"],
             tenant_name=endpoint["tenant_name"],
         )
-        return cls(cloud_ns, user_ns, identity)
+        return cls(cloud_ns, user_ns, identity, urls)
 
     def __repr__(self):
         return "<Cloud(namespace={!r})>".format(self.access_ns)
