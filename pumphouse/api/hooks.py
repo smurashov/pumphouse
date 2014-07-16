@@ -26,9 +26,6 @@ class Cloud(object):
         self._client = None
 
     def init_app(self, app):
-        import threading
-        t = threading.current_thread()
-        LOG.warning("Initialization started in thread %r[%s]", t, t.ident)
         app.config.setdefault("CLOUDS", None)
         app.config.setdefault("CLOUD_DRIVER", "pumphouse.cloud.Cloud")
         app.config.setdefault("IDENTITY_DRIVER", "pumphouse.cloud.Identity")
