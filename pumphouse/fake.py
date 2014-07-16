@@ -410,7 +410,7 @@ class Service(NovaResource):
 
     def disable(self, hostname, binary):
         service = self.find(host=hostname, binary=binary)
-        service.status = "disbled"
+        service.status = "disabled"
         return service
 
     def enable(self, hostname, binary):
