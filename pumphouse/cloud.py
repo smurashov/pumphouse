@@ -151,10 +151,8 @@ class Cloud(object):
 
 
 def make_client(config, target, cloud_driver, identity_driver):
-    identity = identity_driver(**config["identity"])
-    cloud = cloud_driver.from_dict(endpoint=config["endpoint"],
-                                   identity=identity,
-                                   urls=config["urls"])
+    identity = identity_driver(**config.pop("identity"))
+    cloud = cloud_driver.from_dict(identity=identity, **config)
     LOG.info("Cloud client initialized for endpoint: %s",
              config["endpoint"]["auth_url"])
     return cloud

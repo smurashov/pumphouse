@@ -126,7 +126,7 @@ class Server(NovaResource):
             updated = datetime.datetime.strptime(
                 server.updated, "%Y-%m-%dT%H:%M:%S.%f")
             delta = datetime.datetime.now() - updated
-            if delta.total_seconds() > 10:
+            if not self.cloud.delays or delta.total_seconds() > 10:
                 server.updated = datetime.datetime.now().isoformat()
                 server.status = "ACTIVE"
         return server
@@ -611,14 +611,21 @@ class Cloud(object):
                      data=self.data)
 
     @classmethod
-    def from_dict(cls, endpoint, identity, urls):
+    def from_dict(cls, endpoint, identity, urls, fake=None):
         cloud_ns = pump_cloud.Namespace(auth_url=endpoint["auth_url"])
         user_ns = pump_cloud.Namespace(
             username=endpoint["username"],
             password=endpoint["password"],
             tenant_name=endpoint["tenant_name"],
         )
-        return cls(cloud_ns, user_ns, identity, urls)
+        cloud = cls(cloud_ns, user_ns, identity, urls)
+        if fake:
+            num_tenants = fake.get("num_tenants", 2)
+            num_servers = fake.get("num_servers", 2)
+            management.setup(cloud, num_tenants, num_servers)
+            delays = fake.get("delays", False)
+            cloud.delays = delays
+        return cloud
 
     def __repr__(self):
         return "<Cloud(namespace={!r})>".format(self.access_ns)
@@ -639,16 +646,3 @@ class Identity(object):
 
     def update(self, iterable):
         pass
-
-
-def make_client(config, target, cloud_driver, identity_driver):
-    cloud = pump_cloud.make_client(config, target, cloud_driver,
-                                   identity_driver)
-    if target == "source":
-        parameters = config.get("fake", {})
-        num_tenants = parameters.get("num_tenants", 2)
-        num_servers = parameters.get("num_servers", 2)
-        management.setup(cloud, num_tenants, num_servers)
-        delays = parameters.get("delays", False)
-        cloud.delays = delays
-    return cloud

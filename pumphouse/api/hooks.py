@@ -57,7 +57,7 @@ class Cloud(object):
         LOG.info("Cloud initializer will be used: %s",
                  config["CLIENT_MAKER"])
         make_client = utils.load_class(config["CLIENT_MAKER"])
-        cloud_config = config["CLOUDS"][self.target]
+        cloud_config = config["CLOUDS"][self.target].copy()
         cloud = make_client(cloud_config, self.target, cloud_driver,
                             identity_driver)
         return cloud
