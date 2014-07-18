@@ -20,7 +20,7 @@ TEST_IMAGE_URL = ("http://download.cirros-cloud.net/0.3.2/"
                   "cirros-0.3.2-x86_64-disk.img")
 TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
 TEST_RESOURCE_PREFIX = "pumphouse-test"
-FLOATING_IP_STRING = "172.18.167.{}"
+FLOATING_IP_STRING = "172.16.0.{}"
 
 
 def become_admin_in_tenant(cloud, user, tenant):
