@@ -162,6 +162,20 @@ def setup(events, cloud, target, num_tenants, num_servers):
         test_tenant_clouds[tenant.id] = tenant_cloud
         test_tenants[tenant.id] = tenant
         LOG.info("Created: %s", tenant._info)
+        secgroup = tenant_cloud.nova.security_groups.find(
+            name='default')
+        tenant_cloud.nova.security_group_rules.create(
+            secgroup.id,
+            ip_protocol='ICMP',
+            from_port='-1',
+            to_port='-1',
+            cidr='0.0.0.0/0')
+        tenant_cloud.nova.security_group_rules.create(
+            secgroup.id,
+            ip_protocol='TCP',
+            from_port='80',
+            to_port='80',
+            cidr='0.0.0.0/0')
         role = cloud.keystone.roles.create(
             "{0}-role-{1}"
             .format(prefix,
