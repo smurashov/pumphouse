@@ -175,15 +175,6 @@ def setup(cloud, num_tenants, num_servers):
             pass
         else:
             test_nets[tenant.id] = net
-        try:
-            net = tenant_cloud.nova.networks.findall(
-                project_id=None)[0]
-        except nova_excs.NotFound:
-            LOG.exception("No suitable networks found: %s",
-                          tenant._info)
-            raise exceptions.Error()
-        else:
-            test_nets[tenant.id] = net
         LOG.info("Created: %s", net._info)
         user_ns = pump_cloud.Namespace(username=user.name,
                                        password="default",
