@@ -137,7 +137,7 @@ class Cloud(object):
         return Cloud(self.cloud_ns, user_ns, self.identity, self.urls)
 
     @classmethod
-    def from_dict(cls, endpoint, identity, urls):
+    def from_dict(cls, endpoint, identity, urls=None):
         cloud_ns = Namespace(auth_url=endpoint["auth_url"])
         user_ns = Namespace(
             username=endpoint["username"],
