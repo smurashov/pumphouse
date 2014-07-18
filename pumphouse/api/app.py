@@ -24,12 +24,15 @@ def start_app(config=None, **kwargs):
     :param config: a dict with configuration values
     """
     def get_bind_host():
-        bind_host = app.config["BIND_HOST"]
-        if bind_host is None:
-            server_name = app.config["SERVER_NAME"]
-            if server_name is not None:
-                bind_host, _, _ = server_name.partition(":")
-        return bind_host
+        bind_host = app.config.get("BIND_HOST", app.config["SERVER_NAME"])
+        if bind_host is not None:
+            host, _, port = bind_host.partition(":")
+            if isinstance(port, basestring) and port.isdigit():
+                port = int(port)
+            else:
+                port = None
+            return (host, port)
+        return (None, None)
 
     logging.basicConfig(level=logging.INFO)
     app = create_app()
@@ -39,7 +42,8 @@ def start_app(config=None, **kwargs):
     hooks.events.init_app(app)
     hooks.source.init_app(app)
     hooks.destination.init_app(app)
-    hooks.events.run(app, host=get_bind_host(), policy_server = False)
+    host, port = get_bind_host()
+    hooks.events.run(app, policy_server=False, host=host, port=port)
 
 
 if __name__ == "__main__":
