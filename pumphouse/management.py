@@ -231,26 +231,15 @@ def setup(cloud, num_tenants, num_servers):
                 pass
             else:
                 LOG.info("Created: %s", floating_ip._info)
-            while True:
+                server = utils.wait_for(server.id, cloud.nova.servers.get,
+                                        value="ACTIVE")
                 try:
                     server.add_floating_ip(floating_ip.ip, ip)
-                except nova_excs.BadRequest:
-                    LOG.warn("Network info not ready for instance: %s",
-                             server._info)
-                    time.sleep(1)
-                    continue
                 except nova_excs.NotFound:
-                    LOG.warn("Floating IP not found: %s",
-                             floating_ip._info)
-                    time.sleep(1)
-                    continue
-                except Exception as exc:
-                    LOG.exception("Cannot create floating ip range: %s",
-                                  exc.message)
-                    break
+                    LOG.exception("Floating IP not found: %s", floating_ip._info)
+                    raise
                 else:
-                    break
-            server = cloud.nova.servers.get(server)
-            LOG.info("Assigned floating ip %s to server: %s",
-                     floating_ip._info,
-                     server._info)
+                    server = cloud.nova.servers.get(server)
+                    LOG.info("Assigned floating ip %s to server: %s",
+                             floating_ip._info,
+                             server._info)
