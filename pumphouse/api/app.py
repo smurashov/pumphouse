@@ -39,7 +39,7 @@ def start_app(config=None, **kwargs):
     hooks.events.init_app(app)
     hooks.source.init_app(app)
     hooks.destination.init_app(app)
-    hooks.events.run(app, host=get_bind_host())
+    hooks.events.run(app, host=get_bind_host(), policy_server = False)
 
 
 if __name__ == "__main__":
