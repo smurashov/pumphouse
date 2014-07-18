@@ -165,14 +165,13 @@ def setup(cloud, num_tenants, num_servers):
                 cidr="10.10.{}.0/24".format(i),
                 project_id=tenant.id)
         except nova_excs.Conflict:
-            pass
-        else:
-            test_nets[tenant.id] = net
-        try:
-            net = tenant_cloud.nova.networks.find(
-                project_id=tenant.id)
-        except nova_excs.NotFound:
-            pass
+            try:
+                net = tenant_cloud.nova.networks.find(
+                    project_id=tenant.id)
+            except nova_excs.NotFound:
+                pass
+            else:
+                test_nets[tenant.id] = net
         else:
             test_nets[tenant.id] = net
         LOG.info("Created: %s", net._info)
