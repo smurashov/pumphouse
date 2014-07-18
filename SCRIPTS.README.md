@@ -26,6 +26,13 @@ To install the pumphouse package use the command:
 $ pip install --allow-external mysql-connector-python .
 ```
 
+Alternatively, if you want to install in Python virtual environment, you could
+use `tox` with `apitest` env:
+
+```sh
+$ tox -e apitest
+```
+
 Two commands would be avaiable in your environment:
 
 * `pumphouse`
