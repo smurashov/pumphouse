@@ -7,6 +7,19 @@ To perform installation with a third-party user interface the package should be
 prepared. It is a simple action and it require just copy files in the
 pumphouse/api/static directory. A file with the index.html name must be there.
 
+You can prepare for running API service with 3rd-party user interface with:
+
+```sh
+$ env SERVER_NAME=$SERVER_NAME \
+UI_URL=$UI_URL \
+make api
+```
+
+Set `$SERVER_NAME` to 'address:port' of the server you're installing on. Defaults
+to `127.0.0.1:5000`.
+Set `$UI_URL` to the working Git repo URL where user interface is being
+developed.
+
 To install the pumphouse package use the command:
 
 ```sh
@@ -49,6 +62,9 @@ CLOUDS:
         identity:
             connection: mysql+mysqlconnector://keystone:secrete@172.18.18.132/keystone
 ```
+
+See example in [`doc/samples/api-config.yaml`](doc/samples/api-config.yaml)
+file.
 
 ## `pumphouse` - Simple migration script
 
