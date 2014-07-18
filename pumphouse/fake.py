@@ -126,7 +126,7 @@ class Server(NovaResource):
             updated = datetime.datetime.strptime(
                 server.updated, "%Y-%m-%dT%H:%M:%S.%f")
             delta = datetime.datetime.now() - updated
-            if delta.total_seconds() > 30:
+            if delta.total_seconds() > 10:
                 server.updated = datetime.datetime.now().isoformat()
                 server.status = "ACTIVE"
         return server
@@ -240,7 +240,7 @@ class Image(Resource):
 
     def upload(self, image_id, data):
         if self.cloud.delays:
-            time.sleep(random.randint(15, 45))
+            time.sleep(random.randint(5, 15))
 
     def create(self, **kwargs):
         image_uuid = uuid.uuid4()
@@ -575,7 +575,7 @@ class Cloud(object):
                 "binary": "nova-compute",
                 "state": "up",
                 "status": "enabled",
-            }) for i in range(2)]
+            }) for i in range(5)]
             hypervs = [AttrDict(self.nova, {
                 "name": s.host,
                 "service": s,

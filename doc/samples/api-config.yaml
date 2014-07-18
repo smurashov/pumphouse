@@ -14,8 +14,8 @@ CLOUDS:
         identity:
             connection:  mysql+mysqlconnector://root:root@127.0.0.1/keystone
         fake:
-            num_servers: 5
-            num_tenants: 2
+            num_servers: 3
+            num_tenants: 3
             delays:      True
         urls:
             horizon:        http://10.0.0.1/
