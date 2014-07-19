@@ -1,3 +1,5 @@
+import datetime
+import functools
 import gevent
 import logging
 
@@ -12,6 +14,7 @@ LOG = logging.getLogger(__name__)
 
 pump = flask.Blueprint("pumphouse", __name__)
 
+
 def crossdomain(origin=None, methods=None, headers=None,
                 max_age=21600, attach_to_all=True,
                 automatic_options=True):
@@ -21,23 +24,23 @@ def crossdomain(origin=None, methods=None, headers=None,
         headers = ', '.join(x.upper() for x in headers)
     if not isinstance(origin, basestring):
         origin = ', '.join(origin)
-    if isinstance(max_age, timedelta):
+    if isinstance(max_age, datetime.timedelta):
         max_age = max_age.total_seconds()
 
     def get_methods():
         if methods is not None:
             return methods
 
-        options_resp = current_app.make_default_options_response()
+        options_resp = flask.current_app.make_default_options_response()
         return options_resp.headers['allow']
 
     def decorator(f):
         def wrapped_function(*args, **kwargs):
-            if automatic_options and request.method == 'OPTIONS':
-                resp = current_app.make_default_options_response()
+            if automatic_options and flask.request.method == 'OPTIONS':
+                resp = flask.current_app.make_default_options_response()
             else:
-                resp = make_response(f(*args, **kwargs))
-            if not attach_to_all and request.method != 'OPTIONS':
+                resp = flask.make_response(f(*args, **kwargs))
+            if not attach_to_all and flask.request.method != 'OPTIONS':
                 return resp
 
             h = resp.headers
@@ -50,7 +53,7 @@ def crossdomain(origin=None, methods=None, headers=None,
             return resp
 
         f.provide_automatic_options = False
-        return update_wrapper(wrapped_function, f)
+        return functools.update_wrapper(wrapped_function, f)
     return decorator
 
 

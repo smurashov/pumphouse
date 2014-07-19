@@ -1,7 +1,6 @@
 import logging
 import os
 import random
-import time
 import urllib
 
 from keystoneclient.openstack.common.apiclient import exceptions \
@@ -229,7 +228,8 @@ def setup(cloud, num_tenants, num_servers):
                 try:
                     server.add_floating_ip(floating_ip.ip, ip)
                 except nova_excs.NotFound:
-                    LOG.exception("Floating IP not found: %s", floating_ip._info)
+                    LOG.exception("Floating IP not found: %s",
+                                  floating_ip._info)
                     raise
                 else:
                     server = cloud.nova.servers.get(server)
