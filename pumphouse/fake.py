@@ -546,7 +546,8 @@ class Keystone(BaseService):
 
 
 class Cloud(object):
-    def __init__(self, cloud_ns, user_ns, identity, urls, data=None):
+    def __init__(self, cloud_ns, user_ns, identity, urls,
+                 data=None, num_hypervisors=2):
         self.urls = urls
         self.delays = False
         self.cloud_ns = cloud_ns
@@ -583,7 +584,7 @@ class Cloud(object):
                 "binary": "nova-compute",
                 "state": "up",
                 "status": "enabled",
-            }) for i in range(5)]
+            }) for i in range(num_hypervisors)]
             hypervs = [AttrDict(self.nova, {
                 "name": s.host,
                 "service": s,
@@ -618,13 +619,17 @@ class Cloud(object):
             password=endpoint["password"],
             tenant_name=endpoint["tenant_name"],
         )
-        cloud = cls(cloud_ns, user_ns, identity, urls)
         if fake:
             num_tenants = fake.get("num_tenants", 2)
             num_servers = fake.get("num_servers", 2)
-            management.setup(cloud, num_tenants, num_servers)
+            num_hypervisors = fake.get("num_hypervisors", 2)
             delays = fake.get("delays", False)
+            cloud = cls(cloud_ns, user_ns, identity, urls,
+                        num_hypervisors=num_hypervisors)
+            management.setup(cloud, num_tenants, num_servers)
             cloud.delays = delays
+        else:
+            cloud = cls(cloud_ns, user_ns, identity, urls)
         return cloud
 
     def __repr__(self):
