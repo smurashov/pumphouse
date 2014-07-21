@@ -46,9 +46,9 @@ class Resource(object):
 
     def list(self, search_opts=None, filters=None, tenant_id=None,
              project_id=None):
-        for obj in self.objects:
+        for obj in self.objects.itervalues():
             obj = self._update_status(obj)
-        return self.objects
+        return self.objects.values()
 
     findall = list
 
@@ -56,21 +56,21 @@ class Resource(object):
         return obj
 
     def create(self, obj):
-        self.objects.append(obj)
+        self.objects[obj.id] = obj
 
     def get(self, id):
         if isinstance(id, AttrDict):
             real_id = id['id']
         else:
             real_id = id
-        for obj in self.objects:
-            if obj.id == real_id:
+        for obj_id, obj in self.objects.iteritems():
+            if obj_id == real_id:
                 obj = self._update_status(obj)
                 return obj
         raise self.NotFound("Not found: {}".format(id))
 
     def find(self, **kwargs):
-        for obj in self.objects:
+        for obj in self.objects.itervalues():
             for key, value in kwargs.iteritems():
                 if obj[key] != value:
                     break
@@ -82,7 +82,11 @@ class Resource(object):
 
     def _findall(self, **kwargs):
         objects = []
-        for obj in self.objects:
+        if isinstance(self.objects, list):
+            objs = self.objects
+        else:
+            objs = self.objects.itervalues()
+        for obj in objs:
             for key, value in kwargs.iteritems():
                 if obj[key] != value:
                     break
@@ -90,22 +94,23 @@ class Resource(object):
                 objects.append(obj)
         return objects
 
-    def delete(self, id):
-        deleted = self.get(id)
-        for obj in list(self.objects):
-            if obj.id == deleted.id:
-                self.objects.remove(obj)
+    def delete(self, obj):
+        if hasattr(obj, "id"):
+            obj_id = obj.id
+        else:
+            obj_id = obj
+        self.objects.pop(obj_id, None)
 
     def _get_user_id(self, username):
-        for user in self.cloud.data['keystone']['users']:
+        for user_id, user in self.cloud.data['keystone']['users'].iteritems():
             if user['name'] == username:
-                return user['id']
-        return None
+                return user_id
+        return
 
     def _get_tenant_id(self, tenant_name):
-        for tenant in self.cloud.data['keystone']['tenants']:
+        for tenant_id, tenant in self.cloud.data['keystone']['tenants'].iteritems():
             if tenant['name'] == tenant_name:
-                return tenant['id']
+                return tenant_id
         raise exceptions.NotFound()
 
 
@@ -138,7 +143,7 @@ class Server(NovaResource):
             image_id = image
         else:
             image_id = image['id']
-        if isinstance(flavor, int):
+        if isinstance(flavor, six.string_types):
             flavor_id = flavor
         else:
             flavor_id = flavor['id']
@@ -184,7 +189,7 @@ class Server(NovaResource):
             "os-extended-volumes:volumes_attached": [],
             "metadata": {}},
             add_floating_ip=self.add_floating_ip)
-        self.objects.append(server)
+        self.objects[server.id] = server
         return server
 
     def add_floating_ip(self, floating_ip, fixed_ip=None):
@@ -194,8 +199,8 @@ class Server(NovaResource):
             "addr": floating_ip,
             "OS-EXT-IPS:type": "floating"
         }
-        floating_ip_list = self.cloud.data['nova']['floatingipbulks']
-        for server in self.objects:
+        floating_ip_list = self.cloud.nova.floating_ips_bulk.list()
+        for server_id, server in self.objects.iteritems():
             for net in server["addresses"]:
                 if not fixed_ip:
                     raise NotImplementedError
@@ -205,7 +210,7 @@ class Server(NovaResource):
                         server._info = server
                         for ip in floating_ip_list:
                             if ip.address == floating_ip:
-                                ip['instance_uuid'] = server["id"]
+                                ip['instance_uuid'] = server_id
                         return server
         raise exceptions.NotFound
 
@@ -260,7 +265,7 @@ class Image(Resource):
             "min_disk": 0,
             "protected": False},
             **kwargs)
-        self.objects.append(image)
+        self.objects[image.id] = image
         return image
 
 
@@ -297,7 +302,7 @@ class Network(NovaResource):
             "dns1": "8.8.4.4",
         }, **kwargs)
         network._info = network
-        self.objects.append(network)
+        self.objects[network.id] = network
         return network
 
     def disassociate(self, network):
@@ -306,7 +311,7 @@ class Network(NovaResource):
 
 class Flavor(NovaResource):
     def create(self, name, ram, vcpus, disk, **kwargs):
-        flavor_id = random.randint(0, 100)
+        flavor_id = str(uuid.uuid4())
         flavor = AttrDict(self, {
             "name": name,
             "ram": ram,
@@ -320,14 +325,15 @@ class Flavor(NovaResource):
             "id": flavor_id,
             "ephemeral": 0}, **kwargs)
         flavor._info = flavor
-        self.objects.append(flavor)
+        self.objects[flavor.id] = flavor
         return flavor
 
 
 class FloatingIP(NovaResource):
     def create(self, pool=None):
-        self.objects = self.cloud.data['nova']['floatingipbulks']
-        floating_ips = [obj for obj in self.objects if not obj.project_id]
+        floating_ips = [obj
+                        for obj in self.objects.itervalues()
+                        if not obj.project_id]
         if len(floating_ips) < 1:
             raise self.NotFound()
         floating_ip = floating_ips[0]
@@ -337,7 +343,13 @@ class FloatingIP(NovaResource):
 
 
 class FloatingIPPool(NovaResource):
-    pass
+    def create(self, name):
+        pool = AttrDict(self, {
+            "id": str(uuid.uuid4()),
+            "name": name,
+        })
+        self.objects[pool.id] = pool
+        return pool
 
 
 class FloatingIPBulk(NovaResource):
@@ -351,17 +363,14 @@ class FloatingIPBulk(NovaResource):
             "pool": pool,
         })
         floating_ip._info = floating_ip
-        self.objects.append(floating_ip)
-        if "floatingippools" not in self.cloud.data["nova"]:
-            self.cloud.data["nova"]["floatingippools"] = []
-        self.cloud.data["nova"]["floatingippools"].append(
-            AttrDict(self, {"name": pool}))
+        self.objects[floating_ip.id] = floating_ip
+        self.cloud.nova.floating_ip_pools.create(pool)
         return floating_ip
 
     def delete(self, ip_range):
-        for obj in list(self.objects):
+        for obj_id, obj in self.objects.items():
             if obj.address == ip_range:
-                self.objects.remove(obj)
+                self.objects.pop(obj_id, None)
 
 
 class SecGroup(NovaResource):
@@ -375,7 +384,7 @@ class SecGroup(NovaResource):
             "tenant_id": self.tenant_id,
         })
         secgroup._info = secgroup
-        self.objects.append(secgroup)
+        self.objects[secgroup.id] = secgroup
         return secgroup
 
 
@@ -387,12 +396,14 @@ class SecGroupRule(Resource):
                 "cidr": kwargs["cidr"],
             },
         }, **kwargs)
-        rule._info = rule
-        self.objects.append(rule)
+        self.objects[rule.id] = rule
         return rule
 
 
 class Hypervisor(NovaResource):
+    def list(self):
+        return self.objects
+
     def search(self, hostname, servers=False):
         hypervs = []
         for hyperv in self.objects:
@@ -439,7 +450,7 @@ class Tenant(KeystoneResource):
             "id": str(tenant_uuid),
             "enabled": True,
         }, **kwargs)
-        self.objects.append(tenant)
+        self.objects[tenant.id] = tenant
         return tenant
 
     def add_user(self, tenant, user, role):
@@ -460,7 +471,7 @@ class User(KeystoneResource):
             "username": kwargs["name"],
             "enabled": True
         }, **kwargs)
-        self.objects.append(user)
+        self.objects[user.id] = user
         return user
 
 
@@ -471,15 +482,15 @@ class Role(KeystoneResource):
             "id": str(role_uuid),
             "name": name,
         })
-        self.objects.append(role)
+        self.objects[role.id] = role
         return role
 
     def add_user_role(self, user_id, role_id, tenant):
-        for role in self.objects:
-            if role["id"] == role_id:
+        for r_id, role in self.objects.iteritems():
+            if r_id == role_id:
                 break
-        for user in self.cloud.data['keystone']['users']:
-            if user["id"] == user_id:
+        for user in self.cloud.keystone.users.list():
+            if user.id == user_id:
                 if 'roles' in user:
                     user['roles'].append(role)
                 else:
@@ -488,7 +499,7 @@ class Role(KeystoneResource):
         raise exceptions.NotFound()
 
     def roles_for_user(self, user_id, **kwargs):
-        for user in self.cloud.data['keystone']['users']:
+        for user in self.cloud.keystone.users.list():
             if user['id'] == user_id:
                 return user['roles']
         raise exceptions.NotFound()
@@ -509,10 +520,13 @@ class BaseService(object):
         if resource_class in self.resources:
             return self.resources[resource_class]
         resource_name = "{}s".format(resource_class.__name__.lower())
-        objects = self.resources_objects.setdefault(resource_name, [])
+        objects = self.get_named_resource(resource_class, resource_name)
         self.resources[resource_class] = resource = resource_class(self.cloud,
                                                                    objects)
         return resource
+
+    def get_named_resource(self, resource_class, resource_name):
+        return self.resources_objects.setdefault(resource_name, {})
 
 
 class Nova(BaseService):
@@ -532,6 +546,12 @@ class Nova(BaseService):
                                           binary="nova-compute")
         service = random.choice(services)
         return service.host
+
+    def get_named_resource(self, resource_class, resource_name):
+        if resource_name == "floatingips":
+            resource_name = "floatingipbulks"
+        return super(Nova, self).get_named_resource(resource_class,
+                                                    resource_name)
 
 
 class Glance(BaseService):
@@ -590,9 +610,9 @@ class Cloud(object):
             "tenantId": admin_tenant.id,
             "enabled": True,
         })
-        self.data["keystone"]["tenants"] = [admin_tenant]
-        self.data["keystone"]["roles"] = [admin_role]
-        self.data["keystone"]["users"] = [admin_user]
+        self.data["keystone"]["tenants"] = {admin_tenant.id: admin_tenant}
+        self.data["keystone"]["roles"] = {admin_role.id: admin_role}
+        self.data["keystone"]["users"] = {admin_user.id: admin_user}
         hostname_prefix = "".join(random.choice(string.ascii_uppercase)
                                   for i in (0, 0))
         services = [AttrDict(self.nova, {
@@ -605,26 +625,26 @@ class Cloud(object):
             "name": s.host,
             "service": s,
         }) for s in services]
-        secgroups = [AttrDict(self.nova, {
+        secgroup = AttrDict(self.nova, {
             "name": "default",
             "description": "default",
             "tenant_id": admin_tenant.id,
             "id": str(uuid.uuid4()),
             "rules": "",
-        })]
+        })
         self.data["nova"]["services"] = services
         self.data["nova"]["hypervisors"] = hypervs
-        self.data["nova"]["secgroups"] = secgroups
+        self.data["nova"]["secgroups"] = {secgroup.id: secgroup}
 
-    def reset(self):
+    def reset(self, events, target):
         self.delays, delays = False, self.delays
-        management.cleanup(self)
+        management.cleanup(events, self, target)
         if self.populate:
             num_tenants = self.populate.get("num_tenants",
                                             self.default_num_tenants)
             num_servers = self.populate.get("num_servers",
                                             self.default_num_servers)
-            management.setup(self, num_tenants, num_servers)
+            management.setup(events, self, target, num_tenants, num_servers)
         self.delays = delays
 
     def get_service(self, service_name):

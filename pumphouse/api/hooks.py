@@ -66,7 +66,7 @@ class Cloud(object):
 
     def reset(self):
         with self._reset_lock:
-            self.client.reset()
+            self.client.reset(events, self.target)
 
     @property
     def client(self):
