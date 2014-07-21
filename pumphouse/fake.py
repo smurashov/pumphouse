@@ -546,63 +546,86 @@ class Keystone(BaseService):
 
 
 class Cloud(object):
+    default_num_tenants = 2
+    default_num_servers = 2
+    default_num_hypervisors = 2
+    default_delays = False
+
     def __init__(self, cloud_ns, user_ns, identity, urls,
-                 data=None, num_hypervisors=2):
-        self.urls = urls
-        self.delays = False
+                 data=None, fake=None):
         self.cloud_ns = cloud_ns
         self.user_ns = user_ns
         self.access_ns = cloud_ns.restrict(user_ns)
+        self.fake = fake or {}
+        self.delays = self.fake.get("delays", self.default_delays)
+        self.num_hypervisors = self.fake.get("num_hypervisors",
+                                             self.default_num_hypervisors)
+        self.populate = self.fake.get("populate", {})
+        self.urls = urls
         self.data = data or {}
         self.nova = Nova(self)
         self.keystone = Keystone(self)
         self.glance = Glance(self)
-        if not data:
-            admin_tenant = AttrDict(self.keystone, {
-                "name": self.access_ns.tenant_name,
-                "id": str(uuid.uuid4()),
-            }, description="admin")
-            admin_role = AttrDict(self.keystone, {
-                "name": "admin",
-                "id": str(uuid.uuid4()),
-            })
-            admin_user = AttrDict(self.keystone, {
-                "username": self.access_ns.username,
-                "name": self.access_ns.username,
-                "id": str(uuid.uuid4()),
-                "roles": [admin_role],
-                "tenantId": admin_tenant.id,
-                "enabled": True,
-            })
-            self.data["keystone"]["tenants"] = [admin_tenant]
-            self.data["keystone"]["roles"] = [admin_role]
-            self.data["keystone"]["users"] = [admin_user]
-            hostname_prefix = "".join(random.choice(string.ascii_uppercase)
-                                      for i in (0, 0))
-            services = [AttrDict(self.nova, {
-                "host": "pumphouse-{0}-{1}".format(hostname_prefix, i),
-                "binary": "nova-compute",
-                "state": "up",
-                "status": "enabled",
-            }) for i in range(num_hypervisors)]
-            hypervs = [AttrDict(self.nova, {
-                "name": s.host,
-                "service": s,
-            }) for s in services]
-            secgroups = [AttrDict(self.nova, {
-                "name": "default",
-                "description": "default",
-                "tenant_id": admin_tenant.id,
-                "id": str(uuid.uuid4()),
-                "rules": "",
-            })]
-            self.data["nova"]["services"] = services
-            self.data["nova"]["hypervisors"] = hypervs
-            self.data["nova"]["secgroups"] = secgroups
         if isinstance(identity, Identity):
             self.identity = identity
         else:
             self.identity = Identity(**identity)
+        if data is None:
+            self.initialize_data()
+
+    def initialize_data(self):
+        admin_tenant = AttrDict(self.keystone, {
+            "name": self.access_ns.tenant_name,
+            "id": str(uuid.uuid4()),
+        }, description="admin")
+        admin_role = AttrDict(self.keystone, {
+            "name": "admin",
+            "id": str(uuid.uuid4()),
+        })
+        admin_user = AttrDict(self.keystone, {
+            "username": self.access_ns.username,
+            "name": self.access_ns.username,
+            "id": str(uuid.uuid4()),
+            "roles": [admin_role],
+            "tenantId": admin_tenant.id,
+            "enabled": True,
+        })
+        self.data["keystone"]["tenants"] = [admin_tenant]
+        self.data["keystone"]["roles"] = [admin_role]
+        self.data["keystone"]["users"] = [admin_user]
+        hostname_prefix = "".join(random.choice(string.ascii_uppercase)
+                                  for i in (0, 0))
+        services = [AttrDict(self.nova, {
+            "host": "pumphouse-{0}-{1}".format(hostname_prefix, i),
+            "binary": "nova-compute",
+            "state": "up",
+            "status": "enabled",
+        }) for i in range(self.num_hypervisors)]
+        hypervs = [AttrDict(self.nova, {
+            "name": s.host,
+            "service": s,
+        }) for s in services]
+        secgroups = [AttrDict(self.nova, {
+            "name": "default",
+            "description": "default",
+            "tenant_id": admin_tenant.id,
+            "id": str(uuid.uuid4()),
+            "rules": "",
+        })]
+        self.data["nova"]["services"] = services
+        self.data["nova"]["hypervisors"] = hypervs
+        self.data["nova"]["secgroups"] = secgroups
+
+    def reset(self):
+        self.delays, delays = False, self.delays
+        management.cleanup(self)
+        if self.populate:
+            num_tenants = self.populate.get("num_tenants",
+                                            self.default_num_tenants)
+            num_servers = self.populate.get("num_servers",
+                                            self.default_num_servers)
+            management.setup(self, num_tenants, num_servers)
+        self.delays = delays
 
     def get_service(self, service_name):
         return self.data.setdefault(service_name, {})
@@ -612,24 +635,14 @@ class Cloud(object):
                      data=self.data)
 
     @classmethod
-    def from_dict(cls, endpoint, identity, urls, fake=None):
+    def from_dict(cls, endpoint, identity, urls, **kwargs):
         cloud_ns = pump_cloud.Namespace(auth_url=endpoint["auth_url"])
         user_ns = pump_cloud.Namespace(
             username=endpoint["username"],
             password=endpoint["password"],
             tenant_name=endpoint["tenant_name"],
         )
-        if fake:
-            num_tenants = fake.get("num_tenants", 2)
-            num_servers = fake.get("num_servers", 2)
-            num_hypervisors = fake.get("num_hypervisors", 2)
-            delays = fake.get("delays", False)
-            cloud = cls(cloud_ns, user_ns, identity, urls,
-                        num_hypervisors=num_hypervisors)
-            management.setup(cloud, num_tenants, num_servers)
-            cloud.delays = delays
-        else:
-            cloud = cls(cloud_ns, user_ns, identity, urls)
+        cloud = cls(cloud_ns, user_ns, identity, urls, **kwargs)
         return cloud
 
     def __repr__(self):

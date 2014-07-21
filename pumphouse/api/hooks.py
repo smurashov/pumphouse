@@ -1,3 +1,4 @@
+import gevent.lock
 import logging
 
 import flask
@@ -22,6 +23,7 @@ class Clouds(object):
 
 class Cloud(object):
     def __init__(self, target):
+        self._reset_lock = gevent.lock.RLock()
         self.target = target
         self._client = None
 
@@ -63,10 +65,8 @@ class Cloud(object):
         return cloud
 
     def reset(self):
-        app = flask.current_app
-        clouds = self.register_extension(app)
-        client = self.make_client(app)
-        clouds.set(self.target, client)
+        with self._reset_lock:
+            self.client.reset()
 
     @property
     def client(self):

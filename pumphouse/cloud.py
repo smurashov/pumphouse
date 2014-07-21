@@ -133,6 +133,9 @@ class Cloud(object):
                                     token=self.keystone.auth_token)
         self.urls = urls
 
+    def reset(self):
+        pass
+
     def restrict(self, user_ns):
         return Cloud(self.cloud_ns, user_ns, self.identity, self.urls)
 
