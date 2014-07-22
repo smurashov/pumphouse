@@ -46,8 +46,8 @@ class Resource(object):
 
     def list(self, search_opts=None, filters=None, tenant_id=None,
              project_id=None):
-        for obj in self.objects.itervalues():
-            obj = self._update_status(obj)
+        for obj in self._iterate_values():
+            self._update_status(obj)
         return self.objects.values()
 
     findall = list
@@ -70,7 +70,7 @@ class Resource(object):
         raise self.NotFound("Not found: {}".format(id))
 
     def find(self, **kwargs):
-        for obj in self.objects.itervalues():
+        for obj in self._iterate_values():
             for key, value in kwargs.iteritems():
                 if obj[key] != value:
                     break
@@ -80,13 +80,14 @@ class Resource(object):
                                for k, v in kwargs.iteritems())
         raise self.NotFound("Not found: {}".format(filter_str))
 
+    def _iterate_values(self):
+        if isinstance(self.objects, list):
+            return self.objects
+        return self.objects.itervalues()
+
     def _findall(self, **kwargs):
         objects = []
-        if isinstance(self.objects, list):
-            objs = self.objects
-        else:
-            objs = self.objects.itervalues()
-        for obj in objs:
+        for obj in self._iterate_values():
             for key, value in kwargs.iteritems():
                 if obj[key] != value:
                     break
@@ -332,7 +333,7 @@ class Flavor(NovaResource):
 class FloatingIP(NovaResource):
     def create(self, pool=None):
         floating_ips = [obj
-                        for obj in self.objects.itervalues()
+                        for obj in self._iterate_values()
                         if not obj.project_id]
         if len(floating_ips) < 1:
             raise self.NotFound()
