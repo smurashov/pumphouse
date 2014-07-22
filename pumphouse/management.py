@@ -126,7 +126,7 @@ def setup(cloud, num_tenants, num_servers):
             "{0}-flavor-{1}"
             .format(prefix,
                     str(random.randint(1, 0x7fffffff))),
-            '1', '1', '2', is_public='True')
+            '1024', '1', '5', is_public='True')
         test_flavors[flavor.id] = flavor
         LOG.info("Created: %s", flavor._info)
         tenant_id = str(random.randint(1, 0x7fffffff))
