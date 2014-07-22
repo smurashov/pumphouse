@@ -118,8 +118,14 @@ def reset():
     reset = flask.current_app.config["CLOUDS_RESET"]
     if not reset:
         return flask.make_response("", 404)
-    hooks.destination.reset()
-    hooks.source.reset()
+    @flask.copy_current_request_context
+    def reset_source():
+        hooks.source.reset(hooks.events)
+    @flask.copy_current_request_context
+    def reset_destination():
+        hooks.destination.reset(hooks.events)
+    gevent.spawn(reset_destination)
+    gevent.spawn(reset_source)
     return flask.make_response("", 201)
 
 
