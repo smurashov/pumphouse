@@ -607,10 +607,10 @@ def main():
     Cloud = load_cloud_driver(is_fake=args.fake)
     if args.action == "migrate":
         mapping = {}
-        src = Cloud.from_dict(**args.config["CLOUDS"]["source"])
+        src = Cloud.from_dict(**args.config["source"])
         if args.setup:
             management.setup(src, args.num_tenants, args.num_servers)
-        dst = Cloud.from_dict(**args.config["CLOUDS"]["destination"])
+        dst = Cloud.from_dict(**args.config["destination"])
         migrate_resources = RESOURCES_MIGRATIONS[args.resource]
         if args.ids:
             ids = args.ids
@@ -623,13 +623,13 @@ def main():
         migrate_resources(mapping, src, dst, ids)
         LOG.info("Migration mapping: %r", mapping)
     elif args.action == "cleanup":
-        cloud = Cloud.from_dict(**args.config["CLOUDS"][args.target])
+        cloud = Cloud.from_dict(**args.config[args.target])
         management.cleanup(cloud)
     elif args.action == "setup":
-        src = Cloud.from_dict(**args.config["CLOUDS"]["source"])
+        src = Cloud.from_dict(**args.config["source"])
         management.setup(src, args.num_tenants, args.num_servers)
     elif args.action == "evacuate":
-        cloud = Cloud.from_dict(**args.config["CLOUDS"]["source"])
+        cloud = Cloud.from_dict(**args.config["source"])
         evacuate(cloud, args.host)
 
 

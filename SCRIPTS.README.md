@@ -70,7 +70,7 @@ CLOUDS:
             connection: mysql+mysqlconnector://keystone:secrete@172.18.18.132/keystone
 ```
 
-See example in [`doc/samples/config.yaml`](doc/samples/config.yaml)
+See example in [`doc/samples/api-config.yaml`](doc/samples/api-config.yaml)
 file.
 
 ## `pumphouse` - Simple migration script
