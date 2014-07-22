@@ -3,6 +3,8 @@ SERVER_NAME: 127.0.0.1:5000
 BIND_HOST: 127.0.0.1:5000
 CLOUD_DRIVER: pumphouse.fake.Cloud
 IDENTITY_DRIVER: pumphouse.fake.Identity
+CLOUD_SERVICE: pumphouse.fake.Service
+CLOUDS_RESET: true
 CLOUDS:
     source:
         endpoint:
@@ -13,9 +15,11 @@ CLOUDS:
         identity:
             connection:  mysql+mysqlconnector://root:root@127.0.0.1/keystone
         fake:
+            delays: true
+            num_hypervisors: 6
+        populate:
             num_servers: 3
             num_tenants: 3
-            delays:      True
         urls:
             horizon:        http://10.0.0.1/
     destination:
@@ -29,3 +33,6 @@ CLOUDS:
         urls:
             horizon:        http://horizon.endpoint.com/
             mos:            http://127.0.0.1:8000/
+        fake:
+            delays: true
+            num_hypervisors: 4

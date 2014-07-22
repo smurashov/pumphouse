@@ -9,9 +9,9 @@ from novaclient import exceptions as nova_excs
 from keystoneclient.openstack.common.apiclient import exceptions \
     as keystone_excs
 
+from . import base
 from . import cloud as pump_cloud
 from . import exceptions
-from . import management
 
 
 class AttrDict(dict):
@@ -567,8 +567,6 @@ class Keystone(BaseService):
 
 
 class Cloud(object):
-    default_num_tenants = 2
-    default_num_servers = 2
     default_num_hypervisors = 2
     default_delays = False
 
@@ -593,6 +591,9 @@ class Cloud(object):
             self.identity = Identity(**identity)
         if data is None:
             self.initialize_data()
+
+    def ping(self):
+        return True
 
     def initialize_data(self):
         admin_tenant = AttrDict(self.keystone, {
@@ -637,17 +638,6 @@ class Cloud(object):
         self.data["nova"]["hypervisors"] = hypervs
         self.data["nova"]["secgroups"] = {secgroup.id: secgroup}
 
-    def reset(self, events, target):
-        self.delays, delays = False, self.delays
-        management.cleanup(events, self, target)
-        if self.populate:
-            num_tenants = self.populate.get("num_tenants",
-                                            self.default_num_tenants)
-            num_servers = self.populate.get("num_servers",
-                                            self.default_num_servers)
-            management.setup(events, self, target, num_tenants, num_servers)
-        self.delays = delays
-
     def get_service(self, service_name):
         return self.data.setdefault(service_name, {})
 
@@ -685,3 +675,11 @@ class Identity(object):
 
     def update(self, iterable):
         pass
+
+
+class Service(base.Service):
+    def reset(self, events, cloud):
+        cloud.delays, delays = False, cloud.delays
+        super(Service, self).reset(events, cloud)
+        cloud.delays = delays
+        return cloud

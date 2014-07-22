@@ -133,8 +133,8 @@ class Cloud(object):
                                     token=self.keystone.auth_token)
         self.urls = urls
 
-    def reset(self):
-        pass
+    def ping(self):
+        return True
 
     def restrict(self, user_ns):
         return Cloud(self.cloud_ns, user_ns, self.identity, self.urls)
@@ -151,11 +151,3 @@ class Cloud(object):
 
     def __repr__(self):
         return "<Cloud(namespace={!r})>".format(self.access_ns)
-
-
-def make_client(config, target, cloud_driver, identity_driver):
-    identity = identity_driver(**config.pop("identity"))
-    cloud = cloud_driver.from_dict(identity=identity, **config)
-    LOG.info("Cloud client initialized for endpoint: %s",
-             config["endpoint"]["auth_url"])
-    return cloud
