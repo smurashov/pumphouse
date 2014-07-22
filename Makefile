@@ -23,8 +23,8 @@ api:
 	cp -r pumphouse-ui/static/ajs pumphouse/api/static/
 	cp pumphouse/api/static/ajs/index.html pumphouse/api/static/
 	sed -i -e "s/SERVER_NAME: 127.0.0.1:5000/SERVER_NAME: $(SERVER_NAME)/" \
-		doc/samples/config.yaml
+		doc/samples/api-config.yaml
 	sed -i -e "s/BIND_HOST: 127.0.0.1/BIND_HOST: $(BIND_HOST)/" \
-		doc/samples/config.yaml
+		doc/samples/api-config.yaml
 	sed -i -e "s/localhost:3002/$(SERVER_NAME)/" \
 		pumphouse/api/static/ajs/js/constants.js
