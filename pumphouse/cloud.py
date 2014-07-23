@@ -134,7 +134,15 @@ class Cloud(object):
         self.urls = urls
 
     def ping(self):
-        return True
+        try:
+            self.keystone.users.list()
+            self.nova.servers.list()
+            self.glance.images.list()
+        except Exception:
+            LOG.exception("The client check is failed for cloud %r", self)
+            return False
+        else:
+            return True
 
     def restrict(self, user_ns):
         return Cloud(self.cloud_ns, user_ns, self.identity, self.urls)
