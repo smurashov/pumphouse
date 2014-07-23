@@ -232,6 +232,8 @@ def setup(events, cloud, target, num_tenants, num_servers):
                 flavor.id,
                 nics=nics)
             test_servers[server.id] = server
+            server = utils.wait_for(server.id, cloud.nova.servers.get,
+                                    value="ACTIVE")
             LOG.info("Created server: %s", server._info)
             hostname = getattr(server, "OS-EXT-SRV-ATTR:hypervisor_hostname")
             events.emit("server boot", {
@@ -258,8 +260,6 @@ def setup(events, cloud, target, num_tenants, num_servers):
                 pass
             else:
                 LOG.info("Created: %s", floating_ip._info)
-                server = utils.wait_for(server.id, cloud.nova.servers.get,
-                                        value="ACTIVE")
                 try:
                     server.add_floating_ip(floating_ip.ip, ip)
                 except nova_excs.NotFound:
