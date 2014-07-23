@@ -5,6 +5,7 @@ import logging
 
 import flask
 
+from pumphouse import management
 from . import evacuation
 from . import hooks
 from . import migration
@@ -112,10 +113,27 @@ def index():
     return flask.send_file(filename)
 
 
+@pump.route("/reset", methods=["POST"])
+def reset():
+    reset = flask.current_app.config["CLOUDS_RESET"]
+    if not reset:
+        return flask.make_response("", 404)
+    @flask.copy_current_request_context
+    def reset_source():
+        hooks.source.reset(hooks.events)
+    @flask.copy_current_request_context
+    def reset_destination():
+        hooks.destination.reset(hooks.events)
+    gevent.spawn(reset_destination)
+    gevent.spawn(reset_source)
+    return flask.make_response("", 201)
+
+
 @pump.route("/resources")
 @crossdomain(origin='*.mirantis.com')
 def resources():
     return flask.jsonify(
+        reset=flask.current_app.config["CLOUDS_RESET"],
         source=cloud_resources(hooks.source.client),
         destination=cloud_resources(hooks.destination.client),
         # TODO(akscram): A set of hosts that don't belong to any cloud.

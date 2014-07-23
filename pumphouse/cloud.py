@@ -133,6 +133,17 @@ class Cloud(object):
                                     token=self.keystone.auth_token)
         self.urls = urls
 
+    def ping(self):
+        try:
+            self.keystone.users.list()
+            self.nova.servers.list()
+            self.glance.images.list()
+        except Exception:
+            LOG.exception("The client check is failed for cloud %r", self)
+            return False
+        else:
+            return True
+
     def restrict(self, user_ns):
         return Cloud(self.cloud_ns, user_ns, self.identity, self.urls)
 
@@ -148,13 +159,3 @@ class Cloud(object):
 
     def __repr__(self):
         return "<Cloud(namespace={!r})>".format(self.access_ns)
-
-
-def make_client(config, target, cloud_driver, identity_driver):
-    identity = identity_driver(**config["identity"])
-    cloud = cloud_driver.from_dict(endpoint=config["endpoint"],
-                                   identity=identity,
-                                   urls=config["urls"])
-    LOG.info("Cloud client initialized for endpoint: %s",
-             config["endpoint"]["auth_url"])
-    return cloud

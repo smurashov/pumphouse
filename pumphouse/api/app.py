@@ -36,6 +36,7 @@ def start_app(config=None, **kwargs):
 
     logging.basicConfig(level=logging.INFO)
     app = create_app()
+    app.config.setdefault("CLOUDS_RESET", False)
     app.config.setdefault("BIND_HOST", None)
     if config is not None:
         app.config.update(config)

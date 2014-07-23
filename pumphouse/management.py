@@ -43,7 +43,7 @@ def become_admin_in_tenant(cloud, user, tenant):
                     user, tenant)
 
 
-def cleanup(cloud):
+def cleanup(events, cloud, target):
     def is_prefixed(string):
         return string.startswith(TEST_RESOURCE_PREFIX)
     search_opts = {"all_tenants": 1}
@@ -54,6 +54,12 @@ def cleanup(cloud):
         utils.wait_for(server, cloud.nova.servers.get,
                        expect_excs=(nova_excs.NotFound,))
         LOG.info("Deleted server: %s", server._info)
+        hostname = getattr(server, "OS-EXT-SRV-ATTR:hypervisor_hostname")
+        events.emit("server delete", {
+            "cloud": target,
+            "id": server.id,
+            "host_name": hostname,
+        }, namespace="/events")
     for flavor in cloud.nova.flavors.list():
         if is_prefixed(flavor.name):
             cloud.nova.flavors.delete(flavor)
@@ -94,9 +100,22 @@ def cleanup(cloud):
         if is_prefixed(tenant.name):
             cloud.keystone.tenants.delete(tenant)
             LOG.info("Deleted role: %s", tenant._info)
+            events.emit("tenant delete", {
+                "cloud": target,
+                "id": tenant.id,
+            }, namespace="/events")
+    services = cloud.nova.services.list(binary="nova-compute")
+    for service in services:
+        if service.status == "disabled":
+            cloud.nova.services.enable(service.host, "nova-compute")
+            LOG.info("Enabled the nova-compute service on %s", service.host)
+            events.emit("", {
+                "cloud": target,
+                "name": service.host,
+            }, namespace="/events")
 
 
-def setup(cloud, num_tenants, num_servers):
+def setup(events, cloud, target, num_tenants, num_servers):
 
     """Prepares test resources in the source cloud
 
@@ -181,6 +200,12 @@ def setup(cloud, num_tenants, num_servers):
                                        password="default",
                                        tenant_name=tenant.name)
         test_clouds[tenant.id] = cloud.restrict(user_ns)
+        events.emit("tenant create", {
+            "cloud": target,
+            "id": tenant.id,
+            "name": tenant.name,
+            "description": tenant.description,
+        }, namespace="/events")
     for tenant_ref in test_tenants:
         cloud = test_clouds[tenant_ref]
         tenant_cloud = test_tenant_clouds[tenant_ref]
@@ -207,7 +232,17 @@ def setup(cloud, num_tenants, num_servers):
                 flavor.id,
                 nics=nics)
             test_servers[server.id] = server
-            LOG.info("Created: %s", server._info)
+            LOG.info("Created server: %s", server._info)
+            hostname = getattr(server, "OS-EXT-SRV-ATTR:hypervisor_hostname")
+            events.emit("server boot", {
+                "cloud": target,
+                "id": server.id,
+                "name": server.name,
+                "tenant_id": server.tenant_id,
+                "image_id": server.image["id"],
+                "host_name": hostname,
+                "status": server.status.lower(),
+            }, namespace="/events")
             try:
                 pool = "{}-pool-{}".format(prefix, tenant_ref)
                 floating_addr = FLOATING_IP_STRING.format(136 + len(
