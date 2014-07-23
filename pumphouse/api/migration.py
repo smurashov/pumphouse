@@ -270,9 +270,11 @@ def migrate_resources(tenant_id):
     events.emit("tenant migrate", {"id": tenant_id}, namespace="/events")
     src_tenant, dst_tenant = migrate_tenant(mapping, events, source,
                                             destination, tenant_id)
-    events.emit("tenant create", {
+    events.emit("tenant clone", {
         "id": dst_tenant.id,
         "source_id": src_tenant.id,
+        "name": dst_tenant.name,
+        "description": dst_tenant.description,
         "cloud": "destination",
     }, namespace="/events")
     management.become_admin_in_tenant(destination,
