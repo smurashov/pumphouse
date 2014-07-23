@@ -615,7 +615,8 @@ def main():
         mapping = {}
         src = Cloud.from_dict(**args.config["source"])
         if args.setup:
-            management.setup(events, src, args.num_tenants, args.num_servers)
+            management.setup(events, src, "source", args.num_tenants,
+                             args.num_servers)
         dst = Cloud.from_dict(**args.config["destination"])
         migrate_resources = RESOURCES_MIGRATIONS[args.resource]
         if args.ids:
@@ -630,10 +631,11 @@ def main():
         LOG.info("Migration mapping: %r", mapping)
     elif args.action == "cleanup":
         cloud = Cloud.from_dict(**args.config[args.target])
-        management.cleanup(events, cloud)
+        management.cleanup(events, cloud, args.target)
     elif args.action == "setup":
         src = Cloud.from_dict(**args.config["source"])
-        management.setup(events, src, args.num_tenants, args.num_servers)
+        management.setup(events, src, "source", args.num_tenants,
+                         args.num_servers)
     elif args.action == "evacuate":
         cloud = Cloud.from_dict(**args.config["source"])
         evacuate(cloud, args.host)
