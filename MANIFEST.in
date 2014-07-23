@@ -1,1 +1,1 @@
-recursive-include pumphouse/api/static *.html *.js *.css *.png
+recursive-include pumphouse/api/static *.html *.js *.css *.png *.jpg
