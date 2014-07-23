@@ -104,6 +104,15 @@ def cleanup(events, cloud, target):
                 "cloud": target,
                 "id": tenant.id,
             }, namespace="/events")
+    services = cloud.nova.services.list(binary="nova-compute")
+    for service in services:
+        if service.status == "disabled":
+            cloud.nova.services.enable(service.host, "nova-compute")
+            LOG.info("Enabled the nova-compute service on %s", service.host)
+            events.emit("", {
+                "cloud": target,
+                "name": service.host,
+            }, namespace="/events")
 
 
 def setup(events, cloud, target, num_tenants, num_servers):
