@@ -207,15 +207,15 @@ def setup(events, cloud, target, num_tenants, num_servers):
             "description": tenant.description,
         }, namespace="/events")
     for tenant_ref in test_tenants:
-        cloud = test_clouds[tenant_ref]
+        user_cloud = test_clouds[tenant_ref]
         tenant_cloud = test_tenant_clouds[tenant_ref]
-        image = cloud.glance.images.create(
+        image = user_cloud.glance.images.create(
             disk_format='qcow2',
             container_format='bare',
             name="{0}-image-{1}"
             .format(prefix,
                     random.randint(1, 0x7fffffff)))
-        cloud.glance.images.upload(image.id, open(TEST_IMAGE_FILE, "rb"))
+        user_cloud.glance.images.upload(image.id, open(TEST_IMAGE_FILE, "rb"))
         test_images[image.id] = image
         LOG.info("Created: %s", dict(image))
         for i in range(num_servers):
@@ -225,7 +225,7 @@ def setup(events, cloud, target, num_tenants, num_servers):
                 "net-id": test_nets[tenant_ref].id,
                 "v4-fixed-ip": ip,
             }]
-            server = cloud.nova.servers.create(
+            server = user_cloud.nova.servers.create(
                 "{0}-{1}".format(prefix,
                                  str(random.randint(1, 0x7fffffff))),
                 image.id,
@@ -252,7 +252,7 @@ def setup(events, cloud, target, num_tenants, num_servers):
                 floating_range = tenant_cloud.nova.floating_ips_bulk.create(
                     floating_addr,
                     pool=pool)
-                floating_ip = cloud.nova.floating_ips.create(
+                floating_ip = user_cloud.nova.floating_ips.create(
                     pool=pool)
             except Exception as exc:
                 LOG.exception("Cannot create floating ip: %s",
