@@ -239,8 +239,10 @@ def migrate_server(mapping, src, dst, id):
                                                floating_ip_dict["addr"])
             while True:
                 try:
-                    s1.add_floating_ip(floating_ip1.address,
-                                       fixed_ip)
+                    dst.nova.servers.add_floating_ip(
+                        s1,
+                        floating_ip1.address,
+                        fixed_ip)
                 except nova_excs.BadRequest:
                     LOG.warn("Network info not ready for instance: %s",
                              s1._info)

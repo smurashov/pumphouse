@@ -261,7 +261,10 @@ def setup(events, cloud, target, num_tenants, num_servers):
             else:
                 LOG.info("Created: %s", floating_ip._info)
                 try:
-                    server.add_floating_ip(floating_ip.ip, ip)
+                    user_cloud.nova.servers.add_floating_ip(
+                        server,
+                        floating_ip.ip,
+                        ip)
                 except nova_excs.NotFound:
                     LOG.exception("Floating IP not found: %s",
                                   floating_ip._info)
