@@ -190,12 +190,11 @@ class Server(NovaResource):
             "created": str(datetime.datetime.now()),
             "tenant_id": self.tenant_id,
             "os-extended-volumes:volumes_attached": [],
-            "metadata": {}},
-            add_floating_ip=self.add_floating_ip)
+            "metadata": {}},)
         self.objects[server.id] = server
         return server
 
-    def add_floating_ip(self, floating_ip, fixed_ip=None):
+    def add_floating_ip(self, server_ref, floating_ip, fixed_ip=None):
         floating_ip_addr = {
             "OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:c3:d8:d4",
             "version": 4,
@@ -203,18 +202,22 @@ class Server(NovaResource):
             "OS-EXT-IPS:type": "floating"
         }
         floating_ip_list = self.cloud.nova.floating_ips_bulk.list()
-        for server_id, server in self.objects.iteritems():
-            for net in server["addresses"]:
-                if not fixed_ip:
-                    raise NotImplementedError
-                for addr in server["addresses"][net]:
-                    if addr['addr'] == fixed_ip:
-                        server['addresses'][net].append(floating_ip_addr)
-                        server._info = server
-                        for ip in floating_ip_list:
-                            if ip.address == floating_ip:
-                                ip['instance_uuid'] = server_id
-                        return server
+        if hasattr(server_ref, "id"):
+            server_id = server_ref.id
+        else:
+            server_id = server_ref
+        server = self.objects[server_id]
+        for net in server["addresses"]:
+            if not fixed_ip:
+                raise NotImplementedError
+            for addr in server["addresses"][net]:
+                if addr['addr'] == fixed_ip:
+                    server['addresses'][net].append(floating_ip_addr)
+                    server._info = server
+                    for ip in floating_ip_list:
+                        if ip.address == floating_ip:
+                            ip['instance_uuid'] = server_id
+                    return server
         raise exceptions.NotFound
 
     def suspend(self, obj_id):
