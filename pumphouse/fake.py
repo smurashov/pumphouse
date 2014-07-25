@@ -103,13 +103,15 @@ class Resource(object):
         self.objects.pop(obj_id, None)
 
     def _get_user_id(self, username):
-        for user_id, user in self.cloud.data['keystone']['users'].iteritems():
+        users_dict = self.cloud.data['keystone']['users']
+        for user_id, user in users_dict.iteritems():
             if user['name'] == username:
                 return user_id
         return
 
     def _get_tenant_id(self, tenant_name):
-        for tenant_id, tenant in self.cloud.data['keystone']['tenants'].iteritems():
+        tenants_dict = self.cloud.data['keystone']['tenants']
+        for tenant_id, tenant in tenants_dict.iteritems():
             if tenant['name'] == tenant_name:
                 return tenant_id
         raise exceptions.NotFound()

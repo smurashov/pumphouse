@@ -60,7 +60,10 @@ class Cloud(object):
                  config["CLOUD_SERVICE"])
         cloud_config = config["CLOUDS"][self.target].copy()
         cloud_service = utils.load_class(config["CLOUD_SERVICE"])
-        service = cloud_service(cloud_config, self.target, cloud_driver, identity_driver)
+        service = cloud_service(cloud_config,
+                                self.target,
+                                cloud_driver,
+                                identity_driver)
         return service
 
     def reset(self, events):

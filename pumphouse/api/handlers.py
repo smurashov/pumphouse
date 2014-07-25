@@ -5,7 +5,6 @@ import logging
 
 import flask
 
-from pumphouse import management
 from . import evacuation
 from . import hooks
 from . import migration
@@ -118,9 +117,11 @@ def reset():
     reset = flask.current_app.config["CLOUDS_RESET"]
     if not reset:
         return flask.make_response("", 404)
+
     @flask.copy_current_request_context
     def reset_source():
         hooks.source.reset(hooks.events)
+
     @flask.copy_current_request_context
     def reset_destination():
         hooks.destination.reset(hooks.events)
