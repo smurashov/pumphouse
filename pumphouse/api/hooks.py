@@ -83,6 +83,9 @@ class Cloud(object):
             service, client = clouds.get(self.target)
             # TODO(akscram): One check is not enough.
             if not service.check(client):
+                LOG.warning("The client %s is unusable, try to reinitialize "
+                            "it",
+                            client)
                 client = service.make()
                 clouds.set(self.target, service, client)
             return client
