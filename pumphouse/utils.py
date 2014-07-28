@@ -38,17 +38,18 @@ def wait_for(resource, update_resource,
     while True:
         LOG.debug("Trying to get resource: %s", resource)
         try:
-            resource = update_resource(resource)
+            upd_resource = update_resource(resource)
         except stop_excs:
             LOG.exception("Could not fetch updated resource: %s", resource)
             break
         except expect_excs as exc:
             LOG.warn("Expected exception: %s", exc.message)
         else:
-            LOG.debug("Got resource: %s", resource)
-            result = attribute_getter(resource)
+            LOG.debug("Got resource: %s", upd_resource)
+            result = attribute_getter(upd_resource)
             if result == value:
-                return resource
+                return upd_resource
+            resource = upd_resource
         time.sleep(check_interval)
         if time.time() - start > timeout:
             raise exceptions.TimeoutException()

@@ -210,8 +210,6 @@ def migrate_network(mapping, events, src, dst, name):
 
 def migrate_secgroup(mapping, events, src, dst, id):
     sg0 = src.nova.security_groups.get(id)
-    t0 = src.keystone.tenants.find(id=sg0.tenant_id)
-    t1 = migrate_tenant(mapping, src, dst, t0.id)
     try:
         sg1 = dst.nova.security_groups.find(name=sg0.name)
     except nova_excs.NotFound:
@@ -245,8 +243,61 @@ def migrate_secgroup_rule(mapping, events, src, dst, src_rule, id):
         raise
 
 
+def migrate_floating_ip(mapping, events, src, dst, ip):
+
+    '''Create IP address in floating IP address pool in destination cloud
+
+    Creates IP address if it does not exist. Creates a pool in destination
+    cloud as well if it does not exist.
+
+    :param mapping:     dict mapping entity ids in source and target clouds
+    :param src:         Cloud object representing source cloud
+    :param dst:         Cloud object representing destination cloud
+    :param ip:          IP address
+    :type ip:           string
+    '''
+
+    floating_ip0 = src.nova.floating_ips_bulk.find(address=ip)
+    ip_pool0 = src.nova.floating_ip_pools.find(name=floating_ip0.pool)
+    try:
+        floating_ip1 = dst.nova.floating_ips_bulk.find(address=ip)
+    except nova_excs.NotFound:
+        dst.nova.floating_ips_bulk.create(floating_ip0.address,
+                                          pool=ip_pool0.name)
+        try:
+            floating_ip1 = dst.nova.floating_ips_bulk.find(address=ip)
+        except nova_excs.NotFound:
+            LOG.exception("Not added: %s", ip)
+            raise exceptions.Error()  # TODO(ogelbukh): emit event here
+        else:
+            LOG.info("Created: %s", floating_ip1._info)
+            pass  # TODO(ogelbukh): emit event here
+    else:
+        LOG.warn("Already exists, %s", floating_ip1._info)
+        pass  # TODO(ogelbukh): emit event here
+    return floating_ip1
+
+
 def migrate_server(mapping, events, src, dst, id):
     """Migrates the server."""
+    def _associate_floating_ip((cloud, floating_ip, server, fixed_ip)):
+        try:
+            cloud.nova.servers.add_floating_ip(
+                server, floating_ip.ip, fixed_ip)
+        except nova_excs.BadRequest:
+            return (cloud,
+                    floating_ip,
+                    server,
+                    fixed_ip)
+        else:
+            return (cloud,
+                    cloud.nova.floating_ips.get(floating_ip),
+                    server,
+                    fixed_ip)
+
+    def _get_floating_ip_server((cloud, floating_ip, server, fixed_ip)):
+        return floating_ip.instance_id
+
     s0 = src.nova.servers.get(id)
     if s0.id in mapping:
         LOG.warn("Skipped because mapping: %s", s0._info)
@@ -283,6 +334,20 @@ def migrate_server(mapping, events, src, dst, id):
             for secgroup in s0.security_groups:
                 sg0 = src.nova.security_groups.find(name=secgroup['name'])
                 sg1 = migrate_secgroup(mapping, events, src, dst, sg0.id)
+            for fixed_ip in floating_ips:
+                for floating_ip_dict in floating_ips[fixed_ip]:
+                    floating_ip_range = migrate_floating_ip(
+                        mapping, events, src, dst,
+                        floating_ip_dict["addr"])
+                    floating_ip1 = user_dst.nova.floating_ips.create(
+                        pool=floating_ip_range.pool)
+                    LOG.info("Created: %s", floating_ip1._info)
+                    floating_ip1 = utils.wait_for(
+                        (user_dst, floating_ip1, s1, fixed_ip),
+                        _associate_floating_ip,
+                        attribute_getter=_get_floating_ip_server,
+                        value=s1.id,
+                        expect_excs=(nova_excs.BadRequest, ))
             hostname = getattr(s1, "OS-EXT-SRV-ATTR:hypervisor_hostname")
             events.emit("server boot", {
                 "cloud": "destination",
