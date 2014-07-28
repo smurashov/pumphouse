@@ -543,6 +543,7 @@ class Nova(BaseService):
     floating_ips_bulk = Collection(FloatingIPBulk)
     floating_ip_pools = Collection(FloatingIPPool)
     security_groups = Collection(SecGroup)
+    security_group_rules = Collection(SecGroupRule)
     hypervisors = Collection(Hypervisor)
     services = Collection(Service)
 
