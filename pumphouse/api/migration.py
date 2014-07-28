@@ -181,22 +181,26 @@ def migrate_network(mapping, events, src, dst, name):
     if n0.id in mapping:
         LOG.warn("Skipped because mapping: %s", n0._info)
         return n0, dst.nova.networks.get(mapping[n0.id])
-    # XXX(akscram): Restrict of tenant priviliges.
-    _, t1 = migrate_tenant(mapping, events, src, dst, n0.project_id)
-    tenant_ns = dst.user_ns.restrict(tenant_name=t1.name)
-    tenant_dst = dst.restrict(tenant_ns)
-    n1 = tenant_dst.nova.networks.create(label=n0.label,
-                                         cidr=n0.cidr,
-                                         cidr_v6=n0.cidr_v6,
-                                         dns1=n0.dns1,
-                                         dns2=n0.dns2,
-                                         gateway=n0.gateway,
-                                         gateway_v6=n0.gateway_v6,
-                                         multi_host=n0.multi_host,
-                                         priority=n0.priority,
-                                         project_id=mapping[n0.project_id],
-                                         vlan_start=n0.vlan,
-                                         vpn_start=n0.vpn_private_address)
+    if n0.project_id:
+        # XXX(akscram): Restrict of tenant priviliges.
+        _, t1 = migrate_tenant(mapping, events, src, dst, n0.project_id)
+        tenant_ns = dst.user_ns.restrict(tenant_name=t1.name)
+        tenant_dst = dst.restrict(tenant_ns)
+        cloud, project_id = tenant_dst, t1.id
+    else:
+        cloud, project_id = dst, None
+    n1 = cloud.nova.networks.create(label=n0.label,
+                                    cidr=n0.cidr,
+                                    cidr_v6=n0.cidr_v6,
+                                    dns1=n0.dns1,
+                                    dns2=n0.dns2,
+                                    gateway=n0.gateway,
+                                    gateway_v6=n0.gateway_v6,
+                                    multi_host=n0.multi_host,
+                                    priority=n0.priority,
+                                    project_id=project_id,
+                                    vlan_start=n0.vlan,
+                                    vpn_start=n0.vpn_private_address)
     mapping[n0.id] = n1.id
     return n0, n1
 
