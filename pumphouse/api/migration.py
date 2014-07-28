@@ -208,6 +208,43 @@ def migrate_network(mapping, events, src, dst, name):
     return n0, n1
 
 
+def migrate_secgroup(mapping, events, src, dst, id):
+    sg0 = src.nova.security_groups.get(id)
+    t0 = src.keystone.tenants.find(id=sg0.tenant_id)
+    t1 = migrate_tenant(mapping, src, dst, t0.id)
+    try:
+        sg1 = dst.nova.security_groups.find(name=sg0.name)
+    except nova_excs.NotFound:
+        sg1 = dst.nova.security_groups.create(sg0.name,
+                                              sg0.description)
+        LOG.info("Created: %s", sg1._info)
+    else:
+        LOG.warn("Already exists: %s", sg1._info)
+    for rule in sg0.rules:
+        migrate_secgroup_rule(mapping, src, dst, rule, sg1.id)
+    return sg1
+
+
+def migrate_secgroup_rule(mapping, events, src, dst, src_rule, id):
+    r0 = src_rule
+    try:
+        r1 = dst.nova.security_group_rules.create(id,
+                                                  ip_protocol=r0[
+                                                      'ip_protocol'],
+                                                  from_port=r0[
+                                                      'from_port'],
+                                                  to_port=r0['to_port'],
+                                                  cidr=r0[
+                                                      'ip_range']['cidr'])
+        LOG.info("Created: %s", r1._info)
+    except nova_excs.BadRequest:
+        LOG.warn("Duplicated rule: %s", r0)
+    except nova_excs.NotFound:
+        LOG.exception("Rule create attempted for non-existent "
+                      "security group: %s", r0)
+        raise
+
+
 def migrate_server(mapping, events, src, dst, id):
     """Migrates the server."""
     s0 = src.nova.servers.get(id)
@@ -243,6 +280,9 @@ def migrate_server(mapping, events, src, dst, id):
         try:
             s1 = user_dst.nova.servers.create(s0.name, i1, f1, nics=nics)
             s1 = utils.wait_for(s1, dst.nova.servers.get, value="ACTIVE")
+            for secgroup in s0.security_groups:
+                sg0 = src.nova.security_groups.find(name=secgroup['name'])
+                sg1 = migrate_secgroup(mapping, events, src, dst, sg0.id)
             hostname = getattr(s1, "OS-EXT-SRV-ATTR:hypervisor_hostname")
             events.emit("server boot", {
                 "cloud": "destination",
