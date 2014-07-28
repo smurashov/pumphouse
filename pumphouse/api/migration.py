@@ -189,18 +189,21 @@ def migrate_network(mapping, events, src, dst, name):
         cloud, project_id = tenant_dst, t1.id
     else:
         cloud, project_id = dst, None
-    n1 = cloud.nova.networks.create(label=n0.label,
-                                    cidr=n0.cidr,
-                                    cidr_v6=n0.cidr_v6,
-                                    dns1=n0.dns1,
-                                    dns2=n0.dns2,
-                                    gateway=n0.gateway,
-                                    gateway_v6=n0.gateway_v6,
-                                    multi_host=n0.multi_host,
-                                    priority=n0.priority,
-                                    project_id=project_id,
-                                    vlan_start=n0.vlan,
-                                    vpn_start=n0.vpn_private_address)
+    try:
+        n1 = cloud.nova.networks.create(label=n0.label,
+                                        cidr=n0.cidr,
+                                        cidr_v6=n0.cidr_v6,
+                                        dns1=n0.dns1,
+                                        dns2=n0.dns2,
+                                        gateway=n0.gateway,
+                                        gateway_v6=n0.gateway_v6,
+                                        multi_host=n0.multi_host,
+                                        priority=n0.priority,
+                                        project_id=project_id,
+                                        vlan_start=n0.vlan,
+                                        vpn_start=n0.vpn_private_address)
+    except nova_excs.Conflict:
+        n1 = cloud.nova.networks.findall(project_id=None)[0]
     mapping[n0.id] = n1.id
     return n0, n1
 
