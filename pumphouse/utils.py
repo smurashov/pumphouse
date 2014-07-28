@@ -32,15 +32,18 @@ status_attr = operator.attrgetter("status")
 
 def wait_for(resource, update_resource,
              attribute_getter=status_attr, value="ACTIVE", timeout=60,
-             check_interval=1, expect_excs=(exceptions.NotFound,)):
+             check_interval=1, expect_excs=None,
+             stop_excs=None):
     start = time.time()
     while True:
         LOG.debug("Trying to get resource: %s", resource)
         try:
             resource = update_resource(resource)
-        except expect_excs:
+        except stop_excs:
             LOG.exception("Could not fetch updated resource: %s", resource)
             break
+        except expect_excs as exc:
+            LOG.warn("Expected exception: %s", exc.message)
         else:
             LOG.debug("Got resource: %s", resource)
             result = attribute_getter(resource)
