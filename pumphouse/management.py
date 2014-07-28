@@ -20,6 +20,9 @@ TEST_IMAGE_URL = ("http://download.cirros-cloud.net/0.3.2/"
 TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
 TEST_RESOURCE_PREFIX = "pumphouse-test"
 FLOATING_IP_STRING = "172.16.0.{}"
+# TODO(ogelbukh): make FLATDHCP actual configuration parameter and/or
+# command-line parameter, maybe autodetected in future
+FLATDHCP = True
 
 
 def become_admin_in_tenant(cloud, user, tenant):
@@ -159,6 +162,20 @@ def setup(events, cloud, target, num_tenants, num_servers):
         test_tenant_clouds[tenant.id] = tenant_cloud
         test_tenants[tenant.id] = tenant
         LOG.info("Created: %s", tenant._info)
+        secgroup = tenant_cloud.nova.security_groups.find(
+            name='default')
+        tenant_cloud.nova.security_group_rules.create(
+            secgroup.id,
+            ip_protocol='ICMP',
+            from_port='-1',
+            to_port='-1',
+            cidr='0.0.0.0/0')
+        tenant_cloud.nova.security_group_rules.create(
+            secgroup.id,
+            ip_protocol='TCP',
+            from_port='80',
+            to_port='80',
+            cidr='0.0.0.0/0')
         role = cloud.keystone.roles.create(
             "{0}-role-{1}"
             .format(prefix,
@@ -177,25 +194,40 @@ def setup(events, cloud, target, num_tenants, num_servers):
             role.id,
             tenant=tenant.id)
         LOG.info("Assigned: %s", user_role)
-        try:
-            net = tenant_cloud.nova.networks.create(
-                label="{0}-pumphouse-{1}".format(prefix, i),
-                cidr="10.10.{}.0/24".format(i),
-                project_id=tenant.id)
-        except nova_excs.Conflict:
+        if FLATDHCP:
             try:
-                net = tenant_cloud.nova.networks.find(
-                    project_id=tenant.id)
+                net = cloud.nova.networks.find(
+                    project_id=None)
             except nova_excs.NotFound:
-                LOG.exception("Not found at lest one network for tenant %s",
-                              tenant.id)
-                raise
+                net = cloud.nova.networks.create(
+                    label="novanetwork",
+                    cidr="10.10.0.0/24")
+                LOG.info("Created: %s", net._info)
+                test_nets[tenant.id] = net
             else:
                 LOG.info("Already exists: %s", net._info)
                 test_nets[tenant.id] = net
         else:
-            LOG.info("Created: %s", net._info)
-            test_nets[tenant.id] = net
+            try:
+                net = tenant_cloud.nova.networks.create(
+                    label="{0}-pumphouse-{1}".format(prefix, i),
+                    cidr="10.10.{}.0/24".format(i),
+                    project_id=tenant.id)
+            except nova_excs.Conflict:
+                try:
+                    net = tenant_cloud.nova.networks.find(
+                        project_id=tenant.id)
+                except nova_excs.NotFound:
+                    LOG.exception("Not found at least one "
+                                  "network for tenant %s",
+                                  tenant.id)
+                    raise
+                else:
+                    LOG.info("Already exists: %s", net._info)
+                    test_nets[tenant.id] = net
+            else:
+                LOG.info("Created: %s", net._info)
+                test_nets[tenant.id] = net
         user_ns = pump_cloud.Namespace(username=user.name,
                                        password="default",
                                        tenant_name=tenant.name)
@@ -219,18 +251,28 @@ def setup(events, cloud, target, num_tenants, num_servers):
         test_images[image.id] = image
         LOG.info("Created: %s", dict(image))
         for i in range(num_servers):
-            (net, _, addr) = test_nets[tenant_ref].dhcp_start.rpartition('.')
-            ip = ".".join((net, str(int(addr) + len(test_servers))))
-            nics = [{
-                "net-id": test_nets[tenant_ref].id,
-                "v4-fixed-ip": ip,
-            }]
-            server = user_cloud.nova.servers.create(
-                "{0}-{1}".format(prefix,
-                                 str(random.randint(1, 0x7fffffff))),
-                image.id,
-                flavor.id,
-                nics=nics)
+            if test_nets:
+                (net, _, addr) = test_nets[tenant_ref].dhcp_start.rpartition(
+                    '.')
+                ip = ".".join((net, str(int(addr) + len(test_servers))))
+                nics = [{
+                    "net-id": test_nets[tenant_ref].id,
+                    "v4-fixed-ip": ip,
+                }]
+                server = user_cloud.nova.servers.create(
+                    "{0}-{1}".format(prefix,
+                                     str(random.randint(1, 0x7fffffff))),
+                    image.id,
+                    flavor.id,
+                    nics=nics)
+            else:
+                server = user_cloud.nova.servers.create(
+                    "{0}-{1}".format(prefix,
+                                     str(random.randint(1, 0x7fffffff))),
+                    image.id,
+                    flavor.id)
+                net = server._info['addresses'][0]
+                ip = net['addr']
             test_servers[server.id] = server
             server = utils.wait_for(server.id, cloud.nova.servers.get,
                                     value="ACTIVE")
@@ -262,7 +304,7 @@ def setup(events, cloud, target, num_tenants, num_servers):
                 LOG.info("Created: %s", floating_ip._info)
                 try:
                     user_cloud.nova.servers.add_floating_ip(
-                        server,
+                        server.id,
                         floating_ip.ip,
                         ip)
                 except nova_excs.NotFound:
