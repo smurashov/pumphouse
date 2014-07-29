@@ -317,6 +317,7 @@ def migrate_server(mapping, events, src, dst, id):
             "net-id": n1.id,
             "v4-fixed-ip": fixed_ip["addr"],
         })
+    LOG.info("Network configuration: %s", nics)
     try:
         src.nova.servers.suspend(s0)
         utils.wait_for(s0, src.nova.servers.get, value="SUSPENDED")
