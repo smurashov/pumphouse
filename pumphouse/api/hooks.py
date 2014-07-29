@@ -75,19 +75,21 @@ class Cloud(object):
                 client = service.reset(events, client)
                 clouds.set(self.target, service, client)
 
-    @property
-    def client(self):
+    def connect(self):
         ctx = flask._app_ctx_stack.top
         if ctx is not None:
             clouds = self.get_extension(ctx.app)
             service, client = clouds.get(self.target)
             # TODO(akscram): One check is not enough.
+            LOG.info("Trying to check client %s", client)
             if not service.check(client):
                 LOG.warning("The client %s is unusable, try to reinitialize "
                             "it",
                             client)
                 client = service.make()
                 clouds.set(self.target, service, client)
+            else:
+                LOG.info("Client looks like alive %s", client)
             return client
 
 

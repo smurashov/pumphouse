@@ -135,8 +135,8 @@ def reset():
 def resources():
     return flask.jsonify(
         reset=flask.current_app.config["CLOUDS_RESET"],
-        source=cloud_resources(hooks.source.client),
-        destination=cloud_resources(hooks.destination.client),
+        source=cloud_resources(hooks.source.connect()),
+        destination=cloud_resources(hooks.destination.connect()),
         # TODO(akscram): A set of hosts that don't belong to any cloud.
         hosts=[],
         # TODO(akscram): A set of current events.
@@ -148,7 +148,10 @@ def resources():
 def migrate_tenant(tenant_id):
     @flask.copy_current_request_context
     def migrate():
-        migration.migrate_resources(tenant_id)
+        source = hooks.source.connect()
+        destination = hooks.destination.connect()
+        migration.migrate_resources(hooks.events, source, destination,
+                                    tenant_id)
     gevent.spawn(migrate)
     return flask.make_response()
 
@@ -157,7 +160,8 @@ def migrate_tenant(tenant_id):
 def evacuate_host(host_name):
     @flask.copy_current_request_context
     def evacuate():
-        evacuation.evacuate_servers(host_name)
+        source = hooks.source.connect()
+        evacuation.evacuate_servers(hooks.events, source, host_name)
     gevent.spawn(evacuate)
     return flask.make_response()
 
