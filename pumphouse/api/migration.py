@@ -319,6 +319,10 @@ def migrate_server(mapping, events, src, dst, id):
             "v4-fixed-ip": fixed_ip["addr"],
         })
     LOG.info("Network configuration: %s", nics)
+    for secgroup in s0.security_groups:
+        sg0 = tenant_src.nova.security_groups.find(name=secgroup['name'])
+        sg1 = migrate_secgroup(
+            mapping, events, tenant_src, user_dst, sg0.id)
     try:
         src.nova.servers.suspend(s0)
         utils.wait_for(s0, src.nova.servers.get, value="SUSPENDED")
@@ -328,24 +332,6 @@ def migrate_server(mapping, events, src, dst, id):
         try:
             s1 = user_dst.nova.servers.create(s0.name, i1, f1, nics=nics)
             s1 = utils.wait_for(s1, dst.nova.servers.get, value="ACTIVE")
-            for secgroup in s0.security_groups:
-                sg0 = tenant_src.nova.security_groups.find(name=secgroup['name'])
-                sg1 = migrate_secgroup(
-                    mapping, events, tenant_src, user_dst, sg0.id)
-            for fixed_ip in floating_ips:
-                for floating_ip_dict in floating_ips[fixed_ip]:
-                    floating_ip_range = migrate_floating_ip(
-                        mapping, events, src, dst,
-                        floating_ip_dict["addr"])
-                    floating_ip1 = user_dst.nova.floating_ips.create(
-                        pool=floating_ip_range.pool)
-                    LOG.info("Created: %s", floating_ip1._info)
-                    floating_ip1 = utils.wait_for(
-                        (user_dst, floating_ip1, s1, fixed_ip),
-                        _associate_floating_ip,
-                        attribute_getter=_get_floating_ip_server,
-                        value=s1.id,
-                        expect_excs=(nova_excs.BadRequest, ))
             hostname = getattr(s1, "OS-EXT-SRV-ATTR:hypervisor_hostname")
             events.emit("server boot", {
                 "cloud": "destination",
@@ -360,6 +346,20 @@ def migrate_server(mapping, events, src, dst, id):
             LOG.exception("Failed to create server: %s", s0._info)
             raise
         else:
+            for fixed_ip in floating_ips:
+                for floating_ip_dict in floating_ips[fixed_ip]:
+                    floating_ip_range = migrate_floating_ip(
+                        mapping, events, src, dst,
+                        floating_ip_dict["addr"])
+                    floating_ip1 = user_dst.nova.floating_ips.create(
+                        pool=floating_ip_range.pool)
+                    LOG.info("Created: %s", floating_ip1._info)
+                    floating_ip1 = utils.wait_for(
+                        (user_dst, floating_ip1, s1, fixed_ip),
+                        _associate_floating_ip,
+                        attribute_getter=_get_floating_ip_server,
+                        value=s1.id,
+                        expect_excs=(nova_excs.BadRequest, ))
             src.nova.servers.delete(s0)
             events.emit("server terminate", {"cloud": "source", "id": s0.id},
                         namespace="/events")
