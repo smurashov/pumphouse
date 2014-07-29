@@ -329,7 +329,7 @@ def migrate_server(mapping, events, src, dst, id):
             s1 = user_dst.nova.servers.create(s0.name, i1, f1, nics=nics)
             s1 = utils.wait_for(s1, dst.nova.servers.get, value="ACTIVE")
             for secgroup in s0.security_groups:
-                sg0 = src.nova.security_groups.find(name=secgroup['name'])
+                sg0 = tenant_src.nova.security_groups.find(name=secgroup['name'])
                 sg1 = migrate_secgroup(
                     mapping, events, tenant_src, user_dst, sg0.id)
             for fixed_ip in floating_ips:
