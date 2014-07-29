@@ -8,7 +8,6 @@ from pumphouse import cloud
 from pumphouse import exceptions
 from pumphouse import management
 from pumphouse import utils
-from . import hooks
 
 
 LOG = logging.getLogger(__name__)
@@ -208,8 +207,91 @@ def migrate_network(mapping, events, src, dst, name):
     return n0, n1
 
 
+def migrate_secgroup(mapping, events, src, dst, id):
+    sg0 = src.nova.security_groups.get(id)
+    try:
+        sg1 = dst.nova.security_groups.find(name=sg0.name)
+    except nova_excs.NotFound:
+        sg1 = dst.nova.security_groups.create(sg0.name,
+                                              sg0.description)
+        LOG.info("Created: %s", sg1._info)
+    else:
+        LOG.warn("Already exists: %s", sg1._info)
+    for rule in sg0.rules:
+        migrate_secgroup_rule(mapping, events, src, dst, rule, sg1.id)
+    return sg1
+
+
+def migrate_secgroup_rule(mapping, events, src, dst, src_rule, id):
+    r0 = src_rule
+    try:
+        r1 = dst.nova.security_group_rules.create(
+            id, ip_protocol=r0['ip_protocol'], from_port=r0['from_port'],
+            to_port=r0['to_port'], cidr=r0['ip_range']['cidr'])
+        LOG.info("Created: %s", r1._info)
+    except nova_excs.BadRequest:
+        LOG.warn("Duplicate rule: %s", r0)
+    except nova_excs.NotFound:
+        LOG.exception("Rule create attempted for non-existent "
+                      "security group: %s", r0)
+        raise nova_excs.NotFound
+
+
+def migrate_floating_ip(mapping, events, src, dst, ip):
+
+    '''Create IP address in floating IP address pool in destination cloud
+
+    Creates IP address if it does not exist. Creates a pool in destination
+    cloud as well if it does not exist.
+
+    :param mapping:     dict mapping entity ids in source and target clouds
+    :param src:         Cloud object representing source cloud
+    :param dst:         Cloud object representing destination cloud
+    :param ip:          IP address
+    :type ip:           string
+    '''
+
+    floating_ip0 = src.nova.floating_ips_bulk.find(address=ip)
+    ip_pool0 = src.nova.floating_ip_pools.find(name=floating_ip0.pool)
+    try:
+        floating_ip1 = dst.nova.floating_ips_bulk.find(address=ip)
+    except nova_excs.NotFound:
+        dst.nova.floating_ips_bulk.create(floating_ip0.address,
+                                          pool=ip_pool0.name)
+        try:
+            floating_ip1 = dst.nova.floating_ips_bulk.find(address=ip)
+        except nova_excs.NotFound:
+            LOG.exception("Not added: %s", ip)
+            raise exceptions.Error()  # TODO(ogelbukh): emit event here
+        else:
+            LOG.info("Created: %s", floating_ip1._info)
+            pass  # TODO(ogelbukh): emit event here
+    else:
+        LOG.warn("Already exists, %s", floating_ip1._info)
+        pass  # TODO(ogelbukh): emit event here
+    return floating_ip1
+
+
 def migrate_server(mapping, events, src, dst, id):
     """Migrates the server."""
+    def _associate_floating_ip((cloud, floating_ip, server, fixed_ip)):
+        try:
+            cloud.nova.servers.add_floating_ip(
+                server, floating_ip.ip, fixed_ip)
+        except nova_excs.BadRequest:
+            return (cloud,
+                    floating_ip,
+                    server,
+                    fixed_ip)
+        else:
+            return (cloud,
+                    cloud.nova.floating_ips.get(floating_ip),
+                    server,
+                    fixed_ip)
+
+    def _get_floating_ip_server((cloud, floating_ip, server, fixed_ip)):
+        return floating_ip.instance_id
+
     s0 = src.nova.servers.get(id)
     if s0.id in mapping:
         LOG.warn("Skipped because mapping: %s", s0._info)
@@ -221,6 +303,8 @@ def migrate_server(mapping, events, src, dst, id):
                               tenant_name=tenant.name,
                               password="default")
     user_dst = dst.restrict(user_ns)
+    tenant_ns = src.user_ns.restrict(tenant_name=tenant.name)
+    tenant_src = src.restrict(tenant_ns)
     _, f1 = migrate_flavor(mapping, events, src, dst, s0.flavor["id"])
     nics = []
     _, i1 = migrate_image(mapping, events, src, user_dst, s0.image["id"])
@@ -234,6 +318,11 @@ def migrate_server(mapping, events, src, dst, id):
             "net-id": n1.id,
             "v4-fixed-ip": fixed_ip["addr"],
         })
+    LOG.info("Network configuration: %s", nics)
+    for secgroup in s0.security_groups:
+        sg0 = tenant_src.nova.security_groups.find(name=secgroup['name'])
+        sg1 = migrate_secgroup(
+            mapping, events, tenant_src, user_dst, sg0.id)
     try:
         src.nova.servers.suspend(s0)
         utils.wait_for(s0, src.nova.servers.get, value="SUSPENDED")
@@ -257,10 +346,31 @@ def migrate_server(mapping, events, src, dst, id):
             LOG.exception("Failed to create server: %s", s0._info)
             raise
         else:
-            src.nova.servers.delete(s0)
-            events.emit("server terminate", {"cloud": "source", "id": s0.id},
-                        namespace="/events")
-            LOG.info("Deleted: %s", s0)
+            try:
+                for fixed_ip in floating_ips:
+                    for floating_ip_dict in floating_ips[fixed_ip]:
+                        floating_ip_range = migrate_floating_ip(
+                            mapping, events, src, dst,
+                            floating_ip_dict["addr"])
+                        floating_ip1 = user_dst.nova.floating_ips.create(
+                            pool=floating_ip_range.pool)
+                        LOG.info("Created: %s", floating_ip1._info)
+                        floating_ip1 = utils.wait_for(
+                            (user_dst, floating_ip1, s1, fixed_ip),
+                            _associate_floating_ip,
+                            attribute_getter=_get_floating_ip_server,
+                            value=s1.id,
+                            expect_excs=(nova_excs.BadRequest, ))
+            except Exception:
+                LOG.exception("Failed to assign floating ip: %s",
+                              floating_ips[fixed_ip])
+                raise
+            else:
+                src.nova.servers.delete(s0)
+                events.emit("server terminate",
+                            {"cloud": "source", "id": s0.id},
+                            namespace="/events")
+                LOG.info("Deleted: %s", s0)
     except Exception:
         LOG.exception("Error occured in migration: %s", s0._info)
         src.nova.servers.resume(s0)
