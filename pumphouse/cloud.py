@@ -135,9 +135,9 @@ class Cloud(object):
 
     def ping(self):
         try:
-            self.keystone.users.list()
-            self.nova.servers.list()
-            self.glance.images.list()
+            self.keystone.users.list(limit=1)
+            self.nova.servers.list(limit=1)
+            iter(self.glance.images.list(limit=1)).next()
         except Exception:
             LOG.exception("The client check is failed for cloud %r", self)
             return False
