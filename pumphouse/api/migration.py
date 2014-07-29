@@ -226,21 +226,16 @@ def migrate_secgroup(mapping, events, src, dst, id):
 def migrate_secgroup_rule(mapping, events, src, dst, src_rule, id):
     r0 = src_rule
     try:
-        r1 = dst.nova.security_group_rules.create(id,
-                                                  ip_protocol=r0[
-                                                      'ip_protocol'],
-                                                  from_port=r0[
-                                                      'from_port'],
-                                                  to_port=r0['to_port'],
-                                                  cidr=r0[
-                                                      'ip_range']['cidr'])
+        r1 = dst.nova.security_group_rules.create(
+            id, ip_protocol=r0['ip_protocol'], from_port=r0['from_port'],
+            to_port=r0['to_port'],cidr=r0['ip_range']['cidr'])
         LOG.info("Created: %s", r1._info)
     except nova_excs.BadRequest:
-        LOG.warn("Duplicated rule: %s", r0)
+        LOG.warn("Duplicate rule: %s", r0)
     except nova_excs.NotFound:
         LOG.exception("Rule create attempted for non-existent "
                       "security group: %s", r0)
-        raise
+        raise nova_excs.NotFound
 
 
 def migrate_floating_ip(mapping, events, src, dst, ip):
@@ -333,7 +328,7 @@ def migrate_server(mapping, events, src, dst, id):
             s1 = utils.wait_for(s1, dst.nova.servers.get, value="ACTIVE")
             for secgroup in s0.security_groups:
                 sg0 = src.nova.security_groups.find(name=secgroup['name'])
-                sg1 = migrate_secgroup(mapping, events, src, dst, sg0.id)
+                sg1 = migrate_secgroup(mapping, events, src, user_dst, sg0.id)
             for fixed_ip in floating_ips:
                 for floating_ip_dict in floating_ips[fixed_ip]:
                     floating_ip_range = migrate_floating_ip(
