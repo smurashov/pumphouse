@@ -346,24 +346,31 @@ def migrate_server(mapping, events, src, dst, id):
             LOG.exception("Failed to create server: %s", s0._info)
             raise
         else:
-            for fixed_ip in floating_ips:
-                for floating_ip_dict in floating_ips[fixed_ip]:
-                    floating_ip_range = migrate_floating_ip(
-                        mapping, events, src, dst,
-                        floating_ip_dict["addr"])
-                    floating_ip1 = user_dst.nova.floating_ips.create(
-                        pool=floating_ip_range.pool)
-                    LOG.info("Created: %s", floating_ip1._info)
-                    floating_ip1 = utils.wait_for(
-                        (user_dst, floating_ip1, s1, fixed_ip),
-                        _associate_floating_ip,
-                        attribute_getter=_get_floating_ip_server,
-                        value=s1.id,
-                        expect_excs=(nova_excs.BadRequest, ))
-            src.nova.servers.delete(s0)
-            events.emit("server terminate", {"cloud": "source", "id": s0.id},
-                        namespace="/events")
-            LOG.info("Deleted: %s", s0)
+            try:
+                for fixed_ip in floating_ips:
+                    for floating_ip_dict in floating_ips[fixed_ip]:
+                        floating_ip_range = migrate_floating_ip(
+                            mapping, events, src, dst,
+                            floating_ip_dict["addr"])
+                        floating_ip1 = user_dst.nova.floating_ips.create(
+                            pool=floating_ip_range.pool)
+                        LOG.info("Created: %s", floating_ip1._info)
+                        floating_ip1 = utils.wait_for(
+                            (user_dst, floating_ip1, s1, fixed_ip),
+                            _associate_floating_ip,
+                            attribute_getter=_get_floating_ip_server,
+                            value=s1.id,
+                            expect_excs=(nova_excs.BadRequest, ))
+            except Exception:
+                LOG.exception("Failed to assign floating ip: %s",
+                              floating_ips[fixed_ip])
+                raise
+            else:
+                src.nova.servers.delete(s0)
+                events.emit("server terminate",
+                            {"cloud": "source", "id": s0.id},
+                            namespace="/events")
+                LOG.info("Deleted: %s", s0)
     except Exception:
         LOG.exception("Error occured in migration: %s", s0._info)
         src.nova.servers.resume(s0)
