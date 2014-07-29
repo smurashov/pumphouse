@@ -8,7 +8,6 @@ from pumphouse import cloud
 from pumphouse import exceptions
 from pumphouse import management
 from pumphouse import utils
-from . import hooks
 
 
 LOG = logging.getLogger(__name__)
@@ -228,7 +227,7 @@ def migrate_secgroup_rule(mapping, events, src, dst, src_rule, id):
     try:
         r1 = dst.nova.security_group_rules.create(
             id, ip_protocol=r0['ip_protocol'], from_port=r0['from_port'],
-            to_port=r0['to_port'],cidr=r0['ip_range']['cidr'])
+            to_port=r0['to_port'], cidr=r0['ip_range']['cidr'])
         LOG.info("Created: %s", r1._info)
     except nova_excs.BadRequest:
         LOG.warn("Duplicate rule: %s", r0)
@@ -304,6 +303,8 @@ def migrate_server(mapping, events, src, dst, id):
                               tenant_name=tenant.name,
                               password="default")
     user_dst = dst.restrict(user_ns)
+    tenant_ns = src.user_ns.restrict(tenant_name=tenant.name)
+    tenant_src = src.restrict(tenant_ns)
     _, f1 = migrate_flavor(mapping, events, src, dst, s0.flavor["id"])
     nics = []
     _, i1 = migrate_image(mapping, events, src, user_dst, s0.image["id"])
@@ -329,7 +330,8 @@ def migrate_server(mapping, events, src, dst, id):
             s1 = utils.wait_for(s1, dst.nova.servers.get, value="ACTIVE")
             for secgroup in s0.security_groups:
                 sg0 = src.nova.security_groups.find(name=secgroup['name'])
-                sg1 = migrate_secgroup(mapping, events, src, user_dst, sg0.id)
+                sg1 = migrate_secgroup(
+                    mapping, events, tenant_src, user_dst, sg0.id)
             for fixed_ip in floating_ips:
                 for floating_ip_dict in floating_ips[fixed_ip]:
                     floating_ip_range = migrate_floating_ip(
