@@ -10,7 +10,6 @@ LOG = logging.getLogger(__name__)
 
 
 def evacuate_servers(events, cloud, hostname):
-    events, cloud = hooks.events, hooks.source.client
     try:
         hypervs = cloud.nova.hypervisors.search(hostname, servers=True)
     except nova_excs.NotFound:
