@@ -218,7 +218,7 @@ def migrate_secgroup(mapping, events, src, dst, id):
     else:
         LOG.warn("Already exists: %s", sg1._info)
     for rule in sg0.rules:
-        migrate_secgroup_rule(mapping, src, dst, rule, sg1.id)
+        migrate_secgroup_rule(mapping, events, src, dst, rule, sg1.id)
     return sg1
 
 
