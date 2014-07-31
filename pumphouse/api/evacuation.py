@@ -2,7 +2,6 @@ import logging
 
 from novaclient import exceptions as nova_excs
 
-from . import hooks
 from pumphouse import utils
 
 
