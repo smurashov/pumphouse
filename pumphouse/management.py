@@ -53,6 +53,18 @@ def cleanup(events, cloud, target):
     for server in cloud.nova.servers.list(search_opts=search_opts):
         if not is_prefixed(server.name):
             continue
+        try:
+            server_floating_ips = cloud.nova.floating_ips_bulk.findall(
+                instance_uuid=server.id)
+        except nova_excs.NotFound:
+            LOG.info("No floating ips found for server: %s",
+                     server._info)
+        else:
+            for floating_ip in server_floating_ips:
+                cloud.nova.servers.remove_floating_ip(server,
+                                                      floating_ip.address)
+                LOG.info("Removed floating ip address: %s",
+                         floating_ip._info)
         cloud.nova.servers.delete(server)
         utils.wait_for(server, cloud.nova.servers.get,
                        expect_excs=(nova_excs.NotFound,))
