@@ -13,6 +13,7 @@ class Service(object):
     def __init__(self, config, target, cloud_driver, identity_driver):
         self.identity_config = config.pop("identity")
         self.populate_config = config.pop("populate", None)
+        self.workloads_config = config.pop("workloads", None)
         self.cloud_config = config
         self.target = target
         self.cloud_driver = cloud_driver
@@ -31,7 +32,10 @@ class Service(object):
 
     def reset(self, events, cloud):
         management.cleanup(events, cloud, self.target)
-        if isinstance(self.populate_config, dict):
+        if isinstance(self.workloads_config, dict):
+            management.setup(events, cloud, self.target,
+                             workloads=self.workloads_config)
+        elif isinstance(self.populate_config, dict):
             num_tenants = self.populate_config.get("num_tenants",
                                                    self.default_num_tenants)
             num_servers = self.populate_config.get("num_servers",
