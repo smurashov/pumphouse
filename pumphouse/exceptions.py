@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and#
 # limitations under the License.
 
+from keystoneclient.openstack.common.apiclient import (exceptions  # NOQA
+                                                       as keystone_excs)  # NOQA
+from novaclient import exceptions as nova_excs  # NOQA
+
+
 class Error(Exception):
     pass
 

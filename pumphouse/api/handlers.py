@@ -21,7 +21,7 @@ import flask
 
 from . import evacuation
 from . import hooks
-from . import migration
+from pumphouse import flows
 
 
 LOG = logging.getLogger(__name__)
@@ -164,10 +164,13 @@ def migrate_tenant(tenant_id):
     @flask.copy_current_request_context
     def migrate():
         parameters = flask.current_app.config.get("PARAMETERS")
-        source = hooks.source.connect()
-        destination = hooks.destination.connect()
-        migration.migrate_resources(parameters, hooks.events, source,
-                                    destination, tenant_id)
+        src = hooks.source.connect()
+        dst = hooks.destination.connect()
+        store = {}
+        migrate_identity, store = flows.migrate_identity(src, dst, store,
+                                                         tenant_id)
+        result = flows.run_flow(migrate_identity, store)
+        LOG.info("Result of migration: %s", result)
     gevent.spawn(migrate)
     return flask.make_response()
 
