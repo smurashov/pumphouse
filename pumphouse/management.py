@@ -157,6 +157,7 @@ def generate_images_list(num):
     yield {"name": "{}-image".format(TEST_RESOURCE_PREFIX),
            "disk_format": "qcow2",
            "container_format": "bare",
+           "visibility": "public",
            "url": TEST_IMAGE_URL}
 
 
@@ -170,6 +171,45 @@ def generate_servers_list(num, images, flavors):
                "flavor": flavor}
 
 
+def setup_floating_ip(cloud, floating_ip):
+    try:
+        ip_range = cloud.nova.floating_ips_bulk.create(
+            floating_ip["addr"], pool=floating_ip["pool"])
+    except Exception as exc:
+        LOG.exception("Cannot create floating ip: %s",
+                      exc.message)
+        raise
+    else:
+        return ip_range
+
+
+def setup_secgroup(cloud, name='default'):
+    secgroup = cloud.nova.security_groups.find(name=name)
+    cloud.nova.security_group_rules.create(
+        secgroup.id,
+        ip_protocol='ICMP',
+        from_port='-1',
+        to_port='-1',
+        cidr='0.0.0.0/0')
+    cloud.nova.security_group_rules.create(
+        secgroup.id,
+        ip_protocol='TCP',
+        from_port='80',
+        to_port='80',
+        cidr='0.0.0.0/0')
+    return secgroup
+
+
+def setup_image(cloud, image_dict):
+    url = image_dict.pop("url")
+    image_dict["visibility"] = image_dict.get("visibility", "public")
+    image = cloud.glance.images.create(**image_dict)
+    image_file = cache_image_file(url)
+    cloud.glance.images.upload(image.id,
+                               open(image_file.name, "rb"))
+    return image
+
+
 def cache_image_file(url=TEST_IMAGE_URL):
     tmpfile = os.tmpfile()
     LOG.info("Caching test image: %s", tmpfile.name)
@@ -177,7 +217,49 @@ def cache_image_file(url=TEST_IMAGE_URL):
     return tmpfile
 
 
-def setup(events, cloud, target, num_tenants, num_servers, workloads=None):
+def setup_server(cloud, server_dict):
+    image = list(cloud.glance.images.list(
+        filters={
+            "name": server_dict["image"]["name"]
+        }))[0]
+    flavor = cloud.nova.flavors.find(name=server_dict["flavor"]["name"])
+    server_params = (server_dict["name"],
+                     image.id,
+                     flavor.id)
+    server = cloud.nova.servers.create(*server_params)
+    server = utils.wait_for(server.id, cloud.nova.servers.get,
+                            value="ACTIVE")
+    return server
+
+
+def setup_server_floating_ip(cloud, server):
+    pool = "{}-pool".format(TEST_RESOURCE_PREFIX)
+    ip_params = server._info["addresses"].get("novanetwork")
+    if not ip_params:
+        LOG.exception("Invalid network name, exiting")
+        raise exceptions.Error
+    ip = ip_params[0]
+    try:
+        floating_ip = cloud.nova.floating_ips.create(pool=pool)
+    except Exception as exc:
+        LOG.exception("Cannot create floating ip: %s", exc.message)
+        raise
+    else:
+        try:
+            cloud.nova.servers.add_floating_ip(
+                server.id,
+                floating_ip.ip,
+                ip["addr"])
+        except nova_excs.NotFound:
+            LOG.exception("Floating IP not found: %s",
+                          floating_ip._info)
+            raise
+        else:
+            server = cloud.nova.servers.get(server)
+            return server, floating_ip
+
+
+def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
 
     """Prepares test resources in the source cloud
 
@@ -190,12 +272,6 @@ def setup(events, cloud, target, num_tenants, num_servers, workloads=None):
     """
 
     prefix = TEST_RESOURCE_PREFIX
-    test_tenants = {}
-    test_images = {}
-    test_flavors = {}
-    test_users = {}
-    test_nets = {}
-    test_servers = {}
     test_clouds = {}
     test_tenant_clouds = {}
     tenants = workloads.get('tenants',
@@ -256,93 +332,17 @@ def setup(events, cloud, target, num_tenants, num_servers, workloads=None):
         tenant_ns = cloud.user_ns.restrict(tenant_name=tenant.name)
         tenant_cloud = cloud.restrict(tenant_ns)
         test_tenant_clouds[tenant.id] = tenant_cloud
-        test_tenants[tenant.id] = tenant
-        LOG.info("Created: %s", tenant._info)
-        for flavor_dict in tenant_dict["flavors"]:
-            flavor = cloud.nova.flavors.create(
-                flavor_dict["name"],
-                flavor_dict["ram"],
-                flavor_dict["vcpu"],
-                flavor_dict["disk"],
-                is_public=True)
-            test_flavors[flavor.id] = flavor
-            LOG.info("Created: %s", flavor._info)
-        secgroup = tenant_cloud.nova.security_groups.find(
-            name='default')
-        tenant_cloud.nova.security_group_rules.create(
-            secgroup.id,
-            ip_protocol='ICMP',
-            from_port='-1',
-            to_port='-1',
-            cidr='0.0.0.0/0')
-        tenant_cloud.nova.security_group_rules.create(
-            secgroup.id,
-            ip_protocol='TCP',
-            from_port='80',
-            to_port='80',
-            cidr='0.0.0.0/0')
-        role = cloud.keystone.roles.create(
-            "{0}-role-{1}"
-            .format(prefix,
-                    str(random.randint(1, 0x7fffffff))))
-        test_roles[role.id] = role
-        LOG.info("Created: %s", role._info)
+        setup_secgroup(tenant_cloud)
         user = cloud.keystone.users.create(
-            name=tenant_dict["user"],
+            name=tenant_dict["username"],
             password="default",
             tenant_id=tenant.id)
-        test_users[tenant.id] = user
         LOG.info("Created: %s", user._info)
-        user_role = cloud.keystone.roles.add_user_role(
-            user.id,
-            role.id,
-            tenant=tenant.id)
-        LOG.info("Assigned: %s", user_role)
-        if FLATDHCP:
-            try:
-                net = cloud.nova.networks.find(
-                    project_id=None)
-            except nova_excs.NotFound:
-                net = cloud.nova.networks.create(
-                    label="novanetwork",
-                    cidr="10.10.0.0/24",
-                    project_id=None)
-                LOG.info("Created: %s", net._info)
-            else:
-                LOG.info("Already exists: %s", net._info)
-        else:
-            try:
-                net = tenant_cloud.nova.networks.create(
-                    label="{}-pumphouse-{}".format(prefix, tenant.id),
-                    cidr="10.10.{}.0/24".format(len(test_tenants)),
-                    project_id=tenant.id)
-            except nova_excs.Conflict:
-                try:
-                    net = tenant_cloud.nova.networks.find(
-                        project_id=tenant.id)
-                except nova_excs.NotFound:
-                    LOG.exception("Not found at least one "
-                                  "network for tenant %s",
-                                  tenant.id)
-                    raise
-                else:
-                    LOG.info("Already exists: %s", net._info)
-                    test_nets[tenant.id] = net
-            else:
-                LOG.info("Created: %s", net._info)
-                test_nets[tenant.id] = net
         user_ns = pump_cloud.Namespace(username=user.name,
                                        password="default",
                                        tenant_name=tenant.name)
         user_cloud = cloud.restrict(user_ns)
-        for image_dict in tenant_dict["images"]:
-            url = image_dict.pop("url")
-            image_file = cache_image_file(url)
-            image = user_cloud.glance.images.create(**image_dict)
-            user_cloud.glance.images.upload(image.id,
-                                            open(image_file.name, "rb"))
-            test_images[image.id] = image
-            LOG.info("Created: %s", dict(image))
+        LOG.info("Created: %s", tenant._info)
         events.emit("tenant create", {
             "cloud": target,
             "id": tenant.id,
@@ -352,6 +352,12 @@ def setup(events, cloud, target, num_tenants, num_servers, workloads=None):
         for server_dict in tenant_dict["servers"]:
             server = setup_server(user_cloud, server_dict)
             LOG.info("Created server: %s", server._info)
+            server, floating_ip = setup_server_floating_ip(user_cloud,
+                                                           server)
+            LOG.info("Assigned floating ip %s to server: %s",
+                     floating_ip._info,
+                     server._info)
+            server = cloud.nova.servers.get(server)
             hostname = getattr(server, "OS-EXT-SRV-ATTR:hypervisor_hostname")
             events.emit("server boot", {
                 "cloud": target,
@@ -362,32 +368,3 @@ def setup(events, cloud, target, num_tenants, num_servers, workloads=None):
                 "host_name": hostname,
                 "status": server.status.lower(),
             }, namespace="/events")
-            try:
-                pool = "{}-pool-{}".format(prefix, tenant.id)
-                floating_addr = FLOATING_IP_STRING.format(136 + len(
-                    test_servers))
-                floating_range = tenant_cloud.nova.floating_ips_bulk.create(
-                    floating_addr,
-                    pool=pool)
-                floating_ip = user_cloud.nova.floating_ips.create(
-                    pool=pool)
-            except Exception as exc:
-                LOG.exception("Cannot create floating ip: %s",
-                              exc.message)
-                pass
-            else:
-                LOG.info("Created: %s", floating_ip._info)
-                try:
-                    user_cloud.nova.servers.add_floating_ip(
-                        server.id,
-                        floating_ip.ip,
-                        ip)
-                except nova_excs.NotFound:
-                    LOG.exception("Floating IP not found: %s",
-                                  floating_ip._info)
-                    raise
-                else:
-                    server = cloud.nova.servers.get(server)
-                    LOG.info("Assigned floating ip %s to server: %s",
-                             floating_ip._info,
-                             server._info)
