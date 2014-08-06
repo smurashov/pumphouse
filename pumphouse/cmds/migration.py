@@ -615,11 +615,16 @@ def main():
     Cloud = load_cloud_driver(is_fake=args.fake)
     if args.action == "migrate":
         mapping = {}
-        src = Cloud.from_dict(**args.config["source"])
+        src_config = args.config["source"]
+        src = Cloud.from_dict(src_config.get("endpoint"),
+                              src_config.get("identity"))
         if args.setup:
+            workloads = args.config["source"].get("workloads", {})
             management.setup(events, src, "source", args.num_tenants,
-                             args.num_servers)
-        dst = Cloud.from_dict(**args.config["destination"])
+                             args.num_servers, workloads)
+        dst_config = args.config["destination"]
+        dst = Cloud.from_dict(dst_config.get("endpoint"),
+                              dst_config.get("identity"))
         migrate_resources = RESOURCES_MIGRATIONS[args.resource]
         if args.ids:
             ids = args.ids
@@ -632,14 +637,21 @@ def main():
         migrate_resources(mapping, src, dst, ids)
         LOG.info("Migration mapping: %r", mapping)
     elif args.action == "cleanup":
-        cloud = Cloud.from_dict(**args.config[args.target])
+        cloud_config = args.config[args.target]
+        cloud = Cloud.from_dict(cloud_config.get("endpoint"),
+                                cloud_config.get("identity"))
         management.cleanup(events, cloud, args.target)
     elif args.action == "setup":
-        src = Cloud.from_dict(**args.config["source"])
+        src_config = args.config["source"]
+        src = Cloud.from_dict(src_config.get("endpoint"),
+                              src_config.get("identity"))
+        workloads = args.config["source"].get("workloads", {})
         management.setup(events, src, "source", args.num_tenants,
-                         args.num_servers)
+                         args.num_servers, workloads)
     elif args.action == "evacuate":
-        cloud = Cloud.from_dict(**args.config["source"])
+        cloud_config = args.config["source"]
+        cloud = Cloud.from_dict(cloud_config.get("endpoint"),
+                                cloud_config.get("identity"))
         evacuate(cloud, args.host)
 
 
