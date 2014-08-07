@@ -86,7 +86,7 @@ class Cloud(object):
                 LOG.warning("The client %s is unusable, try to reinitialize "
                             "it",
                             client)
-                client = service.make()
+                client = service.make(identity=client.identity)
                 clouds.set(self.target, service, client)
             else:
                 LOG.info("Client looks like alive %s", client)
