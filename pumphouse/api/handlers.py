@@ -57,7 +57,7 @@ def crossdomain(origin=None, methods=None, headers=None,
     return decorator
 
 
-def cloud_resources(cloud):
+def cloud_resources(client):
     def get_host_status(hostname):
         services = cloud.nova.services.list(host=hyperv.service["host"],
                                             binary="nova-compute")
@@ -69,8 +69,9 @@ def cloud_resources(cloud):
                 return "blocked"
         return "error"
 
+    cloud = client.connect()
     resources = {
-        "urls": cloud.urls,
+        "urls": client.cloud_urls,
         "tenants": [{
             "id": tenant.id,
             "name": tenant.name,
@@ -135,8 +136,8 @@ def reset():
 def resources():
     return flask.jsonify(
         reset=flask.current_app.config["CLOUDS_RESET"],
-        source=cloud_resources(hooks.source.connect()),
-        destination=cloud_resources(hooks.destination.connect()),
+        source=cloud_resources(hooks.source),
+        destination=cloud_resources(hooks.destination),
         # TODO(akscram): A set of hosts that don't belong to any cloud.
         hosts=[],
         # TODO(akscram): A set of current events.

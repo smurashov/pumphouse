@@ -53,85 +53,60 @@ class Identity(collections.Mapping):
             self.hashes[user_id] = password
 
 
-class Namespace(object):
-    __slots__ = ("username", "password", "tenant_name", "auth_url")
+NAMESPACE = collections.namedtuple("Namespace", ("username", "password",
+                                                 "tenant_name", "auth_url"))
 
-    def __init__(self,
-                 username=None,
-                 password=None,
-                 tenant_name=None,
-                 auth_url=None):
-        self.username = username
-        self.password = password
-        self.tenant_name = tenant_name
-        self.auth_url = auth_url
+class Namespace(NAMESPACE):
+    """Represents a set of credentials
 
+    It's a container for credentials. Any instance of this class
+    provides entire information for :class:`Cloud` initialization. Due
+    to the fact that any user can be present in some tenants and some
+    clouds, credentials can be restricted by them.
+
+    :params username: a name of the user
+    :params password: a password of the user
+    :params tenant_name: a name of the project within scoped the user
+    :params auth_url: an endpoint of the identity service
+    """
     def to_dict(self):
-        return dict((attr, getattr(self, attr)) for attr in self.__slots__)
+        return self._asdict()
 
-    def restrict(self, *nspace, **attrs):
-        def nspace_getter(x, y, z):
-            return getattr(x, y, z)
-
-        def attrs_getter(x, y, z):
-            return x.get(y, z)
-
-        def restrict_by(attrs, getter):
-            namespace = Namespace()
-            for attr in self.__slots__:
-                value = getter(attrs, attr, None)
-                if value is None:
-                    value = getattr(self, attr)
-                setattr(namespace, attr, value)
-            return namespace
-        return restrict_by(*((nspace[0], nspace_getter)
-                             if nspace else
-                             (attrs, attrs_getter)))
+    def restrict(self, **attrs):
+        creds = dict(self._asdict(), **attrs)
+        namespace = self.__class__(**creds)
+        return namespace
 
     def __repr__(self):
         return ("<Namespace(username={!r}, password={!r}, tenant_name={!r}, "
                 "auth_url={!r})>"
-                .format(self.username, self.password, self.tenant_name,
-                        self.auth_url))
-
-    def __eq__(self, other):
-        return (self.username == other.username and
-                self.password == other.password and
-                self.tenant_name == other.tenant_name and
-                self.auth_url == other.auth_url)
+                .format(self.username, "*" * len(self.password),
+                        self.tenant_name, self.auth_url))
 
 
 class Cloud(object):
-
     """Describes a cloud involved in migration process
 
     Both source and destination clouds are instances of this class.
 
-    :param cloud_ns:    an administrative credentials namespace of the cloud
-    :type cloud_ns:     object
-    :param user_ns:     a restricted user credentials namespace
-    :type user_ns:      object
+    :param namespace:   a createndtials of the cloud object
+    :type namespace:    a :class:`Namespace`
     :param identity:    object containing access credentials
-    :param urls:        additional urls to a horizon or another stuff
-    :type urls:         a dict
     """
 
-    def __init__(self, cloud_ns, user_ns, identity, urls):
+    def __init__(self, namespace, identity):
+        self.namespace = namespace
         self.identity = identity
-        self.cloud_ns = cloud_ns
-        self.user_ns = user_ns
-        self.access_ns = cloud_ns.restrict(user_ns)
-        self.nova = nova_client.Client(self.access_ns.username,
-                                       self.access_ns.password,
-                                       self.access_ns.tenant_name,
-                                       self.access_ns.auth_url,
+        self.nova = nova_client.Client(self.namespace.username,
+                                       self.namespace.password,
+                                       self.namespace.tenant_name,
+                                       self.namespace.auth_url,
                                        "compute")
-        self.keystone = keystone_client.Client(**self.access_ns.to_dict())
+        self.keystone = keystone_client.Client(**self.namespace.to_dict())
         g_endpoint = self.keystone.service_catalog.get_endpoints()["image"][0]
         self.glance = glance.Client("2",
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
-        self.urls = urls
 
     def ping(self):
         try:
@@ -144,18 +119,19 @@ class Cloud(object):
         else:
             return True
 
-    def restrict(self, user_ns):
-        return Cloud(self.cloud_ns, user_ns, self.identity, self.urls)
+    def restrict(self, **kwargs):
+        namespace = self.namespace.restrict(**kwargs)
+        return self.__class__(namespace, self.identity)
 
     @classmethod
-    def from_dict(cls, endpoint, identity, urls=None):
-        cloud_ns = Namespace(auth_url=endpoint["auth_url"])
-        user_ns = Namespace(
+    def from_dict(cls, endpoint, identity):
+        namespace = Namespace(
             username=endpoint["username"],
             password=endpoint["password"],
             tenant_name=endpoint["tenant_name"],
+            auth_url=endpoint["auth_url"],
         )
-        return cls(cloud_ns, user_ns, identity, urls)
+        return cls(namespace, identity)
 
     def __repr__(self):
-        return "<Cloud(namespace={!r})>".format(self.access_ns)
+        return "<Cloud(namespace={!r})>".format(self.namespace)
