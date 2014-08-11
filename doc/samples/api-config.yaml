@@ -22,6 +22,47 @@ CLOUDS:
             num_tenants: 3
         urls:
             horizon:        http://10.0.0.1/
+        workloads:
+            flavors:
+              - &small
+                name: pumphouse-flavor-0001-small
+                ram: 1024
+                vcpu: 1
+                disk: 10
+              - &medium
+                name: pumphouse-flavor-0001-medium
+                ram: 4096
+                vcpu: 2
+                disk: 40
+              - &large
+                name: pumphouse-flavor-0001-large
+                ram: 8192
+                vcpu: 4
+                disk: 80
+            images:
+              - &image
+                name: pumphouse-test-image-0001
+                url: http://download.cirros-cloud.net/0.3.2/cirros-0.3.2-x86_64-disk.img
+            tenants:
+              - name: pumphouse-test-0001
+                description: "pumphouse test tenant 0001"
+                username: pumphouse-test-user-0001
+                servers:
+                  - name: pumphouse-test-instance-0001
+                    flavor: 
+                      <<: *small
+                    image:
+                      <<: *image
+                  - name: pumphouse-test-instance-0002
+                    flavor:
+                      <<: *medium
+                    image:
+                      <<: *image
+                  - name: pumphouse-test-instance-0003
+                    flavor:
+                      <<: *large
+                    image:
+                      <<: *image
     destination:
         endpoint:
             auth_url: http://127.0.0.1:5000/v2.0

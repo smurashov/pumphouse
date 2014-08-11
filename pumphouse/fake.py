@@ -150,6 +150,14 @@ class Server(NovaResource):
             flavor_id = flavor
         else:
             flavor_id = flavor['id']
+        if not nics:
+            net_obj = self.cloud.nova.networks.find(label="novanetwork")
+            (net, _, addr) = net_obj.dhcp_start.rpartition('.')
+            ip = ".".join((net, str(int(addr) + 1)))
+            nics = [{
+                "net-id": net_obj.id,
+                "v4-fixed-ip": ip,
+            }]
         for nic in nics:
             net = self.cloud.nova.networks.get(nic["net-id"])
             if net['label'] not in addresses:
@@ -576,7 +584,7 @@ class Cloud(object):
     default_num_hypervisors = 2
     default_delays = False
 
-    def __init__(self, cloud_ns, user_ns, identity, urls,
+    def __init__(self, cloud_ns, user_ns, identity, urls={},
                  data=None, fake=None):
         self.cloud_ns = cloud_ns
         self.user_ns = user_ns
@@ -624,7 +632,7 @@ class Cloud(object):
         hostname_prefix = "".join(random.choice(string.ascii_uppercase)
                                   for i in (0, 0))
         services = [AttrDict(self.nova, {
-            "host": "pumphouse-{0}-{1}".format(hostname_prefix, i),
+            "host": "pumphouse-{}-{}".format(hostname_prefix, i),
             "binary": "nova-compute",
             "state": "up",
             "status": "enabled",
@@ -640,9 +648,40 @@ class Cloud(object):
             "id": str(uuid.uuid4()),
             "rules": "",
         })
+        network = AttrDict(self.nova, {
+            "bridge": "br100",
+            "vpn_public_port": None,
+            "dhcp_start": "10.10.0.2",
+            "bridge_interface": "eth0",
+            "updated_at": str(datetime.datetime.now()),
+            "id": str(uuid.uuid4()),
+            "cidr_v6": None,
+            "deleted_at": None,
+            "gateway": "10.10.0.1",
+            "rxtx_base": None,
+            "priority": None,
+            "project_id": None,
+            "vpn_private_address": None,
+            "deleted": 0,
+            "vlan": 390,
+            "broadcast": "10.10.0.255",
+            "netmask": "255.255.255.0",
+            "injected": False,
+            "cidr": "10.10.0.0/24",
+            "vpn_public_address": None,
+            "multi_host": False,
+            "dns2": None,
+            "created_at": str(datetime.datetime.now()),
+            "host": None,
+            "gateway_v6": None,
+            "netmask_v6": None,
+            "dns1": "8.8.4.4",
+            "label": "novanetwork",
+        })
         self.data["nova"]["services"] = services
         self.data["nova"]["hypervisors"] = hypervs
         self.data["nova"]["secgroups"] = {secgroup.id: secgroup}
+        self.data["nova"]["networks"] = {network.id: network}
 
     def get_service(self, service_name):
         return self.data.setdefault(service_name, {})
@@ -652,14 +691,14 @@ class Cloud(object):
                      data=self.data)
 
     @classmethod
-    def from_dict(cls, endpoint, identity, urls, **kwargs):
+    def from_dict(cls, endpoint, identity, **kwargs):
         cloud_ns = pump_cloud.Namespace(auth_url=endpoint["auth_url"])
         user_ns = pump_cloud.Namespace(
             username=endpoint["username"],
             password=endpoint["password"],
             tenant_name=endpoint["tenant_name"],
         )
-        cloud = cls(cloud_ns, user_ns, identity, urls, **kwargs)
+        cloud = cls(cloud_ns, user_ns, identity, **kwargs)
         return cloud
 
     def __repr__(self):
