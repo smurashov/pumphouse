@@ -294,7 +294,7 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
     # networks = workloads.get('networks',
     #                          generate_networks_list(num_tenants))
     for image_dict in images:
-        image = setup_image(cloud, image_dict)
+        image = setup_image(cloud, image_dict.copy())
         LOG.info("Created: %s", dict(image))
     for flavor_dict in flavors:
         flavor = cloud.nova.flavors.create(
