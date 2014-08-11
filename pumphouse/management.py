@@ -7,7 +7,6 @@ from keystoneclient.openstack.common.apiclient import exceptions \
     as keystone_excs
 from novaclient import exceptions as nova_excs
 
-from . import cloud as pump_cloud
 from . import exceptions
 from . import utils
 
@@ -337,10 +336,9 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
             password="default",
             tenant_id=tenant.id)
         LOG.info("Created: %s", user._info)
-        user_ns = pump_cloud.Namespace(username=user.name,
-                                       password="default",
-                                       tenant_name=tenant.name)
-        user_cloud = cloud.restrict(user_ns)
+        user_cloud = cloud.restrict(username=user.name,
+                                    password="default",
+                                    tenant_name=tenant.name)
         LOG.info("Created: %s", tenant._info)
         events.emit("tenant create", {
             "cloud": target,
