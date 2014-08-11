@@ -14,6 +14,7 @@ class Service(object):
         self.identity_config = config.pop("identity")
         self.populate_config = config.pop("populate", None)
         self.workloads_config = config.pop("workloads", None)
+        self.cloud_urls = config.pop("urls", None)
         self.cloud_config = config
         self.target = target
         self.cloud_driver = cloud_driver

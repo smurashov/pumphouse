@@ -591,7 +591,6 @@ class Cloud(object):
         self.num_hypervisors = self.fake.get("num_hypervisors",
                                              self.default_num_hypervisors)
         self.populate = self.fake.get("populate", {})
-        self.urls = urls
         self.data = data or {}
         self.nova = Nova(self)
         self.keystone = Keystone(self)
@@ -684,8 +683,7 @@ class Cloud(object):
         return self.data.setdefault(service_name, {})
 
     def restrict(self, user_ns):
-        return Cloud(self.cloud_ns, user_ns, self.identity, self.urls,
-                     data=self.data)
+        return Cloud(self.cloud_ns, user_ns, self.identity, data=self.data)
 
     @classmethod
     def from_dict(cls, endpoint, identity, **kwargs):
@@ -695,7 +693,7 @@ class Cloud(object):
             tenant_name=endpoint["tenant_name"],
             auth_url=endpoint["auth_url"],
         )
-        cloud = cls(cloud_ns, user_ns, identity, **kwargs)
+        cloud = cls(namespace, identity, **kwargs)
         return cloud
 
     def __repr__(self):

@@ -92,6 +92,14 @@ class Cloud(object):
                 LOG.info("Client looks like alive %s", client)
             return client
 
+    @property
+    def cloud_urls(self):
+        ctx = flask._app_ctx_stack.top
+        if ctx is not None:
+            clouds = self.get_extension(ctx.app)
+            service, client = clouds.get(self.target)
+            return service.cloud_urls
+
 
 events = socketio.SocketIO()
 source = Cloud("source")

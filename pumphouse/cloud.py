@@ -92,11 +92,9 @@ class Cloud(object):
     :param namespace:   a createndtials of the cloud object
     :type namespace:    a :class:`Namespace`
     :param identity:    object containing access credentials
-    :param urls:        additional urls to a horizon or another stuff
-    :type urls:         a dict
     """
 
-    def __init__(self, namespace, identity, urls):
+    def __init__(self, namespace, identity):
         self.namespace = namespace
         self.identity = identity
         self.nova = nova_client.Client(self.namespace.username,
@@ -109,7 +107,6 @@ class Cloud(object):
         self.glance = glance.Client("2",
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
-        self.urls = urls
 
     def ping(self):
         try:
@@ -124,17 +121,17 @@ class Cloud(object):
 
     def restrict(self, **kwargs):
         namespace = self.namespace.restrict(**kwargs)
-        return self.__class__(namespace, self.identity, self.urls)
+        return self.__class__(namespace, self.identity)
 
     @classmethod
-    def from_dict(cls, endpoint, identity, urls=None):
+    def from_dict(cls, endpoint, identity):
         namespace = Namespace(
             username=endpoint["username"],
             password=endpoint["password"],
             tenant_name=endpoint["tenant_name"],
             auth_url=endpoint["auth_url"],
         )
-        return cls(namespace, identity, urls)
+        return cls(namespace, identity)
 
     def __repr__(self):
         return "<Cloud(namespace={!r})>".format(self.namespace)
