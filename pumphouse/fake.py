@@ -682,12 +682,13 @@ class Cloud(object):
     def get_service(self, service_name):
         return self.data.setdefault(service_name, {})
 
-    def restrict(self, user_ns):
-        return Cloud(self.cloud_ns, user_ns, self.identity, data=self.data)
+    def restrict(self, **kwargs):
+        namespace = self.namespace.restrict(**kwargs)
+        return self.__class__(namespace, self.identity, data=self.data)
 
     @classmethod
     def from_dict(cls, endpoint, identity, **kwargs):
-        namespace = Namespace(
+        namespace = pump_cloud.Namespace(
             username=endpoint["username"],
             password=endpoint["password"],
             tenant_name=endpoint["tenant_name"],
