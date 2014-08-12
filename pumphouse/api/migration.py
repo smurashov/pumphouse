@@ -273,7 +273,7 @@ def migrate_floating_ip(mapping, events, src, dst, ip):
 
 
 def migrate_ephemeral_storage(mapping, events, src, dst, id):
-    """Create snapshot from running server and copy over to destination cloud"""
+    """Create snapshot from running server and copy to destination cloud"""
     def create_snapshot(cloud, server):
         try:
             snapshot_id = cloud.nova.servers.create_image(
@@ -293,7 +293,7 @@ def migrate_ephemeral_storage(mapping, events, src, dst, id):
     return i0, i1
 
 
-def migrate_server(mapping, events, src, dst, id):
+def migrate_server(parameters, mapping, events, src, dst, id):
     """Migrates the server."""
     def _associate_floating_ip((cloud, floating_ip, server, fixed_ip)):
         try:
@@ -328,7 +328,11 @@ def migrate_server(mapping, events, src, dst, id):
     tenant_src = src.restrict(tenant_ns)
     _, f1 = migrate_flavor(mapping, events, src, dst, s0.flavor["id"])
     nics = []
-    _, i1 = migrate_image(mapping, events, src, user_dst, s0.image["id"])
+    if parameters.ephemeral_storage:
+        i0, i1 = migrate_ephemeral_storage(mapping, events, src, user_dst,
+                                           s0.id)
+    else:
+        _, i1 = migrate_image(mapping, events, src, user_dst, s0.image["id"])
     addresses = s0.addresses
     floating_ips = dict()
     for n_label, n_params in addresses.iteritems():
@@ -401,7 +405,7 @@ def migrate_server(mapping, events, src, dst, id):
     return s0, s1
 
 
-def migrate_resources(events, source, destination, tenant_id):
+def migrate_resources(parameters, events, source, destination, tenant_id):
     mapping = {}
     events.emit("tenant migrate", {"id": tenant_id}, namespace="/events")
     src_tenant, dst_tenant = migrate_tenant(mapping, events, source,
@@ -428,8 +432,8 @@ def migrate_resources(events, source, destination, tenant_id):
         if server.tenant_id == tenant_id:
             events.emit("server migrate", {"id": server.id},
                         namespace="/events")
-            _, dst_server = migrate_server(mapping, events, source,
-                                           destination, server)
+            _, dst_server = migrate_server(parameters, mapping, events,
+                                           source, destination, server)
             events.emit("server migrated", {
                 "source_id": server.id,
                 "destination_id": dst_server.id,

@@ -148,10 +148,11 @@ def resources():
 def migrate_tenant(tenant_id):
     @flask.copy_current_request_context
     def migrate():
+        parameters = flask.current_app.config.get("PARAMETERS")
         source = hooks.source.connect()
         destination = hooks.destination.connect()
-        migration.migrate_resources(hooks.events, source, destination,
-                                    tenant_id)
+        migration.migrate_resources(parameters, hooks.events, source,
+                                    destination, tenant_id)
     gevent.spawn(migrate)
     return flask.make_response()
 
