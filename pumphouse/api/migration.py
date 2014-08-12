@@ -272,6 +272,27 @@ def migrate_floating_ip(mapping, events, src, dst, ip):
     return floating_ip1
 
 
+def migrate_ephemeral_storage(mapping, events, src, dst, id):
+    """Create snapshot from running server and copy over to destination cloud"""
+    def create_snapshot(cloud, server):
+        try:
+            snapshot_id = cloud.nova.servers.create_image(
+                server, "pumphouse-snapshot-{}".format(server.id))
+        except Exception:
+            LOG.exception("Exception while snapshotting instance")
+            raise
+        else:
+            snapshot = cloud.glance.images.get(snapshot_id)
+            LOG.info("Created: %s", snapshot._info)
+            return snapshot
+    s0 = src.nova.servers.get(id)
+    i0 = create_snapshot(src, s0)
+    utils.wait_for(i0, cloud.glance.images.get, value='active')
+    _, i1 = migrate_image(mapping, events, src, dst, i0.id)
+    mapping[i0.id] = i1.id
+    return i0, i1
+
+
 def migrate_server(mapping, events, src, dst, id):
     """Migrates the server."""
     def _associate_floating_ip((cloud, floating_ip, server, fixed_ip)):
