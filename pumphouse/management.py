@@ -7,9 +7,9 @@ from keystoneclient.openstack.common.apiclient import exceptions \
     as keystone_excs
 from novaclient import exceptions as nova_excs
 
-from . import cloud as pump_cloud
-from . import exceptions
-from . import utils
+from pumphouse import cloud as pump_cloud
+from pumphouse import exceptions
+from pumphouse import utils
 
 LOG = logging.getLogger(__name__)
 
