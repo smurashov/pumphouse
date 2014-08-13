@@ -485,7 +485,8 @@ class User(KeystoneResource):
             "id": str(user_uuid),
             "tenantId": kwargs["tenant_id"],
             "username": kwargs["name"],
-            "enabled": True
+            "enabled": True,
+            "roles": [self.cloud.keystone.roles.find(name="_member_")]
         }, **kwargs)
         self.objects[user.id] = user
         return user
@@ -624,8 +625,13 @@ class Cloud(object):
             "tenantId": admin_tenant.id,
             "enabled": True,
         })
+        member_role = AttrDict(self.keystone, {
+            "name": "_member_",
+            "id": str(uuid.uuid4()),
+        })
         self.data["keystone"]["tenants"] = {admin_tenant.id: admin_tenant}
-        self.data["keystone"]["roles"] = {admin_role.id: admin_role}
+        self.data["keystone"]["roles"] = {admin_role.id: admin_role,
+                                          member_role.id: member_role}
         self.data["keystone"]["users"] = {admin_user.id: admin_user}
         hostname_prefix = "".join(random.choice(string.ascii_uppercase)
                                   for i in (0, 0))
