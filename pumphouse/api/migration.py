@@ -283,7 +283,7 @@ def migrate_ephemeral_storage(mapping, events, src, dst, id):
             return snapshot
     s0 = src.nova.servers.get(id)
     i0 = create_snapshot(src, s0)
-    utils.wait_for(i0, cloud.glance.images.get, value='active')
+    utils.wait_for(i0, src.glance.images.get, value='active')
     _, i1 = migrate_image(mapping, events, src, dst, i0.id)
     mapping[i0.id] = i1.id
     return i0, i1
@@ -322,7 +322,7 @@ def migrate_server(parameters, mapping, events, src, dst, id):
     tenant_src = src.restrict(tenant_name=tenant.name)
     _, f1 = migrate_flavor(mapping, events, src, dst, s0.flavor["id"])
     nics = []
-    if parameters.ephemeral_storage:
+    if parameters.get("ephemeral_storage"):
         i0, i1 = migrate_ephemeral_storage(mapping, events, src, user_dst,
                                            s0.id)
     else:
