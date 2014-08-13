@@ -279,7 +279,7 @@ def migrate_ephemeral_storage(mapping, events, src, dst, id):
             raise
         else:
             snapshot = cloud.glance.images.get(snapshot_id)
-            LOG.info("Created: %s", snapshot._info)
+            LOG.info("Created: %s", snapshot)
             return snapshot
     s0 = src.nova.servers.get(id)
     i0 = create_snapshot(src, s0)
