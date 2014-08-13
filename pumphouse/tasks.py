@@ -131,3 +131,30 @@ class EnsureRole(BaseCloudTask):
             )
             LOG.info("Created role: %s", role)
         return role.to_dict()
+
+
+class RetrieveFlavor(BaseCloudTask):
+    def execute(self, flavor_id):
+        flavor = self.cloud.nova.flavors.get(flavor_id)
+        return flavor.to_dict()
+
+
+class EnsureFlavor(BaseCloudTask):
+    def execute(self, flavor_info):
+        try:
+            # TODO(akscram): Ensure that the flavor with the same ID is
+            #                equal to the source flavor.
+            flavor = self.cloud.nova.flavors.get(flavor_info["id"])
+        except exceptions.nova_excs.NotFound:
+            flavor = self.cloud.nova.flavors.create(
+                flavor_info["name"],
+                flavor_info["ram"],
+                flavor_info["vcpus"],
+                flavor_info["disk"],
+                flavorid=flavor_info["id"],
+                ephemeral=flavor_info["ephemeral"],
+                swap=flavor_info["swap"] or 0,
+                rxtx_factor=flavor_info["rxtx_factor"],
+                is_public=flavor_info["is_public"],
+            )
+        return flavor.to_dict()

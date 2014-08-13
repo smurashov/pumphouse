@@ -59,6 +59,24 @@ def migrate_role(src, dst, role_id):
     return flow
 
 
+def migrate_flavor(src, dst, flavor_id):
+    flavor_binding = "flavor-{}".format(flavor_id)
+    flavor_retrieve = "{}-retrieve".format(flavor_binding)
+    flavor_ensure = "{}-ensure".format(flavor_binding)
+    flow = linear_flow.Flow("migrate-flavor-{}".format(flavor_id)).add(
+        tasks.RetrieveFlavor(src,
+                             name=flavor_retrieve,
+                             provides=flavor_binding,
+                             rebind=[flavor_retrieve],
+                             inject={flavor_retrieve: flavor_id}),
+        tasks.EnsureFlavor(dst,
+                           name=flavor_ensure,
+                           provides=flavor_ensure,
+                           rebind=[flavor_binding]),
+    )
+    return flow
+
+
 def migrate_membership(src, dst, user_id, role_id, tenant_id):
     user_ensure = "user-{}-ensure".format(user_id)
     role_ensure = "role-{}-ensure".format(role_id)
