@@ -56,6 +56,7 @@ class Identity(collections.Mapping):
 NAMESPACE = collections.namedtuple("Namespace", ("username", "password",
                                                  "tenant_name", "auth_url"))
 
+
 class Namespace(NAMESPACE):
     """Represents a set of credentials
 

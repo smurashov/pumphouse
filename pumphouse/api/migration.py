@@ -4,7 +4,6 @@ from keystoneclient.openstack.common.apiclient import exceptions \
     as keystone_excs
 from novaclient import exceptions as nova_excs
 
-from pumphouse import cloud
 from pumphouse import exceptions
 from pumphouse import management
 from pumphouse import utils
@@ -181,6 +180,7 @@ def migrate_network(mapping, events, src, dst, name):
         LOG.warn("Skipped because mapping: %s", n0._info)
         return n0, dst.nova.networks.get(mapping[n0.id])
     if n0.project_id:
+        t1 = dst.keystone.tenants.get(n0.project_id)
         cloud, project_id = dst.restrict(tenant_name=t1.name), t1.id
     else:
         cloud, project_id = dst, None

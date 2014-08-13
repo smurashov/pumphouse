@@ -7,7 +7,6 @@ from keystoneclient.openstack.common.apiclient import exceptions \
     as keystone_excs
 from novaclient import exceptions as nova_excs
 
-from pumphouse import cloud as pump_cloud
 from pumphouse import exceptions
 from pumphouse import utils
 
