@@ -181,11 +181,7 @@ def migrate_network(mapping, events, src, dst, name):
         LOG.warn("Skipped because mapping: %s", n0._info)
         return n0, dst.nova.networks.get(mapping[n0.id])
     if n0.project_id:
-        # XXX(akscram): Restrict of tenant priviliges.
-        _, t1 = migrate_tenant(mapping, events, src, dst, n0.project_id)
-        tenant_ns = dst.user_ns.restrict(tenant_name=t1.name)
-        tenant_dst = dst.restrict(tenant_ns)
-        cloud, project_id = tenant_dst, t1.id
+        cloud, project_id = dst.restrict(tenant_name=t1.name), t1.id
     else:
         cloud, project_id = dst, None
     try:
@@ -320,12 +316,10 @@ def migrate_server(parameters, mapping, events, src, dst, id):
     # XXX(akscram): Restriction of client priviliges.
     _, user = migrate_user(mapping, events, src, dst, s0.user_id)
     tenant = dst.keystone.tenants.get(mapping[s0.tenant_id])
-    user_ns = cloud.Namespace(username=user.name,
-                              tenant_name=tenant.name,
-                              password="default")
-    user_dst = dst.restrict(user_ns)
-    tenant_ns = src.user_ns.restrict(tenant_name=tenant.name)
-    tenant_src = src.restrict(tenant_ns)
+    user_dst = dst.restrict(username=user.name,
+                            tenant_name=tenant.name,
+                            password="default")
+    tenant_src = src.restrict(tenant_name=tenant.name)
     _, f1 = migrate_flavor(mapping, events, src, dst, s0.flavor["id"])
     nics = []
     if parameters.ephemeral_storage:

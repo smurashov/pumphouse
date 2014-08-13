@@ -86,11 +86,19 @@ class Cloud(object):
                 LOG.warning("The client %s is unusable, try to reinitialize "
                             "it",
                             client)
-                client = service.make()
+                client = service.make(identity=client.identity)
                 clouds.set(self.target, service, client)
             else:
                 LOG.info("Client looks like alive %s", client)
             return client
+
+    @property
+    def cloud_urls(self):
+        ctx = flask._app_ctx_stack.top
+        if ctx is not None:
+            clouds = self.get_extension(ctx.app)
+            service, client = clouds.get(self.target)
+            return service.cloud_urls
 
 
 events = socketio.SocketIO()

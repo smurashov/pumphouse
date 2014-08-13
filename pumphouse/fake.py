@@ -41,8 +41,8 @@ class Resource(object):
     def __init__(self, cloud, objects):
         self.cloud = cloud
         self.objects = objects
-        self.user_id = self._get_user_id(self.cloud.access_ns.username)
-        self.tenant_id = self._get_tenant_id(self.cloud.access_ns.tenant_name)
+        self.user_id = self._get_user_id(self.cloud.namespace.username)
+        self.tenant_id = self._get_tenant_id(self.cloud.namespace.tenant_name)
 
     def list(self, search_opts=None, filters=None, tenant_id=None,
              project_id=None):
@@ -224,7 +224,7 @@ class Server(NovaResource):
                     server._info = server
                     for ip in floating_ip_list:
                         if ip.address == floating_ip:
-                            ip['instance_uuid'] = server_id
+                            ip['instance_uuid'] = ip['instance_id'] = server_id
                     return server
         raise exceptions.NotFound
 
@@ -353,6 +353,7 @@ class FloatingIP(NovaResource):
         floating_ip = floating_ips[0]
         floating_ip['ip'] = floating_ip['address']
         floating_ip['project_id'] = self.tenant_id
+        floating_ip['instance_id'] = None
         return floating_ip
 
 
@@ -373,6 +374,7 @@ class FloatingIPBulk(NovaResource):
             "address": address,
             "id": str(floating_ip_uuid),
             "instance_uuid": None,
+            "instance_id": None,
             "project_id": None,
             "pool": pool,
         })
@@ -483,7 +485,8 @@ class User(KeystoneResource):
             "id": str(user_uuid),
             "tenantId": kwargs["tenant_id"],
             "username": kwargs["name"],
-            "enabled": True
+            "enabled": True,
+            "roles": [self.cloud.keystone.roles.find(name="_member_")]
         }, **kwargs)
         self.objects[user.id] = user
         return user
@@ -584,17 +587,13 @@ class Cloud(object):
     default_num_hypervisors = 2
     default_delays = False
 
-    def __init__(self, cloud_ns, user_ns, identity, urls={},
-                 data=None, fake=None):
-        self.cloud_ns = cloud_ns
-        self.user_ns = user_ns
-        self.access_ns = cloud_ns.restrict(user_ns)
+    def __init__(self, namespace, identity, data=None, fake=None):
+        self.namespace = namespace
         self.fake = fake or {}
         self.delays = self.fake.get("delays", self.default_delays)
         self.num_hypervisors = self.fake.get("num_hypervisors",
                                              self.default_num_hypervisors)
         self.populate = self.fake.get("populate", {})
-        self.urls = urls
         self.data = data or {}
         self.nova = Nova(self)
         self.keystone = Keystone(self)
@@ -611,7 +610,7 @@ class Cloud(object):
 
     def initialize_data(self):
         admin_tenant = AttrDict(self.keystone, {
-            "name": self.access_ns.tenant_name,
+            "name": self.namespace.tenant_name,
             "id": str(uuid.uuid4()),
         }, description="admin")
         admin_role = AttrDict(self.keystone, {
@@ -619,15 +618,20 @@ class Cloud(object):
             "id": str(uuid.uuid4()),
         })
         admin_user = AttrDict(self.keystone, {
-            "username": self.access_ns.username,
-            "name": self.access_ns.username,
+            "username": self.namespace.username,
+            "name": self.namespace.username,
             "id": str(uuid.uuid4()),
             "roles": [admin_role],
             "tenantId": admin_tenant.id,
             "enabled": True,
         })
+        member_role = AttrDict(self.keystone, {
+            "name": "_member_",
+            "id": str(uuid.uuid4()),
+        })
         self.data["keystone"]["tenants"] = {admin_tenant.id: admin_tenant}
-        self.data["keystone"]["roles"] = {admin_role.id: admin_role}
+        self.data["keystone"]["roles"] = {admin_role.id: admin_role,
+                                          member_role.id: member_role}
         self.data["keystone"]["users"] = {admin_user.id: admin_user}
         hostname_prefix = "".join(random.choice(string.ascii_uppercase)
                                   for i in (0, 0))
@@ -686,23 +690,23 @@ class Cloud(object):
     def get_service(self, service_name):
         return self.data.setdefault(service_name, {})
 
-    def restrict(self, user_ns):
-        return Cloud(self.cloud_ns, user_ns, self.identity, self.urls,
-                     data=self.data)
+    def restrict(self, **kwargs):
+        namespace = self.namespace.restrict(**kwargs)
+        return self.__class__(namespace, self.identity, data=self.data)
 
     @classmethod
     def from_dict(cls, endpoint, identity, **kwargs):
-        cloud_ns = pump_cloud.Namespace(auth_url=endpoint["auth_url"])
-        user_ns = pump_cloud.Namespace(
+        namespace = pump_cloud.Namespace(
             username=endpoint["username"],
             password=endpoint["password"],
             tenant_name=endpoint["tenant_name"],
+            auth_url=endpoint["auth_url"],
         )
-        cloud = cls(cloud_ns, user_ns, identity, **kwargs)
+        cloud = cls(namespace, identity, **kwargs)
         return cloud
 
     def __repr__(self):
-        return "<Cloud(namespace={!r})>".format(self.access_ns)
+        return "<Cloud(namespace={!r})>".format(self.namespace)
 
 
 class Identity(object):

@@ -203,12 +203,10 @@ def setup_image(cloud, image_dict):
     url = image_dict.pop("url")
     image_dict["visibility"] = image_dict.get("visibility", "public")
     image = cloud.glance.images.create(**image_dict)
-    if cloud.__module__ == "pumphouse.fake":
-        image_file = os.tmpfile()
-    else:
+    if not cloud.__module__ == "pumphouse.fake":
         image_file = cache_image_file(url)
-    cloud.glance.images.upload(image.id,
-                               open(image_file.name, "rb"))
+        cloud.glance.images.upload(image.id,
+                                   open(image_file.name, "rb"))
     return image
 
 
@@ -331,8 +329,7 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
             tenant_dict["name"],
             description=tenant_dict.get("description"))
         become_admin_in_tenant(cloud, cloud.keystone.auth_ref.user_id, tenant)
-        tenant_ns = cloud.user_ns.restrict(tenant_name=tenant.name)
-        tenant_cloud = cloud.restrict(tenant_ns)
+        tenant_cloud = cloud.restrict(tenant_name=tenant.name)
         test_tenant_clouds[tenant.id] = tenant_cloud
         setup_secgroup(tenant_cloud)
         user = cloud.keystone.users.create(
@@ -340,10 +337,9 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
             password="default",
             tenant_id=tenant.id)
         LOG.info("Created: %s", user._info)
-        user_ns = pump_cloud.Namespace(username=user.name,
-                                       password="default",
-                                       tenant_name=tenant.name)
-        user_cloud = cloud.restrict(user_ns)
+        user_cloud = cloud.restrict(username=user.name,
+                                    password="default",
+                                    tenant_name=tenant.name)
         LOG.info("Created: %s", tenant._info)
         events.emit("tenant create", {
             "cloud": target,
