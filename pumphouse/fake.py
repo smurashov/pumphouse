@@ -224,7 +224,7 @@ class Server(NovaResource):
                     server._info = server
                     for ip in floating_ip_list:
                         if ip.address == floating_ip:
-                            ip['instance_uuid'] = server_id
+                            ip['instance_uuid'] = ip['instance_id'] = server_id
                     return server
         raise exceptions.NotFound
 
@@ -353,6 +353,7 @@ class FloatingIP(NovaResource):
         floating_ip = floating_ips[0]
         floating_ip['ip'] = floating_ip['address']
         floating_ip['project_id'] = self.tenant_id
+        floating_ip['instance_id'] = None
         return floating_ip
 
 
@@ -373,6 +374,7 @@ class FloatingIPBulk(NovaResource):
             "address": address,
             "id": str(floating_ip_uuid),
             "instance_uuid": None,
+            "instance_id": None,
             "project_id": None,
             "pool": pool,
         })
