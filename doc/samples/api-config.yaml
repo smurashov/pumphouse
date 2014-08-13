@@ -49,7 +49,7 @@ CLOUDS:
                 username: pumphouse-test-user-0001
                 servers:
                   - name: pumphouse-test-instance-0001
-                    flavor: 
+                    flavor:
                       <<: *small
                     image:
                       <<: *image
@@ -77,3 +77,9 @@ CLOUDS:
         fake:
             delays: true
             num_hypervisors: 4
+
+cmds:
+    ping: &ping
+        cmd: "ping -c 4 $PUBLIC_IP"
+    simpleWebCheck: &simpleWebCheck
+        cmd: "curl --retry 0 --connect-timeout 1 http://${PUBLIC_IP}/"
