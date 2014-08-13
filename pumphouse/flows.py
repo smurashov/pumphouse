@@ -76,7 +76,7 @@ def migrate_membership(src, dst, user_id, role_id, tenant_id):
 def migrate_passwords(src, dst, users_ids):
     users_ensure = ["user-{}-ensure".format(user_id) for user_id in users_ids]
     task = tasks.RepaireUserPasswords(src, dst,
-                                      rebind=users_ensure)
+                                      requires=users_ensure)
     return task
 
 
@@ -106,9 +106,8 @@ def migrate_identity(src, dst, tenant_id):
         flow.add(role_flow)
     # TODO(akcram): All users' passwords should be restored when all
     #               migration operations ended.
-#    users_passwords_flow, store = migrate_passwords(src, dst, store,
-#                                                    users_ids)
-#    flow.add(users_passwords_flow)
+    users_passwords_flow = migrate_passwords(src, dst, users_ids)
+    flow.add(users_passwords_flow)
     return flow
 
 

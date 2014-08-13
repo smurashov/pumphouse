@@ -62,7 +62,7 @@ class EnsureAdminInTenant(BaseCloudTask):
 class RetrieveUser(BaseRetrieveTask):
     def retrieve(self, user_id):
         user = self.cloud.keystone.users.get(user_id)
-#        self.cloud.identity.fetch(user.id)
+        self.cloud.identity.fetch(user.id)
         return user
 
 
@@ -90,8 +90,15 @@ class EnsureUser(BaseCloudTask):
 
 
 class RepaireUserPasswords(BaseCloudsTask):
-    def execute(self, *users_infos):
-        pass
+    def execute(self, **users_infos):
+        def with_mapping(identity):
+            for user_id, password in identity.iteritems():
+                yield mapping[user_id], password
+
+        mapping = dict((source.split("-", 2)[1], user_info["id"])
+                       for source, user_info in users_infos.iteritems())
+        self.dst_cloud.identity.update(with_mapping(self.src_cloud.identity))
+        self.dst_cloud.identity.push()
 
 
 class EnsureUserRole(BaseCloudTask):
