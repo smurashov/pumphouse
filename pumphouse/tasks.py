@@ -89,7 +89,7 @@ class EnsureUser(BaseCloudTask):
         return user.to_dict()
 
 
-class RepaireUserPasswords(BaseCloudsTask):
+class RepaireUsersPasswords(BaseCloudsTask):
     def execute(self, **users_infos):
         def with_mapping(identity):
             for user_id, password in identity.iteritems():

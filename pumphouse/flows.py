@@ -75,8 +75,8 @@ def migrate_membership(src, dst, user_id, role_id, tenant_id):
 
 def migrate_passwords(src, dst, users_ids):
     users_ensure = ["user-{}-ensure".format(user_id) for user_id in users_ids]
-    task = tasks.RepaireUserPasswords(src, dst,
-                                      requires=users_ensure)
+    task = tasks.RepaireUsersPasswords(src, dst,
+                                       requires=users_ensure)
     return task
 
 
