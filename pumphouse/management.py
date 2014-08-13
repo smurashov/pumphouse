@@ -11,7 +11,6 @@ from . import cloud as pump_cloud
 from . import exceptions
 from . import utils
 
-
 LOG = logging.getLogger(__name__)
 
 RO_SECURITY_GROUPS = ['default']
@@ -204,7 +203,10 @@ def setup_image(cloud, image_dict):
     url = image_dict.pop("url")
     image_dict["visibility"] = image_dict.get("visibility", "public")
     image = cloud.glance.images.create(**image_dict)
-    image_file = cache_image_file(url)
+    if cloud.__module__ == "pumphouse.fake":
+        image_file = os.tmpfile()
+    else:
+        image_file = cache_image_file(url)
     cloud.glance.images.upload(image.id,
                                open(image_file.name, "rb"))
     return image
