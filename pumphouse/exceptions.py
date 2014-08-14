@@ -12,3 +12,10 @@ class HostNotInSourceCloud(Error):
 
 class TimeoutException(Error):
     pass
+
+class ConfigError(Error):
+    pass
+
+class UsageError(Error):
+    pass
+
