@@ -15,6 +15,7 @@
 from keystoneclient.openstack.common.apiclient import (exceptions  # NOQA
                                                        as keystone_excs)  # NOQA
 from novaclient import exceptions as nova_excs  # NOQA
+from glanceclient import exc as glance_excs  # NOQA
 
 
 class Error(Exception):

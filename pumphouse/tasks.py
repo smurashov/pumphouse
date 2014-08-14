@@ -3,6 +3,7 @@ import logging
 from taskflow import task
 
 from pumphouse import exceptions
+from pumphouse import utils
 
 
 LOG = logging.getLogger(__name__)
@@ -70,6 +71,7 @@ class EnsureUser(BaseCloudTask):
     def execute(self, user_info, tenant_info):
         try:
             user = self.cloud.keystone.users.find(name=user_info["name"])
+            # TODO(akscram): Current password should be reseted.
         except exceptions.keystone_excs.NotFound:
             user = self.cloud.keystone.users.create(
                 name=user_info["name"],
@@ -158,3 +160,35 @@ class EnsureFlavor(BaseCloudTask):
                 is_public=flavor_info["is_public"],
             )
         return flavor.to_dict()
+
+
+class EnsureImage(BaseCloudsTask):
+    def execute(self, image_id, kernel_info, ramdisk_info):
+        image_info = self.src_cloud.glance.images.get(image_id)
+        images = self.dst_cloud.glances.images.list(filters={
+            # FIXME(akscram): Not all images have the checksum property.
+            "checksum": image_info["checksum"],
+            "name": image_info["name"],
+        })
+        if not images:
+            image = self.dst_cloud.glances.images.create(
+                disk_format=image_info["disk_format"],
+                container_format=image_info["container_format"],
+                visibility=image_info["visibility"],
+                min_ram=image_info["min_ram"],
+                min_disk=image_info["min_disk"],
+                name=image_info["name"],
+                protected=image_info["protected"],
+                kernel_id=kernel_info["id"] if kernel_info else None,
+                ramdisk_id=ramdisk_info["id"] if ramdisk_info else None,
+            )
+            # TODO(akscram): Chunked request is preferred. So in the
+            #                future we can control this for generating
+            #                the progress of the upload.
+            data = self.src_cloud.glance.images.data(image_info["id"])
+            self.dst_cloud.glance.images.upload(image["id"], data._resp)
+        else:
+            # XXX(akscram): More then one images can be here. Now we
+            #               just ignore this fact.
+            image = images[0]
+        return dict(image)

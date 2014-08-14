@@ -78,6 +78,43 @@ def migrate_flavor(src, dst, store, flavor_id):
     return flow
 
 
+def migrate_image(src, dst, store, image_id):
+    image_retrieve = "image-{}-retrieve".format(image_id)
+    image_ensure = "image-{}-ensure".format(image_id)
+    requires, inject = [image_retrieve], {}
+    image = src.glance.images.get(image_id)
+    flow = graph_flow.Flow("migrate-image-{}".format(image_id))
+    if hasattr(image, "kernel_id"):
+        kernel_retrieve = "image-{}-retrieve".format(image["kernel_id"])
+        kernel_ensure = "image-{}-ensure".format(image["kernel_id"])
+        flow.add(tasks.EnsureImage(src, dst,
+                                   name=kernel_ensure,
+                                   provides=kernel_ensure,
+                                   requires=(kernel_retrieve, None, None)))
+        store[kernel_retrieve] = image["kernel_id"]
+        requires.append(kernel_ensure)
+    else:
+        inject["kernel_id"] = None
+    if hasattr(image, "ramdisk_id"):
+        ramdisk_retrieve = "image-{}-retrieve".format(image["ramdisk_id"])
+        ramdisk_ensure = "image-{}-ensure".format(image["ramdisk_id"])
+        flow.add(tasks.EnsureImage(src, dst,
+                                   name=ramdisk_ensure,
+                                   provides=ramdisk_ensure,
+                                   requires=(ramdisk_retrieve, None, None)))
+        store[ramdisk_retrieve] = image["ramdisk_id"]
+        requires.append(ramdisk_ensure)
+    else:
+        inject["ramdisk_id"] = None
+    flow.add(tasks.EnsureImage(src, dst,
+                               name=image_ensure,
+                               provides=image_ensure,
+                               inject=inject,
+                               requires=requires))
+    store[image_retrieve] = image_id
+    return (flow, store)
+
+
 def migrate_membership(src, dst, store, user_id, role_id, tenant_id):
     user_ensure = "user-{}-ensure".format(user_id)
     role_ensure = "role-{}-ensure".format(role_id)
