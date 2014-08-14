@@ -170,7 +170,11 @@ class EnsureImage(BaseCloudsTask):
             "checksum": image_info["checksum"],
             "name": image_info["name"],
         })
-        if not images:
+        try:
+            # XXX(akscram): More then one images can be here. Now we
+            #               just ignore this fact.
+            image = next(iter(images))
+        except StopIteration:
             image = self.dst_cloud.glances.images.create(
                 disk_format=image_info["disk_format"],
                 container_format=image_info["container_format"],
@@ -187,8 +191,4 @@ class EnsureImage(BaseCloudsTask):
             #                the progress of the upload.
             data = self.src_cloud.glance.images.data(image_info["id"])
             self.dst_cloud.glance.images.upload(image["id"], data._resp)
-        else:
-            # XXX(akscram): More then one images can be here. Now we
-            #               just ignore this fact.
-            image = images[0]
         return dict(image)
