@@ -283,7 +283,7 @@ def migrate_ephemeral_storage(mapping, events, src, dst, id):
             return snapshot
     s0 = src.nova.servers.get(id)
     i0 = create_snapshot(src, s0)
-    utils.wait_for(i0, src.glance.images.get, value='active')
+    utils.wait_for(i0.id, src.glance.images.get, value='active')
     _, i1 = migrate_image(mapping, events, src, dst, i0.id)
     mapping[i0.id] = i1.id
     return i0, i1
