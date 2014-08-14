@@ -16,9 +16,9 @@ class PumpHouseShellCheck(PumpHouseCheck):
 
     def __init__(self, config):
         try:
-            if not(isinstance(config, dict) or
-                isinstance(config['input'], list) or
-                isinstance(config['env'], dict) or
+            if not(isinstance(config, dict) and
+                isinstance(config['input'], list) and
+                isinstance(config['env'], dict) and
                 isinstance(config['cmd'], str)):
                     raise exceptions.UsageError()
 
