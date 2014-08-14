@@ -1,4 +1,5 @@
 #import exceptions
+import subprocess
 from . import exceptions
 
 class PumpHouseCheck(object):
@@ -32,10 +33,17 @@ class PumpHouseShellCheck(PumpHouseCheck):
     def createEnv(self, env):
         r = ""
         for key in env:
-            r = r + key + "=\'" + str(env[key]) + "\' "
+            r = r + key + "=\'" + str(env[key]) + "\'; "
         return r
 
     def run(self):
         inputStream = "\n".join(self.config['input']) + '\n'
         environment = self.createEnv(self.config['env'])
 
+        command = "xargs -I^ -P16 sh -c \"%s %s >/dev/null 2>&1 || (echo ^; exit 255)\" 2>/dev/null" % (environment, self.config['cmd'])
+
+
+        proc = subprocess.Popen(command, shell=True , stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        streamData = proc.communicate(inputStream)[0]
+
+        return streamData.rstrip().split("\n")
