@@ -167,8 +167,9 @@ def migrate_tenant(tenant_id):
         src = hooks.source.connect()
         dst = hooks.destination.connect()
         store = {}
-        identity_flow = flows.migrate_identity(src, dst, tenant_id)
-        result = flows.run_flow(identity_flow, store)
+        migrate_identity, store = flows.migrate_identity(src, dst, store,
+                                                         tenant_id)
+        result = flows.run_flow(migrate_identity, store)
         LOG.info("Result of migration: %s", result)
     gevent.spawn(migrate)
     return flask.make_response()
