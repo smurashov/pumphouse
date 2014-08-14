@@ -8,11 +8,13 @@ CLOUDS_RESET: true
 
 cmds:
     ping: &ping
-	cmd: "| xargs -P20 -I% sh -c 'ping -c4 % >/dev/null 2>&1 || echo %'"
+        cmd: "| xargs -P20 -I% sh -c 'ping -c4 % >/dev/null 2>&1 || echo %'"
 
     ssh: &ssh
-	cmd: "| xargs -P20 -I% sh -c '(echo y | nc % 22) >/dev/null 2>&1 || echo %'"
+        cmd: "| xargs -P20 -I% sh -c '(echo y | nc % 22) >/dev/null 2>&1 || echo %'"
 
+    customerMonitoring: &customerMonitoring
+        cmd: "| xargs -P20 -I% sh -c 'curl '$MONITORING_URL/status.cgi?=%'"
 
     simpleWebCheck: &simpleWebCheck
          cmd: "| xargs -P20 -I% curl --retry 0 --connect-timeout 1 http://%/$REQUEST_URI"
@@ -65,18 +67,22 @@ CLOUDS:
                       <<: *small
                     image:
                       <<: *image
-                    attrs:
                     pre-actions: &health_checks
                         -
                             - <<: *ping
-                               input:
-			          - public
+                              input:
+                                  - public
                                   - private
-			    - <<: *ssh
-                               input:
-			          - public
+                            - <<: *ssh
+                              input:
+                                  - public
                                   - private
+                        - <<: *customerMonitoring
+                          env:
+                                MONITORING_URL: "http://monitoring.customer.int/cgi-bin"
                         - <<: *simpleWebCheck
+                          env:
+                                REQUEST_URI: "/index2.html"
                     post-actions:
                         <<: *health_checks
                   - name: pumphouse-test-instance-0002
