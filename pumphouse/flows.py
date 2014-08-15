@@ -67,12 +67,11 @@ def migrate_flavor(src, dst, store, flavor_id):
         tasks.RetrieveFlavor(src,
                              name=flavor_retrieve,
                              provides=flavor_binding,
-                             rebind=[flavor_retrieve],
-                             inject={flavor_retrieve: flavor_id}),
+                             requires=[flavor_retrieve]),
         tasks.EnsureFlavor(dst,
                            name=flavor_ensure,
                            provides=flavor_ensure,
-                           rebind=[flavor_binding]),
+                           requires=[flavor_binding]),
     )
     store[flavor_retrieve] = flavor_id
     return flow
@@ -90,7 +89,9 @@ def migrate_image(src, dst, store, image_id):
         flow.add(tasks.EnsureImage(src, dst,
                                    name=kernel_ensure,
                                    provides=kernel_ensure,
-                                   requires=(kernel_retrieve, None, None)))
+                                   requires=(kernel_retrieve,),
+                                   inject={"kernel_id": None,
+                                           "ramdisk_id": None}))
         store[kernel_retrieve] = image["kernel_id"]
         requires.append(kernel_ensure)
     else:
@@ -101,7 +102,9 @@ def migrate_image(src, dst, store, image_id):
         flow.add(tasks.EnsureImage(src, dst,
                                    name=ramdisk_ensure,
                                    provides=ramdisk_ensure,
-                                   requires=(ramdisk_retrieve, None, None)))
+                                   requires=(ramdisk_retrieve,),
+                                   inject={"kernel_id": None,
+                                           "ramdisk_id": None}))
         store[ramdisk_retrieve] = image["ramdisk_id"]
         requires.append(ramdisk_ensure)
     else:
