@@ -11,9 +11,6 @@ class PumpHouseCheck(object):
     def run():
         raise NotImplementedError()
 
-class checkExecute():
-
-
 class PumpHouseShellCheck(PumpHouseCheck):
 
 
@@ -51,4 +48,9 @@ class PumpHouseShellCheck(PumpHouseCheck):
 
         proc = subprocess.Popen(command, shell=True , stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
-        return proc.communicate(inputStream)[0].rstrip().split("\n");
+        r =  proc.communicate(inputStream)[0].rstrip().split("\n");
+
+        if (r[0]):
+            raise exceptions.CheckError(r);
+
+        return 1

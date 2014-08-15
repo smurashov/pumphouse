@@ -19,3 +19,7 @@ class ConfigError(Error):
 class UsageError(Error):
     pass
 
+class CheckError(Error):
+    def __init__(self, failList):
+        self.failList = failList
+
