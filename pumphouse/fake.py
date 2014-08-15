@@ -250,6 +250,12 @@ class Server(NovaResource):
         server.update = datetime.datetime.now().isoformat()
         return server
 
+    def create_image(self, server, name):
+        image = self.cloud.glance.images.create(name=name,
+                                                disk_format="qcow2",
+                                                container_format="bare")
+        return image.id
+
 
 class Image(Resource):
     def data(self, id):

@@ -31,6 +31,7 @@ class Cloud(object):
         app.config.setdefault("CLOUD_DRIVER", "pumphouse.cloud.Cloud")
         app.config.setdefault("IDENTITY_DRIVER", "pumphouse.cloud.Identity")
         app.config.setdefault("CLOUD_SERVICE", "pumphouse.base.Service")
+        app.config.setdefault("PARAMETERS", dict())
 
         clouds = self.register_extension(app)
         service = self.init_cloud_service(app)

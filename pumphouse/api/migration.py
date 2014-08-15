@@ -4,7 +4,6 @@ from keystoneclient.openstack.common.apiclient import exceptions \
     as keystone_excs
 from novaclient import exceptions as nova_excs
 
-from pumphouse import cloud
 from pumphouse import exceptions
 from pumphouse import management
 from pumphouse import utils
@@ -181,6 +180,7 @@ def migrate_network(mapping, events, src, dst, name):
         LOG.warn("Skipped because mapping: %s", n0._info)
         return n0, dst.nova.networks.get(mapping[n0.id])
     if n0.project_id:
+        t1 = dst.keystone.tenants.get(n0.project_id)
         cloud, project_id = dst.restrict(tenant_name=t1.name), t1.id
     else:
         cloud, project_id = dst, None
@@ -268,7 +268,28 @@ def migrate_floating_ip(mapping, events, src, dst, ip):
     return floating_ip1
 
 
-def migrate_server(mapping, events, src, dst, id):
+def migrate_ephemeral_storage(mapping, events, src, dst, id):
+    """Create snapshot from running server and copy to destination cloud"""
+    def create_snapshot(cloud, server):
+        try:
+            snapshot_id = cloud.nova.servers.create_image(
+                server, "pumphouse-snapshot-{}".format(server.id))
+        except Exception:
+            LOG.exception("Exception while snapshotting instance")
+            raise
+        else:
+            snapshot = cloud.glance.images.get(snapshot_id)
+            LOG.info("Created: %s", snapshot)
+            return snapshot
+    s0 = src.nova.servers.get(id)
+    i0 = create_snapshot(src, s0)
+    utils.wait_for(i0.id, src.glance.images.get, value='active')
+    _, i1 = migrate_image(mapping, events, src, dst, i0.id)
+    mapping[i0.id] = i1.id
+    return i0, i1
+
+
+def migrate_server(parameters, mapping, events, src, dst, id):
     """Migrates the server."""
     def _associate_floating_ip((cloud, floating_ip, server, fixed_ip)):
         try:
@@ -301,7 +322,11 @@ def migrate_server(mapping, events, src, dst, id):
     tenant_src = src.restrict(tenant_name=tenant.name)
     _, f1 = migrate_flavor(mapping, events, src, dst, s0.flavor["id"])
     nics = []
-    _, i1 = migrate_image(mapping, events, src, user_dst, s0.image["id"])
+    if parameters.get("ephemeral_storage"):
+        i0, i1 = migrate_ephemeral_storage(mapping, events, src, user_dst,
+                                           s0.id)
+    else:
+        _, i1 = migrate_image(mapping, events, src, user_dst, s0.image["id"])
     addresses = s0.addresses
     floating_ips = dict()
     for n_label, n_params in addresses.iteritems():
@@ -374,7 +399,7 @@ def migrate_server(mapping, events, src, dst, id):
     return s0, s1
 
 
-def migrate_resources(events, source, destination, tenant_id):
+def migrate_resources(parameters, events, source, destination, tenant_id):
     mapping = {}
     events.emit("tenant migrate", {"id": tenant_id}, namespace="/events")
     src_tenant, dst_tenant = migrate_tenant(mapping, events, source,
@@ -401,8 +426,8 @@ def migrate_resources(events, source, destination, tenant_id):
         if server.tenant_id == tenant_id:
             events.emit("server migrate", {"id": server.id},
                         namespace="/events")
-            _, dst_server = migrate_server(mapping, events, source,
-                                           destination, server)
+            _, dst_server = migrate_server(parameters, mapping, events,
+                                           source, destination, server)
             events.emit("server migrated", {
                 "source_id": server.id,
                 "destination_id": dst_server.id,

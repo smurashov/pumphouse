@@ -5,6 +5,8 @@ CLOUD_DRIVER: pumphouse.fake.Cloud
 IDENTITY_DRIVER: pumphouse.fake.Identity
 CLOUD_SERVICE: pumphouse.fake.Service
 CLOUDS_RESET: true
+PARAMETERS:
+    ephemeral_storage: true
 CLOUDS:
     source:
         endpoint:
