@@ -1,6 +1,5 @@
 import logging
 
-from taskflow import task
 from taskflow.patterns import linear_flow
 
 from pumphouse import tasks
@@ -23,13 +22,13 @@ class RetrieveFixedIP(tasks.BaseRetriveTask):
 class RetrieveFloatingIPBulk(tasks.BaseRetrieveTask):
     def retrieve(self, address):
         floating_ip = self.cloud.nova.floating_ips_bulk.find(address=address)
-        return floating_ip
+        return floating_ip.to_dict()
 
 
 class EnsureFloatingIPBulk(tasks.BaseCloudTask):
     def execute(self, floating_ip_info):
-        address = floating_ip_info.get("addr")
-        pool = floating_ip_info.get("pool")
+        address = floating_ip_info["addr"]
+        pool = floating_ip_info["pool"]
         try:
             floating_ip = self.cloud.nova.floating_ips_bulk.find(
                 address=address)
