@@ -171,6 +171,35 @@ def migrate_identity(src, dst, store, tenant_id):
     return (flow, store)
 
 
+def migrate_server(src, dst, store, server_id, image_id, flavor_id):
+    server_binding = "server-{}".format(server_id)
+    server_retrieve = "server-{}-retrieve".format(server_id)
+    server_suspend = "server-{}-suspend".format(server_id)
+    server_boot = "server-{}-boot".format(server_id)
+    image_ensure = "image-{}-ensure".format(image_id)
+    flavor_ensure = "flavor-{}-ensure".format(flavor_id)
+    flow = linear_flow.Flow("migrate-server-{}".format(server_id))
+    flow.add(tasks.RetrieveServer(src,
+                                  name=server_binding,
+                                  provides=server_retrieve,
+                                  requires=[server_binding]))
+    flow.add(tasks.SuspendServer(src,
+                                 name=server_binding,
+                                 provides=server_suspend,
+                                 requires=[server_retrieve]))
+    flow.add(tasks.BootServerFromImage(dst,
+                                       name=server_binding,
+                                       provides=server_boot,
+                                       requires=[server_suspend, image_ensure,
+                                                 flavor_ensure]
+                                       ))
+    flow.add(tasks.TerminateServer(src,
+                                   name=server_binding,
+                                   requires=[server_suspend]))
+    store[server_binding] = server_id
+    return (flow, store)
+
+
 def run_flow(flow, store):
     result = taskflow.engines.run(flow, engine_conf='parallel', store=store)
     return result

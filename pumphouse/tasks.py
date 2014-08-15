@@ -192,3 +192,39 @@ class EnsureImage(BaseCloudsTask):
             data = self.src_cloud.glance.images.data(image_info["id"])
             self.dst_cloud.glance.images.upload(image["id"], data._resp)
         return dict(image)
+
+
+class RetrieveServer(BaseCloudTask):
+    def execute(self, server_id):
+        server = self.cloud.nova.servers.get(server_id)
+        return server.to_dict()
+
+
+class SuspendServer(BaseCloudTask):
+    def execute(self, server_info):
+        self.cloud.nova.servers.suspend(server_info)
+        server = utils.wait_for(server_info, self.cloud.nova.servers.get,
+                                value="SUSPENDED")
+        return server.to_dict()
+
+    def revert(self, server_info, result, flow_failures):
+        self.cloud.nova.servers.resume(server_info)
+        server = utils.wait_for(server_info, self.cloud.nova.servers.get,
+                                value="ACTIVE")
+        return server.to_dict()
+
+
+class BootServerFromImage(BaseCloudTask):
+    def execute(self, server_info, image_info, flavor_info):
+        # TODO(akscram): Network information doesn't saved.
+        server = self.cloud.nova.servers.create(server_info["name"],
+                                                image_info["id"],
+                                                flavor_info["id"])
+        server = utils.wait_for(server, self.cloud.nova.servers.get,
+                                value="ACTIVE")
+        return server.to_dict()
+
+
+class TerminateServer(BaseCloudTask):
+    def execute(self, server_info):
+        self.cloud.nova.servers.delete(server_info)
