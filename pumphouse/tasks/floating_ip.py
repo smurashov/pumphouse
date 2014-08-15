@@ -1,7 +1,9 @@
 import logging
 
 from taskflow import task
+from taskflow.patterns import linear_flow
 
+from pumphouse import tasks
 from pumphouse import exceptions
 from pumphoust import utils
 
@@ -9,7 +11,7 @@ from pumphoust import utils
 LOG = logging.getLogger(__name__)
 
 
-class RetrieveFixedIP(BaseRetriveTask):
+class RetrieveFixedIP(tasks.BaseRetriveTask):
     def retrieve(self, server_id, network_id):
         server = self.cloud.nova.servers.get(server_id)
         # XXX(ogelbukh): this is only for nova-network with FlatDHCP
@@ -18,13 +20,13 @@ class RetrieveFixedIP(BaseRetriveTask):
         return fixed_ip_address
 
 
-class RetrieveFloatingIPBulk(BaseRetrieveTask):
+class RetrieveFloatingIPBulk(tasks.BaseRetrieveTask):
     def retrieve(self, address):
         floating_ip = self.cloud.nova.floating_ips_bulk.find(address=address)
         return floating_ip
 
 
-class EnsureFloatingIPBulk(BaseCloudTask):
+class EnsureFloatingIPBulk(tasks.BaseCloudTask):
     def execute(self, floating_ip_info):
         address = floating_ip_info.get("addr")
         pool = floating_ip_info.get("pool")
@@ -35,7 +37,7 @@ class EnsureFloatingIPBulk(BaseCloudTask):
             self.cloud.nova.floating_ips_bulk.create(address,
                                                 pool=pool)
             try:
-                floating_ip = cloud.nova.floating_ips_bulk.find(
+                floating_ip = self.cloud.nova.floating_ips_bulk.find(
                     address=address)
             except exceptions.nova_excs.NotFound:
                 LOG.exception("Not added: %s", address)
@@ -49,7 +51,7 @@ class EnsureFloatingIPBulk(BaseCloudTask):
         return floating_ip
 
 
-class EnsureFloatingIP(BaseCloudTask):
+class EnsureFloatingIP(tasks.BaseCloudTask):
     def execute(self, server_info, floating_ip_info, fixed_ip):
         pool = floating_ip_info.get("pool")
         server_id = server_info.get("id")
@@ -63,14 +65,14 @@ class EnsureFloatingIP(BaseCloudTask):
                 (floating_ip, server_id, fixed_ip),
                 self._associate_floating_ip,
                 attribute_getter=self._get_floating_ip_server,
-                value=server.id)
+                value=server_id)
         return floating_ip
 
     def _associate_floating_ip(self, (floating_ip, server_id, fixed_ip)):
         try:
             self.cloud.nova.servers.add_floating_ip(
                 server_id, floating_ip.ip, fixed_ip)
-        except nova_excs.BadRequest:
+        except exceptions.nova_excs.BadRequest:
             return floating_ip
         else:
             return self.cloud.nova.floating_ips.get(floating_ip),
@@ -89,7 +91,7 @@ def migrate_floating_ip(src, dst, store, address):
                                           provides=floating_ip_bulk_retrieve,
                                           requires=[floating_ip_bulk_binding]))
     flow.add(tasks.EnsureFloatingIPBulk(dst,
-                                        name=floating_ip_bulk_ensure
+                                        name=floating_ip_bulk_ensure,
                                         provides=floating_ip_bulk_ensure,
                                         requires=[floating_ip_bulk_retrieve]))
     store[floating_ip_bulk_binding] = address
@@ -107,7 +109,7 @@ def assign_floating_ip(src, dst, store, floating_ip_address,
     flow.add(tasks.RetrieveFixedIP(src,
                                    name=fixed_ip_binding,
                                    provides=fixed_ip_binding,
-                                   requires[server_ensure]))
+                                   requires=[server_ensure]))
     flow.add(tasks.EnsureFloatingIP(dst,
                                     name=floating_ip_binding,
                                     provides=floating_ip_ensure,
