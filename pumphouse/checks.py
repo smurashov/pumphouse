@@ -11,6 +11,9 @@ class PumpHouseCheck(object):
     def run():
         raise NotImplementedError()
 
+class checkExecute():
+
+
 class PumpHouseShellCheck(PumpHouseCheck):
 
 
@@ -43,7 +46,7 @@ class PumpHouseShellCheck(PumpHouseCheck):
         inputStream = self.generateInputStream(self.config['input'])
         environment = self.generateEnv(self.config['env'])
 
-        command = "xargs -I^ -P16 sh -c \"%s %s >/dev/null 2>&1 || (echo ^; exit 255)\" 2>/dev/null" % (environment, self.config['cmd'])
+        command = "xargs -r -I%% -P16 sh -c \"(%s %s) >/dev/null 2>&1 || (echo %%; exit 255)\" 2>/dev/null" % (environment, self.config['cmd'])
 
 
         proc = subprocess.Popen(command, shell=True , stdin=subprocess.PIPE, stdout=subprocess.PIPE)
