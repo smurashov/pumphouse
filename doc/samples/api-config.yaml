@@ -8,16 +8,16 @@ CLOUDS_RESET: true
 
 cmds:
     ping: &ping
-        cmd: "| xargs -P20 -I% sh -c 'ping -c4 % >/dev/null 2>&1 || echo %'"
+        cmd: "ping %"
 
     ssh: &ssh
-        cmd: "| xargs -P20 -I% sh -c '(echo y | nc % 22) >/dev/null 2>&1 || echo %'"
+        cmd: "echo y | nc % 22"
 
     customerMonitoring: &customerMonitoring
-        cmd: "| xargs -P20 -I% sh -c 'curl '$MONITORING_URL/status.cgi?=%'"
+        cmd: "curl '$MONITORING_URL/status.cgi?=%'"
 
     simpleWebCheck: &simpleWebCheck
-         cmd: "| xargs -P20 -I% curl --retry 0 --connect-timeout 1 http://%/$REQUEST_URI"
+        cmd: "curl http://%/$REQUEST_URI"
 
 CLOUDS:
     source:
