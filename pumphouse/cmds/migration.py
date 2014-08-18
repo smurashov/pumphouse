@@ -15,17 +15,14 @@
 import argparse
 import collections
 import logging
-import time
 
-from pumphouse import management
 from pumphouse import exceptions
+from pumphouse import management
 from pumphouse import utils
 from pumphouse import tasks
 from pumphouse import flows
 
-from keystoneclient.openstack.common.apiclient import exceptions \
-    as keystone_excs
-from novaclient import exceptions as nova_excs
+from taskflow import unordered_flow
 
 
 LOG = logging.getLogger(__name__)
@@ -130,14 +127,14 @@ def get_parser():
 def migrate_flavors(src, dst, flow, store, ids):
     for flavor in src.nova.flavors.list():
         if flavor.id in ids:
-            flow.add(tasks.migrate_flavor(mapping, src, dst, flavor.id))
+            flow.add(tasks.migrate_flavor(src, dst, store, flavor.id))
     return flow, store
 
 
 def migrate_images(src, dst, flow, store, ids):
     for image in src.glance.images.list():
         if image.id in ids:
-            flow.add(tasks.migrate_image(mapping, src, dst, image.id))
+            flow.add(tasks.migrate_image(src, dst, store, image.id))
     return flow, store
 
 
@@ -145,7 +142,7 @@ def migrate_servers(src, dst, flow, store, ids):
     search_opts = {"all_tenants": 1}
     for server in src.nova.servers.list(search_opts=search_opts):
         if server.id in ids:
-            flow.add(tasks.migrate_server(mapping, src, dst, server.id))
+            flow.add(tasks.migrate_server(src, dst, store, server.id))
     return flow, store
 
 
@@ -159,35 +156,29 @@ def migrate_tenants(src, dst, flow, store, ids):
 def migrate_secgroups(src, dst, flow, store, ids):
     for sg in src.nova.security_groups.list():
         if sg.id in ids:
-            flow.add(tasks.migrate_secgroup(mapping, src, dst, sg.id))
+            flow.add(tasks.migrate_secgroup(src, dst, store, sg.id))
     return flow, store
 
 
-def migrate_users(src, dst, store, ids):
+def migrate_users(src, dst, flow, store, ids):
     for user in src.keystone.users.list():
         if user.id in ids:
-           flow.add(tasks.migrate_user(mapping, src, dst, user.id))
+            flow.add(tasks.migrate_user(src, dst, store, user.id))
     return flow, store
 
 
 def migrate_roles(src, dst, flow, store, ids):
     for role in src.keystone.roles.list():
         if role.id in ids:
-            flow.add(tasks.migrate_role(mapping, src, dst, role.id))
+            flow.add(tasks.migrate_role(src, dst, store, role.id))
     return flow, store
-
-
-def migrate(mapping, src, dst):
-    migrate_users(mapping, src, dst)
-    migrate_servers(mapping, src, dst)
-    update_users_passwords(mapping, src, dst)
 
 
 def evacuate(cloud, host):
     binary = "nova-compute"
     try:
         hypervs = cloud.nova.hypervisors.search(host, servers=True)
-    except nova_excs.NotFound:
+    except exceptions.nova_excs.NotFound:
         LOG.exception("Could not find hypervisors at the host %r.", host)
     else:
         if len(hypervs) > 1:
