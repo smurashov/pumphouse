@@ -16,21 +16,20 @@ import logging
 
 from taskflow.patterns import linear_flow
 
-from pumphouse import tasks
-from pumphouse import exceptions
-from pumphoust import utils
+from pumphouse import task
+from pumphouse.tasks import image as image_tasks
 
 
 LOG = logging.getLogger(__name__)
 
 
-class RetrieveImage(tasks.BaseCloudTask):
+class RetrieveImage(task.BaseCloudTask):
     def retrieve(self, image_id):
         image = self.cloud.glance.images.get(image_id)
         return image.to_dict()
 
 
-class EnsureSnapshot(tasks.BaseCloudTask):
+class EnsureSnapshot(task.BaseCloudTask):
     def execute(self, server_info):
         try:
             snapshot_id = self.cloud.servers.create_image(
@@ -56,7 +55,8 @@ def migrate_ephemeral_storage(src, dst, store, server_id):
                             name=snapshot_ensure,
                             provides=snapshot_ensure,
                             requires=[server_binding]))
-    flow.add(tasks.EnsureImage(src, dst,
-                               name=image_ensure,
-                               provides=image_ensure,
-                               requires=[snapshot_ensure]))
+    flow.add(image_tasks.EnsureImage(src, dst,
+                                     name=image_ensure,
+                                     provides=image_ensure,
+                                     requires=[snapshot_ensure]))
+    # FIXME(akscram): It looks like a broken factory.

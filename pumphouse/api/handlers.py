@@ -21,7 +21,8 @@ import flask
 
 from . import evacuation
 from . import hooks
-from pumphouse import flows
+from . import flows
+from .tasks import identity as identity_tasks
 
 
 LOG = logging.getLogger(__name__)
@@ -167,9 +168,9 @@ def migrate_tenant(tenant_id):
         src = hooks.source.connect()
         dst = hooks.destination.connect()
         store = {}
-        migrate_identity, store = flows.migrate_identity(src, dst, store,
-                                                         tenant_id)
-        result = flows.run_flow(migrate_identity, store)
+        identity_flow, store = identity_tasks.migrate_identity(src, dst, store,
+                                                               tenant_id)
+        result = flows.run_flow(identity_flow, store)
         LOG.info("Result of migration: %s", result)
     gevent.spawn(migrate)
     return flask.make_response()
