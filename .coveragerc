@@ -1,0 +1,7 @@
+[run]
+branch = True
+source = pumphouse
+omit = tests/*
+
+[report]
+ignore-errors = True
