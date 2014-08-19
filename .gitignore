@@ -4,3 +4,9 @@
 build
 .tox
 pumphouse/api/static
+
+#Coverage and tests
+.cache/
+.coverage
+.testrepository/
+htmlcov/
