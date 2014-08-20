@@ -2,10 +2,8 @@ import unittest
 from mock import Mock, patch
 
 from pumphouse.tasks import tenant
-import pumphouse.task
+from pumphouse.exceptions import keystone_excs
 from taskflow.patterns import linear_flow
-from keystoneclient.openstack.common.apiclient import (exceptions  # NOQA
-                                                       as keystone_excs)  # NOQA
 
 class TenantTestCase(unittest.TestCase):
     def setUp(self):
@@ -37,7 +35,7 @@ class TestEnsureTenant(TenantTestCase):
     def test_execute(self):
         ensure_tenant = tenant.EnsureTenant(self.cloud)
 
-        # Assures that no cloud.keystone.tenants.create method is called 
+        # Assures that no cloud.keystone.tenants.create method is not called 
         # if cloud.keystone.tenants.find does not raise Not Found exception
         # i.e. tenant is found by its name
         ensure_tenant.execute(self.tenant_info)
@@ -47,7 +45,7 @@ class TestEnsureTenant(TenantTestCase):
         # assures that cloud.keystone.tenants.create is called
         self.cloud.keystone.tenants.find.side_effect = keystone_excs.NotFound
         ensure_tenant.execute(self.tenant_info)
-        self.assertTrue(self.cloud.keystone.tenants.create.called)
+        self.cloud.keystone.tenants.create.assert_called_once_with("dummy", description="dummydummy", enabled=True)
 
 class TestMigrateTenant(TenantTestCase):
     
