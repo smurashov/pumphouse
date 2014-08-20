@@ -19,8 +19,14 @@ import logging
 from pumphouse import exceptions
 from pumphouse import management
 from pumphouse import utils
-from pumphouse import tasks
 from pumphouse import flows
+from pumphouse.tasks import server as server_tasks
+from pumphouse.tasks import image as image_tasks
+from pumphouse.tasks import flavor as flavor_tasks
+from pumphouse.tasks import tenant as tenant_tasks
+from pumphouse.tasks import user as user_tasks
+from pumphouse.tasks import role as role_tasks
+from pumphouse.tasks import secgroup as secgroup_tasks
 
 from taskflow.patterns import unordered_flow
 
@@ -127,14 +133,18 @@ def get_parser():
 def migrate_flavors(src, dst, flow, store, ids):
     for flavor in src.nova.flavors.list():
         if flavor.id in ids:
-            flow.add(tasks.migrate_flavor(src, dst, store, flavor.id))
+            flavor_flow, store = flavor_tasks.migrate_flavor(
+                src, dst, store, flavor.id)
+            flow.add(flavor_flow)
     return flow, store
 
 
 def migrate_images(src, dst, flow, store, ids):
     for image in src.glance.images.list():
         if image.id in ids:
-            flow.add(tasks.migrate_image(src, dst, store, image.id))
+            image_flow, store = image_tasks.migrate_image(
+                src, dst, store, image.id)
+            flow.add(image_flow)
     return flow, store
 
 
@@ -142,35 +152,47 @@ def migrate_servers(src, dst, flow, store, ids):
     search_opts = {"all_tenants": 1}
     for server in src.nova.servers.list(search_opts=search_opts):
         if server.id in ids:
-            flow.add(tasks.migrate_server(src, dst, store, server.id))
+            server_flow, store = server_tasks.migrate_server(
+                src, dst, store, server.id,
+                server["image"]["id"],
+                server["flavor"]["id"])
+            flow.add(server_flow)
     return flow, store
 
 
 def migrate_tenants(src, dst, flow, store, ids):
     for tenant in src.keystone.tenants.list():
         if tenant.id in ids:
-            flow.add(tasks.tenant.migrate_tenant(src, dst, store, tenant.id))
+            tenant_flow, store = tenant_tasks.migrate_tenant(
+                src, dst, store, tenant.id)
+            flow.add(tenant_flow)
     return flow, store
 
 
 def migrate_secgroups(src, dst, flow, store, ids):
     for sg in src.nova.security_groups.list():
         if sg.id in ids:
-            flow.add(tasks.migrate_secgroup(src, dst, store, sg.id))
+            sg_flow, store = secgroup_tasks.migrate_secgroup(
+                src, dst, store, sg.id)
+            flow.add(sg_flow)
     return flow, store
 
 
 def migrate_users(src, dst, flow, store, ids):
     for user in src.keystone.users.list():
         if user.id in ids:
-            flow.add(tasks.migrate_user(src, dst, store, user.id))
+            user_flow, store = user_tasks.migrate_user(
+                src, dst, store, user.id, user.tenantId)
+            flow.add(user_flow)
     return flow, store
 
 
 def migrate_roles(src, dst, flow, store, ids):
     for role in src.keystone.roles.list():
         if role.id in ids:
-            flow.add(tasks.migrate_role(src, dst, store, role.id))
+            role_flow, store = role_tasks.migrate_role(
+                src, dst, store, role.id)
+            flow.add(role_flow)
     return flow, store
 
 
@@ -324,7 +346,8 @@ def main():
             ids = get_ids_by_host(src, args.resource, args.host)
         else:
             ids = get_all_resource_ids(src, args.resource)
-        flows.run_flow(migrate_resources(src, dst, flow, store, ids), store)
+        resources_flow, store = migrate_resources(src, dst, flow, store, ids)
+        flows.run_flow(resources_flow, store)
     elif args.action == "cleanup":
         cloud_config = args.config[args.target]
         cloud = Cloud.from_dict(cloud_config.get("endpoint"),
