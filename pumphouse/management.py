@@ -253,23 +253,17 @@ def setup_server_floating_ip(cloud, server):
         raise exceptions.Error
     ip = ip_params[0]
     try:
-        floating_ip = cloud.nova.floating_ips.create(pool=pool)
-    except Exception as exc:
-        LOG.exception("Cannot create floating ip: %s", exc.message)
+        cloud.nova.servers.add_floating_ip(
+            server.id,
+            floating_ip.ip,
+            ip["addr"])
+    except nova_excs.NotFound:
+        LOG.exception("Floating IP not found: %s",
+                      floating_ip._info)
         raise
     else:
-        try:
-            cloud.nova.servers.add_floating_ip(
-                server.id,
-                floating_ip.ip,
-                ip["addr"])
-        except nova_excs.NotFound:
-            LOG.exception("Floating IP not found: %s",
-                          floating_ip._info)
-            raise
-        else:
-            server = cloud.nova.servers.get(server)
-            return server, floating_ip
+        server = cloud.nova.servers.get(server)
+        return server, floating_ip
 
 
 def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
@@ -363,7 +357,7 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
         for server_dict in tenant_dict["servers"]:
             server = setup_server(user_cloud, server_dict)
             LOG.info("Created server: %s", server._info)
-            server, floating_ip = setup_server_floating_ip(user_cloud,
+            server, floating_ip = setup_server_floating_ip(cloud,
                                                            server)
             LOG.info("Assigned floating ip %s to server: %s",
                      floating_ip._info,

@@ -308,7 +308,7 @@ def migrate_server(parameters, mapping, events, src, dst, id):
     def _associate_floating_ip((cloud, floating_ip, server, fixed_ip)):
         try:
             cloud.nova.servers.add_floating_ip(
-                server, floating_ip.ip, fixed_ip)
+                server, floating_ip.ip_range, fixed_ip)
         except nova_excs.BadRequest:
             return (cloud,
                     floating_ip,
@@ -385,11 +385,9 @@ def migrate_server(parameters, mapping, events, src, dst, id):
                         floating_ip_range = migrate_floating_ip(
                             mapping, events, src, dst,
                             floating_ip_dict["addr"])
-                        floating_ip1 = user_dst.nova.floating_ips.create(
-                            pool=floating_ip_range.pool)
                         LOG.info("Created: %s", floating_ip1._info)
                         floating_ip1 = utils.wait_for(
-                            (user_dst, floating_ip1, s1, fixed_ip),
+                            (dst, floating_ip_range, s1, fixed_ip),
                             _associate_floating_ip,
                             attribute_getter=_get_floating_ip_server,
                             value=s1.id,
