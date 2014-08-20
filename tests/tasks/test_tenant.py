@@ -55,6 +55,7 @@ class TestMigrateTenant(TenantTestCase):
     def test_migrate_tenant(self, mock_flow):
         mock_flow.return_value = self.dummy_id
         store = {}
+        
         (flow, store) = tenant.migrate_tenant(self.tenant, self.dst, store, self.dummy_id)
         # Assures linear_flow.Flow().add is called
         self.assertTrue(mock_flow.called)
