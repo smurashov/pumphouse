@@ -60,3 +60,4 @@ def migrate_ephemeral_storage(src, dst, store, server_id):
                                      provides=image_ensure,
                                      requires=[snapshot_ensure]))
     # FIXME(akscram): It looks like a broken factory.
+    return flow, store
