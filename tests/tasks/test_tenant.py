@@ -1,6 +1,7 @@
 import unittest
 from mock import Mock, patch
 
+from pumphouse import task
 from pumphouse.tasks import tenant
 from pumphouse.exceptions import keystone_excs
 from taskflow.patterns import linear_flow
@@ -28,15 +29,24 @@ class TenantTestCase(unittest.TestCase):
 
 class TestRetrieveTenant(TenantTestCase):
     def test_retrieve(self):
-        tenant.RetrieveTenant(self.cloud).retrieve(self.dummy_id)
+        retrieve_tenant = tenant.RetrieveTenant(self.cloud)
+        
+        # Asser tenant.RetrieveTenant is instance of task.BaseRetrieveTask
+        self.assertIsInstance(retrieve_tenant, task.BaseRetrieveTask)
+        
+        retrieve_tenant.retrieve(self.dummy_id)
+
         # Assures cloud.keystone.tenants.get method is called with
         # the parameter supplied
-        self.cloud.keystone.tenants.get.assert_called_with(self.dummy_id)
+        self.cloud.keystone.tenants.get.assert_called_once_with(self.dummy_id)
 
 
 class TestEnsureTenant(TenantTestCase):
     def test_execute(self):
         ensure_tenant = tenant.EnsureTenant(self.cloud)
+
+        # Assures tenant.EnsureTenant is instance of task.BaseCloudTask
+        self.assertIsInstance(ensure_tenant, task.BaseCloudTask)
 
         # Assures that no cloud.keystone.tenants.create method is not called
         # if cloud.keystone.tenants.find does not raise Not Found exception
@@ -52,7 +62,10 @@ class TestEnsureTenant(TenantTestCase):
         self.cloud.keystone.tenants.find.side_effect = keystone_excs.NotFound
         ensure_tenant.execute(self.tenant_info)
         self.cloud.keystone.tenants.create.assert_called_once_with(
-            "dummy", description="dummydummy", enabled=True)
+            "dummy", 
+            description="dummydummy", 
+            enabled=True
+        )
 
 
 class TestMigrateTenant(TenantTestCase):
@@ -66,7 +79,8 @@ class TestMigrateTenant(TenantTestCase):
             self.tenant,
             self.dst,
             store,
-            self.dummy_id)
+            self.dummy_id
+        )
         # Assures linear_flow.Flow().add is called
         self.assertTrue(mock_flow.called)
 

@@ -1,6 +1,7 @@
 import unittest
 from mock import Mock, patch
 
+from pumphouse import task
 from pumphouse.tasks import role
 from pumphouse.exceptions import keystone_excs
 from taskflow.patterns import linear_flow
@@ -26,16 +27,24 @@ class TestRoleCase(unittest.TestCase):
 
 class TestRetrieveRole(TestRoleCase):
     def test_retrieve(self):
-        role.RetrieveRole(self.cloud).retrieve(self.dummy_id)
+        retrieve_role = role.RetrieveRole(self.cloud)
+
+        # Assures this is the instance of task.BaseRetrieveTask
+        self.assertIsInstance(retrieve_role, task.BaseRetrieveTask)
+
+        retrieve_role.retrieve(self.dummy_id)
 
         # Assures that cloud.keystone.roles.get is called with the same id
         # that was passed to retrieve method
-        self.cloud.keystone.roles.get.assert_called_with(self.dummy_id)
+        self.cloud.keystone.roles.get.assert_called_once_with(self.dummy_id)
 
 
 class TestEnsureRole(TestRoleCase):
     def test_execute(self):
         ensure_role = role.EnsureRole(self.cloud)
+
+        # Assures this is the instance of task.BaseRetrieveTask
+        self.assertIsInstance(ensure_role, task.BaseCloudTask)
 
         # Assures that no cloud.keystone.roles.create method is not called
         # if cloud.keystone.roles.find does not raise Not Found exception
@@ -63,7 +72,8 @@ class TestMigrateRole(TestRoleCase):
             self.role,
             self.dst,
             store,
-            self.dummy_id)
+            self.dummy_id
+        )
         # Assures linear_flow.Flow().add is called
         self.assertTrue(mock_flow.called)
 
