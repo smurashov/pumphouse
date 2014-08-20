@@ -35,6 +35,9 @@ class AttrDict(dict):
         self._info = self
         self.manager = manager
 
+    def to_dict(self):
+        return self.copy()
+
 
 class TenantAttrDict(AttrDict):
     def list_users(self):
