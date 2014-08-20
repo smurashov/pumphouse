@@ -22,7 +22,7 @@ from pumphouse import utils
 from pumphouse import tasks
 from pumphouse import flows
 
-from taskflow import unordered_flow
+from taskflow.patterns import unordered_flow
 
 
 LOG = logging.getLogger(__name__)
@@ -324,7 +324,7 @@ def main():
             ids = get_ids_by_host(src, args.resource, args.host)
         else:
             ids = get_all_resource_ids(src, args.resource)
-        flows.run_flow(migrate_resources(src, dst, flow, store, ids))
+        flows.run_flow(migrate_resources(src, dst, flow, store, ids), store)
     elif args.action == "cleanup":
         cloud_config = args.config[args.target]
         cloud = Cloud.from_dict(cloud_config.get("endpoint"),
