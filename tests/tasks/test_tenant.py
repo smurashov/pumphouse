@@ -41,6 +41,9 @@ class TestEnsureTenant(TenantTestCase):
         ensure_tenant.execute(self.tenant_info)
         self.assertFalse(self.cloud.keystone.tenants.create.called)
 
+    def test_execute_not_found(self):
+        ensure_tenant = tenant.EnsureTenant(self.cloud)
+
         # In case if Not Found exception is raised by ...find call 
         # assures that cloud.keystone.tenants.create is called
         self.cloud.keystone.tenants.find.side_effect = keystone_excs.NotFound

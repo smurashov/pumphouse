@@ -40,6 +40,9 @@ class TestEnsureRole(TestRoleCase):
         ensure_role.execute(self.role_info)
         self.assertFalse(self.cloud.keystone.roles.create.called)
 
+    def test_execute_not_found(self):
+        ensure_role = role.EnsureRole(self.cloud)
+
         # In case if Not Found exception is raised by ...find call 
         # assures that cloud.keystone.roles.create is called
         self.cloud.keystone.roles.find.side_effect = keystone_excs.NotFound
