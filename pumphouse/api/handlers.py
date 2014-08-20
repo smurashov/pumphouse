@@ -164,7 +164,8 @@ def resources():
 def migrate_tenant(tenant_id):
     @flask.copy_current_request_context
     def migrate():
-        parameters = flask.current_app.config.get("PARAMETERS")
+        # FIXME(akscram): The params don't support yet.
+        # parameters = flask.current_app.config.get("PARAMETERS")
         src = hooks.source.connect()
         dst = hooks.destination.connect()
         store = {}
