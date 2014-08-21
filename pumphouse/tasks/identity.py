@@ -46,15 +46,18 @@ def migrate_passwords(src, dst, store, users_ids):
 
 def migrate_identity(src, dst, store, tenant_id):
     flow = graph_flow.Flow("identity-{}".format(tenant_id))
-    tenant_flow, store = tenant_tasks.migrate_tenant(src, dst, store,
-                                                     tenant_id)
-    flow.add(tenant_flow)
+    tenant_retrieve = "tenant-{}-retrieve".format(tenant_id)
+    if tenant_retrieve not in store:
+        tenant_flow, store = tenant_tasks.migrate_tenant(src, dst, store,
+                                                         tenant_id)
+        flow.add(tenant_flow)
     users_ids, roles_ids = set(), set()
     # XXX(akscram): Due to the bug #1308218 users duplication can be here.
     for user in src.keystone.users.list(tenant_id):
-        if user.id in users_ids:
+        user_retrieve = "user-{}-retrieve".format(user.id)
+        if user.id in users_ids or user_retrieve in store:
             continue
-        user_tenant_id = getattr(user, "tenantId", None)
+        user_tenant_id = getattr(user, "tenantId", tenant_id)
         user_flow, store = user_tasks.migrate_user(src, dst, store, user.id,
                                                    tenant_id=user_tenant_id)
         flow.add(user_flow)
@@ -64,16 +67,24 @@ def migrate_identity(src, dst, store, tenant_id):
             #                underscore are hidden.
             if role.name.startswith("_"):
                 continue
+            roles_ids.add(role.id)
+            user_role_ensure = "user-role-{}-{}-{}-ensure".format(user.id,
+                                                                  role.id,
+                                                                  tenant_id)
+            if user_role_ensure in store:
+                continue
             membership_flow, store = user_tasks.migrate_membership(src, dst,
                                                                    store,
                                                                    user.id,
                                                                    role.id,
                                                                    tenant_id)
             flow.add(membership_flow)
-            roles_ids.add(role.id)
     for role_id in roles_ids:
-        role_flow, store = role_tasks.migrate_role(src, dst, store, role_id)
-        flow.add(role_flow)
+        role_retrieve = "role-{}-retrieve".format(role_id)
+        if role_retrieve not in store:
+            role_flow, store = role_tasks.migrate_role(src, dst, store,
+                                                       role_id)
+            flow.add(role_flow)
     # TODO(akcram): All users' passwords should be restored when all
     #               migration operations ended.
     users_passwords_flow, store = migrate_passwords(src, dst, store, users_ids)
