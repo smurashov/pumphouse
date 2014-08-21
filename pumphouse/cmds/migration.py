@@ -26,7 +26,6 @@ from pumphouse.tasks import flavor as flavor_tasks
 from pumphouse.tasks import tenant as tenant_tasks
 from pumphouse.tasks import user as user_tasks
 from pumphouse.tasks import role as role_tasks
-from pumphouse.tasks import secgroup as secgroup_tasks
 from pumphouse.tasks import identity as identity_tasks
 
 from taskflow.patterns import unordered_flow
@@ -170,15 +169,6 @@ def migrate_tenants(src, dst, flow, store, ids):
     return flow, store
 
 
-def migrate_secgroups(src, dst, flow, store, ids):
-    for sg in src.nova.security_groups.list():
-        if sg.id in ids:
-            sg_flow, store = secgroup_tasks.migrate_secgroup(
-                src, dst, store, sg.id)
-            flow.add(sg_flow)
-    return flow, store
-
-
 def migrate_users(src, dst, flow, store, ids):
     for user in src.keystone.users.list():
         if user.id in ids:
@@ -305,8 +295,6 @@ def get_all_resource_ids(cloud, resource_type):
                cloud.nova.servers.list(search_opts={'all-tenants': 1})]
     elif resource_type == 'flavors':
         ids = [flavor.id for flavor in cloud.nova.flavors.list()]
-    elif resource_type == 'security_groups':
-        ids = [secgroup.id for secgroup in cloud.nova.security_groups.list()]
     return ids
 
 
@@ -316,7 +304,6 @@ RESOURCES_MIGRATIONS = collections.OrderedDict([
     ("images", migrate_images),
     ("flavors", migrate_flavors),
     ("servers", migrate_servers),
-    ("security_groups", migrate_secgroups),
     ("roles", migrate_roles),
     ("identity", migrate_identity),
 ])
