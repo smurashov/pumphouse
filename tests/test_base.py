@@ -114,6 +114,16 @@ class TestService(TestBase):
                                            2,
                                            2)
 
+    @patch("pumphouse.management.cleanup")
+    @patch("pumphouse.management.setup")
+    def test_reset_without_configs(self, mock_setup, mock_cleanup):
+        self.service.workloads_config = None
+        self.service.populate_config = None
+        self.service.reset(self.events, self.cloud)
+
+        # Case when none of workloads_config or populate_config are dicts
+        self.assertFalse(mock_setup.called)
+
 
 if __name__ == '__main__':
     unittest.main()
