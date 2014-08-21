@@ -59,7 +59,7 @@ class Resource(object):
         self.tenant_id = self._get_tenant_id(self.cloud.namespace.tenant_name)
 
     def list(self, search_opts=None, filters=None, tenant_id=None,
-             project_id=None):
+             project_id=None, instance_uuid=None):
         for obj in self._iterate_values():
             self._update_status(obj)
         return self.objects.values()
