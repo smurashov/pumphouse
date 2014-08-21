@@ -64,8 +64,8 @@ class TestEnsureTenant(TenantTestCase):
         self.cloud.keystone.tenants.find.side_effect = keystone_excs.NotFound
         ensure_tenant.execute(self.tenant_info)
         self.cloud.keystone.tenants.create.assert_called_once_with(
-            "dummy", 
-            description="dummydummy", 
+            "dummy",
+            description="dummydummy",
             enabled=True
         )
 
