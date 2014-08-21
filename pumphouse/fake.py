@@ -514,6 +514,10 @@ class User(KeystoneResource):
         self.objects[user.id] = user
         return user
 
+    def list_roles(self, id, tenant=None):
+        user = self.objects[id]
+        return user['roles']
+
 
 class Role(KeystoneResource):
     def create(self, name):
