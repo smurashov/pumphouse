@@ -1,4 +1,3 @@
-import mock
 import unittest
 
 from pumphouse.exceptions import nova_excs

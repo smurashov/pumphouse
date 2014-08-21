@@ -2,7 +2,6 @@ import unittest
 from mock import patch, Mock
 
 from pumphouse import base
-from pumphouse import management
 
 
 class TestBase(unittest.TestCase):
@@ -105,7 +104,7 @@ class TestService(TestBase):
     def test_reset_with_populate_default(self, mock_setup, mock_cleanup):
         self.service.workloads_config = None
         self.service.populate_config = {}
-        cloud = self.service.reset(self.events, self.cloud)
+        self.service.reset(self.events, self.cloud)
 
         # Assuring that if there are no num_servers and num_tenants present
         # in populate_config default values are used
