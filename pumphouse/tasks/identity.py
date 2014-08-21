@@ -54,8 +54,9 @@ def migrate_identity(src, dst, store, tenant_id):
     for user in src.keystone.users.list(tenant_id):
         if user.id in users_ids:
             continue
+        user_tenant_id = getattr(user, "tenantId", None)
         user_flow, store = user_tasks.migrate_user(src, dst, store, user.id,
-                                                   tenant_id)
+                                                   tenant_id=user_tenant_id)
         flow.add(user_flow)
         users_ids.add(user.id)
         for role in src.keystone.users.list_roles(user.id, tenant=tenant_id):

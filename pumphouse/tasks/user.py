@@ -45,9 +45,7 @@ class EnsureUser(task.BaseCloudTask):
                 #                original after all operations.
                 password="default",
                 email=user_info["email"],
-                # TODO(akscram): Members of the tenant can be from
-                #                another tenant.
-                tenant_id=tenant_info["id"],
+                tenant_id=user_info.get("tenantId"),
                 enabled=user_info["enabled"],
             )
             LOG.info("Created user: %s", user)
@@ -77,25 +75,29 @@ def migrate_membership(src, dst, store, user_id, role_id, tenant_id):
     task = EnsureUserRole(dst,
                           name=user_role_ensure,
                           provides=user_role_ensure,
-                          rebind=[user_ensure, role_ensure,
-                                  tenant_ensure])
+                          requires=[user_ensure, role_ensure,
+                                    tenant_ensure])
+    store[user_role_ensure] = user_role_ensure
     return (task, store)
 
 
-def migrate_user(src, dst, store, user_id, tenant_id):
+def migrate_user(src, dst, store, user_id, tenant_id=None):
     user_binding = "user-{}".format(user_id)
     user_retrieve = "{}-retrieve".format(user_binding)
     user_ensure = "{}-ensure".format(user_binding)
-    tenant_ensure = "tenant-{}-ensure".format(tenant_id)
+    user_ensure_requires = [user_binding]
+    if tenant_id is not None:
+        tenant_ensure = "tenant-{}-ensure".format(tenant_id)
+        user_ensure_requires.append(tenant_ensure)
     flow = linear_flow.Flow("migrate-user-{}".format(user_id)).add(
         RetrieveUser(src,
                      name=user_retrieve,
                      provides=user_binding,
-                     rebind=[user_retrieve]),
+                     requires=[user_retrieve]),
         EnsureUser(dst,
                    name=user_ensure,
                    provides=user_ensure,
-                   rebind=[user_binding, tenant_ensure]),
+                   requires=user_ensure_requires),
     )
     store[user_retrieve] = user_id
     return (flow, store)
