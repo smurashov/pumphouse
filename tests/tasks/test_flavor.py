@@ -35,14 +35,9 @@ class TestFlavor(unittest.TestCase):
 class TestRetrieveFlavor(TestFlavor):
     def test_execute(self):
         retrieve_flavor = flavor.RetrieveFlavor(self.cloud)
-
-        # Assures this is the instance of task.BaseRetrieveTask
         self.assertIsInstance(retrieve_flavor, task.BaseCloudTask)
 
         retrieve_flavor.execute(self.dummy_id)
-
-        # Assures that cloud.nova.flavors.get is called with the same id
-        # that was passed to retrieve method
         self.cloud.nova.flavors.get.assert_called_once_with(self.dummy_id)
 
 
@@ -50,12 +45,8 @@ class TestEnsureFlavor(TestFlavor):
     def test_execute(self):
         ensure_flavor = flavor.EnsureFlavor(self.cloud)
 
-        # Assures this is the instance of task.BaseCloudTask
         self.assertIsInstance(ensure_flavor, task.BaseCloudTask)
 
-        # Assures that no cloud.nova.flavors.create method is not called
-        # if cloud.nova.flavors.get does not raise Not Found exception
-        # i.e. flavor is found by its name
         ensure_flavor.execute(self.flavor_info)
         self.assertFalse(self.cloud.nova.flavors.create.called)
 

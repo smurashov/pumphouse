@@ -24,7 +24,7 @@ LOG = logging.getLogger(__name__)
 
 
 class RetrieveImage(task.BaseCloudTask):
-    def retrieve(self, image_id):
+    def execute(self, image_id):
         image = self.cloud.glance.images.get(image_id)
         return image.to_dict()
 
@@ -54,10 +54,10 @@ def migrate_ephemeral_storage(src, dst, store, server_id):
     flow.add(EnsureSnapshot(src,
                             name=snapshot_ensure,
                             provides=snapshot_ensure,
-                            requires=[server_binding]))
+                            rebind=[server_binding]))
     flow.add(image_tasks.EnsureImage(src, dst,
                                      name=image_ensure,
                                      provides=image_ensure,
-                                     requires=[snapshot_ensure]))
+                                     rebind=[snapshot_ensure]))
     # FIXME(akscram): It looks like a broken factory.
     return flow, store
