@@ -9,9 +9,9 @@ from taskflow.patterns import linear_flow
 
 class TestRoleCase(unittest.TestCase):
     def setUp(self):
-        self.dummy_id = '123'
+        self.dummy_id = "123"
         self.role_info = {
-            'name': 'dummy'
+            "name": "dummy"
         }
 
         self.role = Mock()
@@ -43,7 +43,7 @@ class TestEnsureRole(TestRoleCase):
     def test_execute(self):
         ensure_role = role.EnsureRole(self.cloud)
 
-        # Assures this is the instance of task.BaseRetrieveTask
+        # Assures this is the instance of task.BaseCloudTask
         self.assertIsInstance(ensure_role, task.BaseCloudTask)
 
         # Assures that no cloud.keystone.roles.create method is not called
@@ -59,11 +59,13 @@ class TestEnsureRole(TestRoleCase):
         # assures that cloud.keystone.roles.create is called
         self.cloud.keystone.roles.find.side_effect = keystone_excs.NotFound
         ensure_role.execute(self.role_info)
-        self.cloud.keystone.roles.create.assert_called_once_with(name="dummy")
+        self.cloud.keystone.roles.create.assert_called_once_with(
+            name=self.role_info["name"]
+        )
 
 
 class TestMigrateRole(TestRoleCase):
-    @patch.object(linear_flow.Flow, 'add')
+    @patch.object(linear_flow.Flow, "add")
     def test_migrate_role(self, mock_flow):
         mock_flow.return_value = self.dummy_id
         store = {}
@@ -81,5 +83,5 @@ class TestMigrateRole(TestRoleCase):
         self.assertNotEqual({}, store)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

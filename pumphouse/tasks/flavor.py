@@ -23,10 +23,10 @@ from pumphouse import task
 LOG = logging.getLogger(__name__)
 
 
-class RetrieveFlavor(task.BaseCloudTask):
-    def execute(self, flavor_id):
+class RetrieveFlavor(task.BaseRetrieveTask):
+    def retrieve(self, flavor_id):
         flavor = self.cloud.nova.flavors.get(flavor_id)
-        return flavor.to_dict()
+        return flavor
 
 
 class EnsureFlavor(task.BaseCloudTask):
@@ -45,7 +45,7 @@ class EnsureFlavor(task.BaseCloudTask):
                 ephemeral=flavor_info["ephemeral"],
                 swap=flavor_info["swap"] or 0,
                 rxtx_factor=flavor_info["rxtx_factor"],
-                is_public=flavor_info["is_public"],
+                is_public=flavor_info["is_public"]
             )
         return flavor.to_dict()
 
@@ -58,11 +58,11 @@ def migrate_flavor(src, dst, store, flavor_id):
         RetrieveFlavor(src,
                        name=flavor_retrieve,
                        provides=flavor_binding,
-                       requires=[flavor_retrieve]),
+                       rebind=[flavor_retrieve]),
         EnsureFlavor(dst,
                      name=flavor_ensure,
                      provides=flavor_ensure,
-                     requires=[flavor_binding]),
+                     rebind=[flavor_binding])
     )
     store[flavor_retrieve] = flavor_id
-    return flow
+    return (flow, store)
