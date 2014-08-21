@@ -26,16 +26,3 @@ class BaseCloudsTask(task.Task):
         super(BaseCloudsTask, self).__init__(*args, **kwargs)
         self.src_cloud = src_cloud
         self.dst_cloud = dst_cloud
-
-
-class BaseRetrieveTask(BaseCloudTask):
-    def execute(self, obj_id):
-        obj = self.retrieve(obj_id)
-        serialized_obj = self.serialize(obj)
-        return serialized_obj
-
-    def retrieve(self, obj_id):
-        raise NotImplementedError()
-
-    def serialize(self, obj):
-        return obj.to_dict()

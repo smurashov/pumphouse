@@ -15,28 +15,28 @@ class TestRoleCase(unittest.TestCase):
         }
 
         self.role = Mock()
-        self.role.to_dict.return_value = {}
+        self.role.to_dict.return_value = dict(self.role_info,
+                                              id=self.dummy_id)
 
         self.dst = Mock()
 
         self.cloud = Mock()
-        self.cloud.keystone.roles.get.return_value = self.dummy_id
+        self.cloud.keystone.roles.get.return_value = self.role
         self.cloud.keystone.roles.find.return_value = self.role
         self.cloud.keystone.roles.create.return_value = self.role
 
 
 class TestRetrieveRole(TestRoleCase):
+    def test_retrieve_is_task(self):
+        retrieve_role = role.RetrieveRole(self.cloud)
+        self.assertIsInstance(retrieve_role, task.BaseCloudTask)
+
     def test_retrieve(self):
         retrieve_role = role.RetrieveRole(self.cloud)
-
-        # Assures this is the instance of task.BaseRetrieveTask
-        self.assertIsInstance(retrieve_role, task.BaseRetrieveTask)
-
-        retrieve_role.retrieve(self.dummy_id)
-
-        # Assures that cloud.keystone.roles.get is called with the same id
-        # that was passed to retrieve method
+        role_info = retrieve_role.execute(self.dummy_id)
         self.cloud.keystone.roles.get.assert_called_once_with(self.dummy_id)
+        self.assertEqual("123", role_info["id"])
+        self.assertEqual("dummy", role_info["name"])
 
 
 class TestEnsureRole(TestRoleCase):

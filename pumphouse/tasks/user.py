@@ -23,11 +23,11 @@ from pumphouse import task
 LOG = logging.getLogger(__name__)
 
 
-class RetrieveUser(task.BaseRetrieveTask):
-    def retrieve(self, user_id):
+class RetrieveUser(task.BaseCloudTask):
+    def execute(self, user_id):
         user = self.cloud.keystone.users.get(user_id)
         self.cloud.identity.fetch(user.id)
-        return user
+        return user.to_dict()
 
 
 class EnsureUser(task.BaseCloudTask):

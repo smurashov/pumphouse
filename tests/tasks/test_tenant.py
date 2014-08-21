@@ -17,28 +17,30 @@ class TenantTestCase(unittest.TestCase):
         }
 
         self.tenant = Mock()
-        self.tenant.to_dict.return_value = {}
+        self.tenant.to_dict.return_value = dict(self.tenant_info,
+                                                id=self.dummy_id)
 
         self.dst = Mock()
 
         self.cloud = Mock()
-        self.cloud.keystone.tenants.get.return_value = self.dummy_id
+        self.cloud.keystone.tenants.get.return_value = self.tenant
         self.cloud.keystone.tenants.find.return_value = self.tenant
         self.cloud.keystone.tenants.create.return_value = self.tenant
 
 
 class TestRetrieveTenant(TenantTestCase):
+    def test_retrieve_is_task(self):
+        retrieve_tenant = tenant.RetrieveTenant(self.cloud)
+        self.assertIsInstance(retrieve_tenant, task.BaseCloudTask)
+
     def test_retrieve(self):
         retrieve_tenant = tenant.RetrieveTenant(self.cloud)
-        
-        # Asser tenant.RetrieveTenant is instance of task.BaseRetrieveTask
-        self.assertIsInstance(retrieve_tenant, task.BaseRetrieveTask)
-        
-        retrieve_tenant.retrieve(self.dummy_id)
-
-        # Assures cloud.keystone.tenants.get method is called with
-        # the parameter supplied
+        tenant_info = retrieve_tenant.execute(self.dummy_id)
         self.cloud.keystone.tenants.get.assert_called_once_with(self.dummy_id)
+        self.assertEqual("123", tenant_info["id"])
+        self.assertEqual("dummy", tenant_info["name"])
+        self.assertEqual("dummydummy", tenant_info["description"])
+        self.assertEqual(True, tenant_info["enabled"])
 
 
 class TestEnsureTenant(TenantTestCase):

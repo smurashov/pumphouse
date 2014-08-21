@@ -23,10 +23,10 @@ from pumphouse import task
 LOG = logging.getLogger(__name__)
 
 
-class RetrieveTenant(task.BaseRetrieveTask):
-    def retrieve(self, tenant_id):
+class RetrieveTenant(task.BaseCloudTask):
+    def execute(self, tenant_id):
         tenant = self.cloud.keystone.tenants.get(tenant_id)
-        return tenant
+        return tenant.to_dict()
 
 
 class EnsureTenant(task.BaseCloudTask):

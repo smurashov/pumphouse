@@ -23,8 +23,8 @@ from pumphouse import exceptions
 LOG = logging.getLogger(__name__)
 
 
-class RetrieveFloatingIP(tasks.BaseRetrieveTask):
-    def retrieve(self, address):
+class RetrieveFloatingIP(tasks.BaseCloudTask):
+    def execute(self, address):
         floating_ip = self.cloud.nova.floating_ips_bulk.find(address=address)
         return floating_ip.to_dict()
 

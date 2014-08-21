@@ -23,10 +23,10 @@ from pumphouse import task
 LOG = logging.getLogger(__name__)
 
 
-class RetrieveRole(task.BaseRetrieveTask):
-    def retrieve(self, role_id):
+class RetrieveRole(task.BaseCloudTask):
+    def execute(self, role_id):
         role = self.cloud.keystone.roles.get(role_id)
-        return role
+        return role.to_dict()
 
 
 class EnsureRole(task.BaseCloudTask):
