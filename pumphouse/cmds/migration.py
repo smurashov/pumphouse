@@ -27,6 +27,7 @@ from pumphouse.tasks import tenant as tenant_tasks
 from pumphouse.tasks import user as user_tasks
 from pumphouse.tasks import role as role_tasks
 from pumphouse.tasks import secgroup as secgroup_tasks
+from pumphouse.tasks import identity as identity_tasks
 
 from taskflow.patterns import unordered_flow
 
@@ -196,6 +197,14 @@ def migrate_roles(src, dst, flow, store, ids):
     return flow, store
 
 
+def migrate_identity(src, dst, flow, store, ids):
+    for tenant_id in ids:
+        identity_flow, store = identity_tasks.migrate_identity(
+            src, dst, store, tenant_id)
+        flow.add(identity_flow)
+    return flow, store
+
+
 def evacuate(cloud, host):
     binary = "nova-compute"
     try:
@@ -282,7 +291,7 @@ def get_all_resource_ids(cloud, resource_type):
     '''
 
     ids = []
-    if resource_type == 'tenants':
+    if resource_type == 'tenants' or resource_type == 'identity':
         ids = [tenant.id for tenant in cloud.keystone.tenants.list()]
     elif resource_type == 'roles':
         ids = [role.id for role in cloud.keystone.roles.list()]
@@ -309,6 +318,7 @@ RESOURCES_MIGRATIONS = collections.OrderedDict([
     ("servers", migrate_servers),
     ("security_groups", migrate_secgroups),
     ("roles", migrate_roles),
+    ("identity", migrate_identity),
 ])
 
 
