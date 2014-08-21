@@ -23,10 +23,10 @@ from pumphouse import task
 LOG = logging.getLogger(__name__)
 
 
-class RetrieveFlavor(task.BaseRetrieveTask):
-    def retrieve(self, flavor_id):
+class RetrieveFlavor(task.BaseCloudTask):
+    def execute(self, flavor_id):
         flavor = self.cloud.nova.flavors.get(flavor_id)
-        return flavor
+        return flavor.to_dict()
 
 
 class EnsureFlavor(task.BaseCloudTask):
