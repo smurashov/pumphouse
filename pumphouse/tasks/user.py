@@ -75,29 +75,26 @@ def migrate_membership(src, dst, store, user_id, role_id, tenant_id):
     task = EnsureUserRole(dst,
                           name=user_role_ensure,
                           provides=user_role_ensure,
-                          requires=[user_ensure, role_ensure,
-                                    tenant_ensure])
+                          rebind=[user_ensure, role_ensure,
+                                  tenant_ensure])
     store[user_role_ensure] = user_role_ensure
     return (task, store)
 
 
-def migrate_user(src, dst, store, user_id, tenant_id=None):
+def migrate_user(src, dst, store, user_id, tenant_id):
     user_binding = "user-{}".format(user_id)
     user_retrieve = "{}-retrieve".format(user_binding)
     user_ensure = "{}-ensure".format(user_binding)
-    user_ensure_requires = [user_binding]
-    if tenant_id is not None:
-        tenant_ensure = "tenant-{}-ensure".format(tenant_id)
-        user_ensure_requires.append(tenant_ensure)
+    tenant_ensure = "tenant-{}-ensure".format(tenant_id)
     flow = linear_flow.Flow("migrate-user-{}".format(user_id)).add(
         RetrieveUser(src,
                      name=user_retrieve,
                      provides=user_binding,
-                     requires=[user_retrieve]),
+                     rebind=[user_retrieve]),
         EnsureUser(dst,
                    name=user_ensure,
                    provides=user_ensure,
-                   requires=user_ensure_requires),
+                   rebind=[user_binding, tenant_ensure]),
     )
     store[user_retrieve] = user_id
     return (flow, store)
