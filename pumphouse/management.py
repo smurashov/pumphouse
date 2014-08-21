@@ -252,10 +252,12 @@ def setup_server_floating_ip(cloud, server):
         LOG.exception("Invalid network name, exiting")
         raise exceptions.Error
     ip = ip_params[0]
+    floating_ips = cloud.nova.floating_ips_bulk.findall(instance_uuid=None)
+    floating_ip = floating_ips[0]
     try:
         cloud.nova.servers.add_floating_ip(
             server.id,
-            floating_ip.ip,
+            floating_ip.address,
             ip["addr"])
     except nova_excs.NotFound:
         LOG.exception("Floating IP not found: %s",
