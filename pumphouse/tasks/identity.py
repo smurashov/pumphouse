@@ -41,8 +41,8 @@ def migrate_passwords(src, dst, store, users_ids, tenant_id):
     users_ensure = ["user-{}-ensure".format(user_id) for user_id in users_ids]
     passwords_repair = "repair-{}".format(tenant_id)
     task = RepairUsersPasswords(src, dst,
-                                 name=passwords_repair,
-                                 requires=users_ensure)
+                                name=passwords_repair,
+                                requires=users_ensure)
     return (task, store)
 
 
