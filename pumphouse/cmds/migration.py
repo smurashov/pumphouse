@@ -28,7 +28,7 @@ from pumphouse.tasks import user as user_tasks
 from pumphouse.tasks import role as role_tasks
 from pumphouse.tasks import identity as identity_tasks
 
-from taskflow.patterns import unordered_flow
+from taskflow.patterns import graph_flow
 
 
 LOG = logging.getLogger(__name__)
@@ -330,7 +330,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     events = Events()
-    flow = unordered_flow.Flow("migrate-resources")
+    flow = graph_flow.Flow("migrate-resources")
     Cloud, Identity = load_cloud_driver(is_fake=args.fake)
     if args.action == "migrate":
         store = {}
