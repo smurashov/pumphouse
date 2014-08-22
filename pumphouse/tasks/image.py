@@ -51,6 +51,7 @@ class EnsureImage(task.BaseCloudsTask):
             # TODO(akscram): Some image can contain additional
             #                parameters which are skipped now.
             image = self.dst_cloud.glance.images.create(**parameters)
+            LOG.info("Image created: %s", image["id"])
             # TODO(akscram): Chunked request is preferred. So in the
             #                future we can control this for generating
             #                the progress of the upload by a custom
@@ -58,6 +59,7 @@ class EnsureImage(task.BaseCloudsTask):
             data = self.src_cloud.glance.images.data(image_info["id"])
             self.dst_cloud.glance.images.upload(image["id"], data._resp)
             image = self.dst_cloud.glance.images.get(image["id"])
+            LOG.info("Image uploaded: %s", image["id"])
         return dict(image)
 
 

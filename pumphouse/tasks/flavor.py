@@ -47,6 +47,7 @@ class EnsureFlavor(task.BaseCloudTask):
                 rxtx_factor=flavor_info["rxtx_factor"],
                 is_public=flavor_info["os-flavor-access:is_public"]
             )
+            LOG.info("Flavor created: %s", flavor.id)
         return flavor.to_dict()
 
 

@@ -34,12 +34,14 @@ class SuspendServer(task.BaseCloudTask):
         self.cloud.nova.servers.suspend(server_info)
         server = utils.wait_for(server_info, self.cloud.nova.servers.get,
                                 value="SUSPENDED")
+        LOG.info("Server suspended: %s", server_info["id"])
         return server.to_dict()
 
     def revert(self, server_info, result, flow_failures):
         self.cloud.nova.servers.resume(server_info)
         server = utils.wait_for(server_info, self.cloud.nova.servers.get,
                                 value="ACTIVE")
+        LOG.info("Server resumed: %s", server_info["id"])
         return server.to_dict()
 
 
@@ -51,12 +53,14 @@ class BootServerFromImage(task.BaseCloudTask):
                                                 flavor_info["id"])
         server = utils.wait_for(server, self.cloud.nova.servers.get,
                                 value="ACTIVE")
+        LOG.info("Server spawned: %s", server_info["id"])
         return server.to_dict()
 
 
 class TerminateServer(task.BaseCloudTask):
     def execute(self, server_info):
         self.cloud.nova.servers.delete(server_info)
+        LOG.info("Server terminated: %s", server_info["id"])
 
 
 def migrate_server(src, dst, store, server_id, image_id, flavor_id):
