@@ -1,7 +1,7 @@
 import unittest
 
 from pumphouse import cloud
-from mock import patch, Mock
+from mock import patch, Mock, MagicMock
 from keystoneclient.v2_0 import client as keystone_client
 import sqlalchemy as sqla
 
@@ -39,16 +39,21 @@ class IdentityTestCase(unittest.TestCase):
 
     def setUp(self):
         with patch.object(sqla, 'create_engine') as mock:
-            mock.create_engine.return_value = True
-            self.identity = cloud.Identity(None);
+            fakeEngine = MagicMock()
+            fakeEngine.execute.return_value =  [(None, "passw0rd")];
+
+
+            mock.create_engine.return_value = fakeEngine
+            self.identity = cloud.Identity(None)
+
+            self.identity.engine = fakeEngine
+
 
     def testInit(self):
         self.assertIsInstance(self.identity, cloud.Identity)
 
-#    @patch.object(self.engine, 'execute')
-#    def testFetch(self, mock_path):
-#        mock_path.execute.return_value = "passw0rd"
-#        self.assertIsEq(self.identity.fetch("foobar", "passw0rd"))
+    def testFetch(self):
+        self.assertTrue(self.identity.fetch("foobar") == "passw0rd")
 
 
 
