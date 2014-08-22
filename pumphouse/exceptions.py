@@ -32,6 +32,10 @@ class PluginAlreadyRegisterError(PluginError):
     pass
 
 
+class PluginNotFoundError(PluginError):
+    pass
+
+
 class PluginFuncError(PluginError):
     def __init__(self, target, name, *args, **kwargs):
         super(PluginFuncError, self).__init__(target, *args, **kwargs)

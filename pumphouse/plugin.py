@@ -15,6 +15,40 @@
 from pumphouse import exceptions
 
 
+class Registry(object):
+    """Registry of plugins."""
+
+    def __init__(self):
+        self.plugins = {}
+
+    def register(self, target):
+        """Register a plugin by the target.
+
+        :param target: a string with name of the plugin
+        :returns: an instance of :class:`Plugin`
+        :raises: :class:`exceptions.PluginAlreadyRegisterError`
+                    if the plugin with the given target already
+                    registered.
+        """
+        if target in self.plugins:
+            raise exceptions.PluginAlreadyRegisterError(target=target)
+        self.plugins[target] = plugin = Plugin(target)
+        return plugin
+
+    def get(self, target):
+        """Get the plugin by the target.
+
+        :param target: a string with name of the plugin
+        :returns: an instance of :class:`Plugin`
+        :raises: :class:`exceptions.PluginAlreadyRegisterError`
+                    if the plugin with the given target already
+                    registered.
+        """
+        if target not in self.plugins:
+            raise exceptions.PluginNotFoundError(target=target)
+        return self.plugins[target]
+
+
 class Plugin(object):
     """Represents plugabble functions.
 

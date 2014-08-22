@@ -14,6 +14,12 @@
 
 import taskflow.engines
 
+from . import plugin
+
+
+registry = plugin.Registry()
+register = registry.register
+
 
 def run_flow(flow, store):
     result = taskflow.engines.run(flow, engine_conf='parallel', store=store)
