@@ -41,7 +41,7 @@ class EnsureUser(task.BaseCloudTask):
                 # TODO(akscram): Here we should generate a temporary
                 #                password for the user and use them
                 #                along the migration process.
-                #                The RepaireUserPasswords should repaire
+                #                The RepairUserPasswords should repair
                 #                original after all operations.
                 password="default",
                 email=user_info["email"],

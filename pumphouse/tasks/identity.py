@@ -25,11 +25,11 @@ from pumphouse.tasks import user as user_tasks
 LOG = logging.getLogger(__name__)
 
 
-class RepaireUsersPasswords(task.BaseCloudsTask):
+class RepairUsersPasswords(task.BaseCloudsTask):
     def execute(self, **users_infos):
         def with_mapping(identity):
-            for user_id, password in identity.iteritems():
-                yield mapping[user_id], password
+            for user_id in mapping:
+                yield user_id, self.src_cloud.identity[user_id]
 
         mapping = dict((source.split("-", 2)[1], user_info["id"])
                        for source, user_info in users_infos.iteritems())
@@ -40,7 +40,7 @@ class RepaireUsersPasswords(task.BaseCloudsTask):
 def migrate_passwords(src, dst, store, users_ids, tenant_id):
     users_ensure = ["user-{}-ensure".format(user_id) for user_id in users_ids]
     passwords_repair = "repair-{}".format(tenant_id)
-    task = RepaireUsersPasswords(src, dst,
+    task = RepairUsersPasswords(src, dst,
                                  name=passwords_repair,
                                  requires=users_ensure)
     return (task, store)
