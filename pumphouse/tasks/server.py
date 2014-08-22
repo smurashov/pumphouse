@@ -63,30 +63,31 @@ class TerminateServer(task.BaseCloudTask):
         LOG.info("Server terminated: %s", server_info["id"])
 
 
-def migrate_server(src, dst, store, server_id, image_id, flavor_id):
+def reprovision_server(src, dst, store, server_id, image_id, flavor_id):
     server_binding = "server-{}".format(server_id)
     server_retrieve = "server-{}-retrieve".format(server_id)
     server_suspend = "server-{}-suspend".format(server_id)
     server_boot = "server-{}-boot".format(server_id)
+    server_terminate = "server-{}-terminate".format(server_id)
     image_ensure = "image-{}-ensure".format(image_id)
     flavor_ensure = "flavor-{}-ensure".format(flavor_id)
     flow = linear_flow.Flow("migrate-server-{}".format(server_id))
     flow.add(RetrieveServer(src,
                             name=server_binding,
                             provides=server_retrieve,
-                            requires=[server_binding]))
+                            rebind=[server_binding]))
     flow.add(SuspendServer(src,
-                           name=server_binding,
+                           name=server_retrieve,
                            provides=server_suspend,
-                           requires=[server_retrieve]))
+                           rebind=[server_retrieve]))
     flow.add(BootServerFromImage(dst,
-                                 name=server_binding,
+                                 name=server_boot,
                                  provides=server_boot,
-                                 requires=[server_suspend, image_ensure,
-                                           flavor_ensure]
+                                 rebind=[server_suspend, image_ensure,
+                                         flavor_ensure]
                                  ))
     flow.add(TerminateServer(src,
-                             name=server_binding,
-                             requires=[server_suspend]))
+                             name=server_terminate,
+                             rebind=[server_suspend]))
     store[server_binding] = server_id
     return (flow, store)
