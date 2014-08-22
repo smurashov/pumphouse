@@ -55,7 +55,8 @@ def migrate_identity(src, dst, store, tenant_id):
     # XXX(akscram): Due to the bug #1308218 users duplication can be here.
     for user in src.keystone.users.list(tenant_id):
         user_retrieve = "user-{}-retrieve".format(user.id)
-        if user.id in users_ids or user_retrieve in store:
+        if (user.id in (users_ids, src.keystone.auth_ref.user_id) or
+                user_retrieve in store):
             continue
         user_tenant_id = getattr(user, "tenantId", None)
         user_flow, store = user_tasks.migrate_user(src, dst, store, user.id,
