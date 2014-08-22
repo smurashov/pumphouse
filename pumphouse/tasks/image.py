@@ -52,6 +52,7 @@ class EnsureImage(task.BaseCloudsTask):
             #                file-file object.
             data = self.src_cloud.glance.images.data(image_info["id"])
             self.dst_cloud.glance.images.upload(image["id"], data._resp)
+            image = self.dst_cloud.glance.images.get(image["id"])
         return dict(image)
 
 
