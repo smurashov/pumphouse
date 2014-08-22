@@ -101,15 +101,13 @@ class TestEnsureUserRole(TestUser):
         )
 
     def test_execute_exception(self):
-        user.EnsureUserRole(self.cloud).execute(
+        self.cloud.keystone.tenants.add_user.side_effect = keystone_excs.Conflict
+        info = user.EnsureUserRole(self.cloud).execute(
             self.user_info,
             self.role_info,
             self.tenant_info
         )
-
-        self.cloud.keystone.tenants.add_user.assert_called_once_with(
-            self.tenant_id, self.user_id, self.role_id
-        )
+        self.assertEqual(info, self.user_info)
 
 
 class TestMigrateMembership(TestUser):
