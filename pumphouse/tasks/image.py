@@ -35,17 +35,22 @@ class EnsureImage(task.BaseCloudsTask):
             #               just ignore this fact.
             image = next(iter(images))
         except StopIteration:
-            image = self.dst_cloud.glance.images.create(
-                disk_format=image_info["disk_format"],
-                container_format=image_info["container_format"],
-                visibility=image_info["visibility"],
-                min_ram=image_info["min_ram"],
-                min_disk=image_info["min_disk"],
-                name=image_info["name"],
-                protected=image_info["protected"],
-                kernel_id=kernel_info["id"] if kernel_info else None,
-                ramdisk_id=ramdisk_info["id"] if ramdisk_info else None,
-            )
+            parameters = {
+                "disk_format": image_info["disk_format"],
+                "container_format": image_info["container_format"],
+                "visibility": image_info["visibility"],
+                "min_ram": image_info["min_ram"],
+                "min_disk": image_info["min_disk"],
+                "name": image_info["name"],
+                "protected": image_info["protected"],
+            }
+            if kernel_info:
+                parameters["kernel_id"] = kernel_info["id"]
+            if ramdisk_info:
+                parameters["ramdisk_id"] = ramdisk_info["id"]
+            # TODO(akscram): Some image can contain additional
+            #                parameters which are skipped now.
+            image = self.dst_cloud.glance.images.create(**parameters)
             # TODO(akscram): Chunked request is preferred. So in the
             #                future we can control this for generating
             #                the progress of the upload by a custom
