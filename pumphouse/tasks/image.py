@@ -25,7 +25,7 @@ LOG = logging.getLogger(__name__)
 class EnsureImage(task.BaseCloudsTask):
     def execute(self, image_id, kernel_info, ramdisk_info):
         image_info = self.src_cloud.glance.images.get(image_id)
-        images = self.dst_cloud.glances.images.list(filters={
+        images = self.dst_cloud.glance.images.list(filters={
             # FIXME(akscram): Not all images have the checksum property.
             "checksum": image_info["checksum"],
             "name": image_info["name"],
