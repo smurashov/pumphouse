@@ -57,7 +57,7 @@ def migrate_identity(src, dst, store, tenant_id):
         user_retrieve = "user-{}-retrieve".format(user.id)
         if user.id in users_ids or user_retrieve in store:
             continue
-        user_tenant_id = getattr(user, "tenantId", tenant_id)
+        user_tenant_id = getattr(user, "tenantId", None)
         user_flow, store = user_tasks.migrate_user(src, dst, store, user.id,
                                                    tenant_id=user_tenant_id)
         flow.add(user_flow)
