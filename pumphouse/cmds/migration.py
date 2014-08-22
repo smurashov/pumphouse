@@ -39,11 +39,12 @@ BUILTIN_ROLES = ('service', 'admin', '_member_')
 
 def load_cloud_driver(is_fake=False):
     if is_fake:
-        import_path = "pumphouse.fake.Cloud"
+        import_path = "pumphouse.fake.{}"
     else:
-        import_path = "pumphouse.cloud.Cloud"
-    cloud_driver = utils.load_class(import_path)
-    return cloud_driver
+        import_path = "pumphouse.cloud.{}"
+    cloud_driver = utils.load_class(import_path.format("Cloud"))
+    idenity_driver = utils.load_class(import_path.format("Identity"))
+    return cloud_driver, identity_driver
 
 
 def get_parser():
@@ -314,6 +315,15 @@ class Events(object):
         pass
 
 
+def init_client(config, client_class, identity_class):
+    endpoint_config = config.get("endpoint")
+    identity_config = config.get("identity")
+    connection = identity_config.get("connection")
+    identity = identity_class(connection)
+    client = client_class.from_dict(endpoint_config, identity)
+    return client
+
+
 def main():
     args = get_parser().parse_args()
 
@@ -321,19 +331,20 @@ def main():
 
     events = Events()
     flow = unordered_flow.Flow("migrate-resources")
-    Cloud = load_cloud_driver(is_fake=args.fake)
+    Cloud, Identity = load_cloud_driver(is_fake=args.fake)
     if args.action == "migrate":
         store = {}
-        src_config = args.config["source"]
-        src = Cloud.from_dict(src_config.get("endpoint"),
-                              src_config.get("identity"))
+        src = init_client(src_config,
+                          Cloud,
+                          Identity)
         if args.setup:
             workloads = args.config["source"].get("workloads", {})
             management.setup(events, src, "source", args.num_tenants,
                              args.num_servers, workloads)
         dst_config = args.config["destination"]
-        dst = Cloud.from_dict(dst_config.get("endpoint"),
-                              dst_config.get("identity"))
+        dst = init_client(dst_config,
+                          Cloud,
+                          Identity)
         migrate_resources = RESOURCES_MIGRATIONS[args.resource]
         if args.ids:
             ids = args.ids
@@ -347,20 +358,23 @@ def main():
         flows.run_flow(resources_flow, store)
     elif args.action == "cleanup":
         cloud_config = args.config[args.target]
-        cloud = Cloud.from_dict(cloud_config.get("endpoint"),
-                                cloud_config.get("identity"))
+        cloud = init_client(cloud_config,
+                            Cloud,
+                            Identity)
         management.cleanup(events, cloud, args.target)
     elif args.action == "setup":
         src_config = args.config["source"]
-        src = Cloud.from_dict(src_config.get("endpoint"),
-                              src_config.get("identity"))
+        src = init_client(src_config,
+                          Cloud,
+                          Identity)
         workloads = args.config["source"].get("workloads", {})
         management.setup(events, src, "source", args.num_tenants,
                          args.num_servers, workloads)
     elif args.action == "evacuate":
         cloud_config = args.config["source"]
-        cloud = Cloud.from_dict(cloud_config.get("endpoint"),
-                                cloud_config.get("identity"))
+        cloud = init_client(cloud_config,
+                            Cloud,
+                            Identity)
         evacuate(cloud, args.host)
 
 if __name__ == "__main__":
