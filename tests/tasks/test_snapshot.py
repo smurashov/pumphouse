@@ -47,10 +47,10 @@ class TestEnsureSnapshot(TestSnapshot):
         self.assertEqual(id, self.dummy_id)
 
     def test_execute_exception(self):
-        self.cloud.glance.images.create_image.side_effect = Exception
+        self.cloud.servers.create_image.side_effect = Exception
 
-        snapshot.EnsureSnapshot(self.cloud).execute(self.image_info)
-        self.assertRaises(Exception)
+        with self.assertRaises(Exception):
+            snapshot.EnsureSnapshot(self.cloud).execute(self.image_info)
 
 
 class TestMigrateEphemeralStorage(TestSnapshot):
