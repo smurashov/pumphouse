@@ -385,7 +385,7 @@ def migrate_server(parameters, mapping, events, src, dst, id):
                         floating_ip_range = migrate_floating_ip(
                             mapping, events, src, dst,
                             floating_ip_dict["addr"])
-                        LOG.info("Created: %s", floating_ip1._info)
+                        LOG.info("Created: %s", floating_ip_range._info)
                         floating_ip1 = utils.wait_for(
                             (dst, floating_ip_range, s1, fixed_ip),
                             _associate_floating_ip,
