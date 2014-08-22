@@ -16,10 +16,10 @@ class TestFlavor(unittest.TestCase):
             "vcpus": 2,
             "disk": 512,
             "id": self.dummy_id,
-            "ephemeral": True,
+            "OS-FLV-EXT-DATA:ephemeral": True,
             "swap": 0,
             "rxtx_factor": 100,
-            "is_public": True
+            "os-flavor-access:is_public": True
         }
 
         self.flavor = Mock()
@@ -66,10 +66,10 @@ class TestEnsureFlavor(TestFlavor):
             self.flavor_info["vcpus"],
             self.flavor_info["disk"],
             flavorid=self.flavor_info["id"],
-            ephemeral=self.flavor_info["ephemeral"],
+            ephemeral=self.flavor_info["OS-FLV-EXT-DATA:ephemeral"],
             swap=self.flavor_info["swap"] or 0,
             rxtx_factor=self.flavor_info["rxtx_factor"],
-            is_public=self.flavor_info["is_public"]
+            is_public=self.flavor_info["os-flavor-access:is_public"]
         )
 
 
