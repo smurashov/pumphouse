@@ -43,7 +43,7 @@ def load_cloud_driver(is_fake=False):
     else:
         import_path = "pumphouse.cloud.{}"
     cloud_driver = utils.load_class(import_path.format("Cloud"))
-    idenity_driver = utils.load_class(import_path.format("Identity"))
+    identity_driver = utils.load_class(import_path.format("Identity"))
     return cloud_driver, identity_driver
 
 
@@ -334,6 +334,7 @@ def main():
     Cloud, Identity = load_cloud_driver(is_fake=args.fake)
     if args.action == "migrate":
         store = {}
+        src_config = args.config["source"]
         src = init_client(src_config,
                           Cloud,
                           Identity)
