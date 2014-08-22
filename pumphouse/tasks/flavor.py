@@ -42,10 +42,10 @@ class EnsureFlavor(task.BaseCloudTask):
                 flavor_info["vcpus"],
                 flavor_info["disk"],
                 flavorid=flavor_info["id"],
-                ephemeral=flavor_info["ephemeral"],
+                ephemeral=flavor_info["OS-FLV-EXT-DATA:ephemeral"],
                 swap=flavor_info["swap"] or 0,
                 rxtx_factor=flavor_info["rxtx_factor"],
-                is_public=flavor_info["is_public"]
+                is_public=flavor_info["os-flavor-access:is_public"]
             )
         return flavor.to_dict()
 
