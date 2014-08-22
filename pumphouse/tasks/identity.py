@@ -37,9 +37,11 @@ class RepaireUsersPasswords(task.BaseCloudsTask):
         self.dst_cloud.identity.push()
 
 
-def migrate_passwords(src, dst, store, users_ids):
+def migrate_passwords(src, dst, store, users_ids, tenant_id):
     users_ensure = ["user-{}-ensure".format(user_id) for user_id in users_ids]
+    passwords_repair = "repair-{}".format(tenant_id)
     task = RepaireUsersPasswords(src, dst,
+                                 name=passwords_repair,
                                  requires=users_ensure)
     return (task, store)
 
@@ -88,6 +90,9 @@ def migrate_identity(src, dst, store, tenant_id):
             flow.add(role_flow)
     # TODO(akcram): All users' passwords should be restored when all
     #               migration operations ended.
-    users_passwords_flow, store = migrate_passwords(src, dst, store, users_ids)
+    users_passwords_flow, store = migrate_passwords(src, dst,
+                                                    store,
+                                                    users_ids,
+                                                    tenant_id)
     flow.add(users_passwords_flow)
     return (flow, store)
