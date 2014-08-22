@@ -35,7 +35,7 @@ class EnsureImage(task.BaseCloudsTask):
             #               just ignore this fact.
             image = next(iter(images))
         except StopIteration:
-            image = self.dst_cloud.glances.images.create(
+            image = self.dst_cloud.glance.images.create(
                 disk_format=image_info["disk_format"],
                 container_format=image_info["container_format"],
                 visibility=image_info["visibility"],
@@ -48,7 +48,8 @@ class EnsureImage(task.BaseCloudsTask):
             )
             # TODO(akscram): Chunked request is preferred. So in the
             #                future we can control this for generating
-            #                the progress of the upload.
+            #                the progress of the upload by a custom
+            #                file-file object.
             data = self.src_cloud.glance.images.data(image_info["id"])
             self.dst_cloud.glance.images.upload(image["id"], data._resp)
         return dict(image)
