@@ -31,19 +31,21 @@ class TestUser(unittest.TestCase):
         self.dst = Mock()
 
         self.cloud = Mock()
-        self.cloud.keystone.users.find.return_value = self.user
-        self.cloud.keystone.users.get.return_value = self.user
-        self.cloud.keystone.users.create.return_value = self.user
+        self.users = self.cloud.keystone.users
+        self.users.find.return_value = self.user
+        self.users.get.return_value = self.user
+        self.users.create.return_value = self.user
+        self.tenants = self.cloud.keystone.tenants
 
     def ensure_user(self, user, tenant_info, is_orphan=False):
-        self.cloud.keystone.users.find.side_effect = keystone_excs.NotFound
+        self.users.find.side_effect = keystone_excs.NotFound
 
         if is_orphan:
             user.execute(self.user_info)
         else:
             user.execute(self.user_info, tenant_info)
 
-        self.cloud.keystone.users.create.assert_called_once_with(
+        self.users.create.assert_called_once_with(
             name=self.user_info["name"],
             password="default",
             email=self.user_info["email"],
@@ -59,7 +61,7 @@ class TestRetrieveUser(TestUser):
         self.assertIsInstance(retrieve_user, task.BaseCloudTask)
 
         retrieve_user.execute(self.user_id)
-        self.cloud.keystone.users.get.assert_called_once_with(self.user_id)
+        self.users.get.assert_called_once_with(self.user_id)
         self.cloud.identity.fetch.assert_called_once_with(self.user_id)
         self.user.to_dict.assert_called_once_with()
 
@@ -70,7 +72,7 @@ class TestEnsureUser(TestUser):
         self.assertIsInstance(ensure_user, task.BaseCloudTask)
 
         ensure_user.execute(self.user_info, self.tenant_info)
-        self.cloud.keystone.users.find.assert_called_once_with(
+        self.users.find.assert_called_once_with(
             name=self.user_info["name"])
         self.user.to_dict.assert_called_once_with()
 
@@ -96,12 +98,13 @@ class TestEnsureUserRole(TestUser):
                                         self.tenant_info)
 
         self.assertEqual(info, self.user_info)
-        self.cloud.keystone.tenants.add_user.assert_called_once_with(
+        self.tenants.add_user.assert_called_once_with(
             self.tenant_id, self.user_id, self.role_id
         )
 
     def test_execute_exception(self):
-        self.cloud.keystone.tenants.add_user.side_effect = keystone_excs.Conflict
+        self.tenants.add_user.side_effect = keystone_excs.Conflict
+
         info = user.EnsureUserRole(self.cloud).execute(
             self.user_info,
             self.role_info,
