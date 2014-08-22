@@ -41,6 +41,7 @@ class IdentityTestCase(unittest.TestCase):
         with patch.object(sqla, 'create_engine') as mock:
             fakeEngine = MagicMock()
             fakeEngine.execute.return_value =  [(None, "passw0rd")];
+            fakeEngine.begin.return_value = fakeEngine
 
 
             mock.create_engine.return_value = fakeEngine
@@ -53,7 +54,14 @@ class IdentityTestCase(unittest.TestCase):
         self.assertIsInstance(self.identity, cloud.Identity)
 
     def testFetch(self):
-        self.assertTrue(self.identity.fetch("foobar") == "passw0rd")
+        self.assertTrue(self.identity.fetch("user") == "passw0rd")
+
+    def testUpdate(self):
+        self.identity.update([ ("user", "passw0rd") ] )
+
+    def testPush(self):
+        self.identity.push()
+
 
 
 
