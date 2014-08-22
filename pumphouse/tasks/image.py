@@ -61,42 +61,65 @@ class EnsureImage(task.BaseCloudsTask):
         return dict(image)
 
 
-def migrate_image(src, dst, store, image_id):
+class EnsureImageWithKernel(EnsureImage):
+    def execute(self, image_id, kernel_info):
+        return super(EnsureSingleImage, self).execute(image_id, kernel_info,
+                                                      None)
+
+
+class EnsureImageWithRamdisk(EnsureImage):
+    def execute(self, image_id, ramdisk_info):
+        return super(EnsureSingleImage, self).execute(image_id, None,
+                                                      ramdisk_info)
+
+
+class EnsureSingleImage(EnsureImage):
+    def execute(self, image_id):
+        return super(EnsureSingleImage, self).execute(image_id, None, None)
+
+
+def migrate_image_task(src, dst, store, task_class, image_id, *rebind):
     image_retrieve = "image-{}-retrieve".format(image_id)
     image_ensure = "image-{}-ensure".format(image_id)
-    requires, inject = [image_retrieve], {}
-    image = src.glance.images.get(image_id)
-    flow = graph_flow.Flow("migrate-image-{}".format(image_id))
-    if hasattr(image, "kernel_id"):
-        kernel_retrieve = "image-{}-retrieve".format(image["kernel_id"])
-        kernel_ensure = "image-{}-ensure".format(image["kernel_id"])
-        flow.add(EnsureImage(src, dst,
-                             name=kernel_ensure,
-                             provides=kernel_ensure,
-                             requires=(kernel_retrieve,),
-                             inject={"kernel_id": None,
-                                     "ramdisk_id": None}))
-        store[kernel_retrieve] = image["kernel_id"]
-        requires.append(kernel_ensure)
-    else:
-        inject["kernel_id"] = None
-    if hasattr(image, "ramdisk_id"):
-        ramdisk_retrieve = "image-{}-retrieve".format(image["ramdisk_id"])
-        ramdisk_ensure = "image-{}-ensure".format(image["ramdisk_id"])
-        flow.add(EnsureImage(src, dst,
-                             name=ramdisk_ensure,
-                             provides=ramdisk_ensure,
-                             requires=(ramdisk_retrieve,),
-                             inject={"kernel_id": None,
-                                     "ramdisk_id": None}))
-        store[ramdisk_retrieve] = image["ramdisk_id"]
-        requires.append(ramdisk_ensure)
-    else:
-        inject["ramdisk_id"] = None
-    flow.add(EnsureImage(src, dst,
-                         name=image_ensure,
-                         provides=image_ensure,
-                         inject=inject,
-                         requires=requires))
+    rebind = set((image_retrieve,)).union(*rebind)
+    task = task_class(src, dst,
+                      name=image_ensure,
+                      provides=image_ensure,
+                      rebind=list(rebind))
     store[image_retrieve] = image_id
-    return (flow, store)
+    return task, store
+
+
+# XXX(akscram): We should to simplify this function. The cascade of
+#               if-statements looks ugly.
+def migrate_image(src, dst, store, image_id):
+    image = src.glance.images.get(image_id)
+    if image["container_format"] == "ami" and (hasattr(image, "kernel_id") or
+                                               hasattr(image, "ramdisk_id")):
+        flow = graph_flow.Flow("migrate-image-{}".format(image_id))
+        if hasattr(image, "kernel_id") and hasattr(image, "ramdisk_id"):
+            kernel, store = migrate_image_task(src, dst, EnsureSingleImage,
+                                               store, image["kernel_id"])
+            ramdisk, store = migrate_image_task(src, dst, EnsureSingleImage,
+                                                store, image["ramdisk_id"])
+            image, store = migrate_image_task(src, dst, EnsureImage, store,
+                                              image_id, kernel.provides,
+                                              ramdisk.provides)
+            flow.add(kernel, ramdisk, image)
+        elif hasattr(image, "kernel_id"):
+            kernel, store = migrate_image_task(src, dst, EnsureSingleImage,
+                                               store, image["kernel_id"])
+            image, store = migrate_image_task(src, dst, EnsureImageWithKernel,
+                                              store, image_id, kernel.provides)
+            flow.add(kernel, image)
+        else:
+            ramdisk, store = migrate_image_task(src, dst, EnsureSingleImage,
+                                                store, image["ramdisk_id"])
+            image, store = migrate_image_task(src, dst, EnsureImageWithRamdisk,
+                                              store, image_id,
+                                              ramdisk.provides)
+            flow.add(ramdisk, image)
+    else:
+        flow, store = migrate_image_task(src, dst, store, EnsureSingleImage,
+                                         image_id)
+    return flow, store
