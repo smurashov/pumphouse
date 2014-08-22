@@ -1,7 +1,9 @@
 import unittest
 
 from pumphouse import cloud
-
+from mock import patch, Mock
+from keystoneclient.v2_0 import client as keystone_client
+import sqlalchemy as sqla
 
 class NamespaceTestCase(unittest.TestCase):
     def setUp(self):
@@ -31,3 +33,40 @@ class NamespaceTestCase(unittest.TestCase):
         self.assertEqual("password", dict_ns["password"])
         self.assertEqual("tenant", dict_ns["tenant_name"])
         self.assertEqual("auth", dict_ns["auth_url"])
+
+
+class IdentityTestCase(unittest.TestCase):
+
+    def setUp(self):
+        with patch.object(sqla, 'create_engine') as mock:
+            mock.create_engine.return_value = True
+            self.identity = cloud.Identity(None);
+
+    def testInit(self):
+        self.assertIsInstance(self.identity, cloud.Identity)
+
+#    @patch.object(self.engine, 'execute')
+#    def testFetch(self, mock_path):
+#        mock_path.execute.return_value = "passw0rd"
+#        self.assertIsEq(self.identity.fetch("foobar", "passw0rd"))
+
+
+
+#class CloudTestCase(unittest.TestCase):
+#    def setUp(self):
+#        self.nspace = cloud.Namespace(
+#            username="user",
+#            password="password",
+#            tenant_name="tenant",
+#            auth_url="auth",
+#        )
+#
+#        self.identity = Mock()
+#
+#    @patch.object(keystone_client.Client, 'authenticate' )
+#    def testInit(self, mock_path):
+#        mock_path.authenticate.return_value = True
+#        self.assertIsInstance(cloud.Cloud(self.nspace, self.identity), cloud.Cloud)
+
+if __name__ == '__main__':
+   unittest.main()
