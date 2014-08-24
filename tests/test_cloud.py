@@ -59,8 +59,14 @@ class IdentityTestCase(unittest.TestCase):
     def testUpdate(self):
         self.identity.update([ ("user", "passw0rd") ] )
 
-    def testPush(self):
+#    def testPush(self):
+#        self.identity.push()
+
+    def testGetter(self):
+        self.identity["user"]
+        self.identity["user"]
         self.identity.push()
+        len(self.identity)
 
 
 
