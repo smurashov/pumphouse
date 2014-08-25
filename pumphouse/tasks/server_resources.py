@@ -45,3 +45,24 @@ def migrate_server_through_image(src, dst, store, server_id):
                                                          image_id,
                                                          flavor_id)
     return resources, server_flow, store
+
+
+@migrate_server.add("snapshot")
+def migrate_server_with_snapshot(src, dst, store, server_id):
+    server = src.nova.servers.get(server_id)
+    flavor_id = server.flavor["id"]
+    snapshot_retrieve = "snapshot-{}".format(server_id)
+    snapshot_ensure = "snapshot-{}-ensure".format(server_id)
+    flavor_retrieve = "flavor-{}-retrieve".format(flavor_id)
+    resources = []
+    if snapshot_ensure not in store:
+        snapshot_flow, store = snapshot_tasks.migrate_snapshot(src, dst, store,
+                                                               server_id)
+        resources.append(snapshot_flow)
+    if flavor_retrieve not in store:
+        flavor_flow, store = flavor_tasks.migrate_flavor(src, dst, store,
+                                                         flavor_id)
+        resources.append(flavor_flow)
+    server_flow, store = server_tasks.reprovision_server(
+        src, dst, store, server.id, store[snapshot_retrieve], flavor_id)
+    return resources, server_flow, store
