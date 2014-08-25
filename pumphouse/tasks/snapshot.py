@@ -17,6 +17,7 @@ import logging
 from taskflow.patterns import linear_flow
 
 from pumphouse import task
+from pumphouse import utils
 from pumphouse.tasks import image as image_tasks
 
 
@@ -29,14 +30,17 @@ class EnsureSnapshot(task.BaseCloudTask):
             snapshot_id = self.cloud.servers.create_image(
                 server_id,
                 "pumphouse-snapshot-{}"
-                .format(server_info["id"]))
+                .format(server_id))
         except Exception:
-            LOG.exception("Snapshot failed: %s", server_info)
+            LOG.exception("Snapshot failed: %s", server_id)
             raise
         else:
             snapshot = self.cloud.glance.images.get(snapshot_id)
+            snapshot = utils.wait_for(snapshot.id,
+                                      self.cloud.glance.images.get,
+                                      value='active')
             LOG.info("Created: %s", snapshot)
-            return snapshot_id
+            return snapshot.id
 
 
 def migrate_snapshot(src, dst, store, server_id):
