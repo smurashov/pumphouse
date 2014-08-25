@@ -5,32 +5,34 @@ from pumphouse import task
 from taskflow.patterns import linear_flow
 
 
+class AttrDict(dict):
+    def __init__(self, *args, **kwargs):
+        super(AttrDict, self).__init__(*args, **kwargs)
+        self.__dict__ = self
+        self._info = self
+
+    def to_dict(self):
+        return self.copy()
+
+
 class TestSnapshot(unittest.TestCase):
     def setUp(self):
-        self.dummy_id = "123"
-        self.image_info = {
-            "id": self.dummy_id
-        }
-
-        self.image = Mock()
-        self.image.to_dict.return_value = {}
+        self.test_server_id = "123"
+        self.test_snapshot_id = "456"
+        self.test_snapshot_info = AttrDict({
+            "id": self.test_snapshot_id,
+            "status": "active"
+        })
 
         self.dst = Mock()
+        self.src = Mock()
 
         self.cloud = Mock()
-        self.cloud.servers.create_image.return_value = self.dummy_id
-        self.cloud.glance.images.get.return_value = self.image
-        self.cloud.glance.images.create_image.return_value = self.image
+        self.cloud.servers.create_image.return_value = self.test_snapshot_id
+        self.cloud.glance.images.get.return_value = self.test_snapshot_info
 
-
-class TestRetrieveImage(TestSnapshot):
-    def test_execute(self):
-        retrieve_image = snapshot.RetrieveImage(self.cloud)
-        self.assertIsInstance(retrieve_image, task.BaseCloudTask)
-
-        retrieve_image.execute(self.dummy_id)
-        self.cloud.glance.images.get.assert_called_once_with(self.dummy_id)
-        self.image.to_dict.assert_called_once_with()
+        self.utils = Mock()
+        self.utils.wait_for.return_value = self.test_snapshot_id
 
 
 class TestEnsureSnapshot(TestSnapshot):
@@ -38,31 +40,30 @@ class TestEnsureSnapshot(TestSnapshot):
         ensure_snapshot = snapshot.EnsureSnapshot(self.cloud)
         self.assertIsInstance(ensure_snapshot, task.BaseCloudTask)
 
-        id = ensure_snapshot.execute(self.image_info)
+        snapshot_id = ensure_snapshot.execute(self.test_server_id)
         self.cloud.servers.create_image.assert_called_once_with(
-            self.dummy_id,
-            "pumphouse-snapshot-%s" % self.dummy_id)
+            self.test_server_id,
+            "pumphouse-snapshot-%s" % self.test_server_id)
 
-        self.cloud.glance.images.get.assert_called_once_with(id)
-        self.assertEqual(id, self.dummy_id)
+        self.assertEqual(snapshot_id, self.test_snapshot_id)
 
     def test_execute_exception(self):
         self.cloud.servers.create_image.side_effect = Exception
 
         with self.assertRaises(Exception):
-            snapshot.EnsureSnapshot(self.cloud).execute(self.image_info)
+            snapshot.EnsureSnapshot(self.cloud).execute(self.test_server_id)
 
 
 class TestMigrateEphemeralStorage(TestSnapshot):
     @patch.object(linear_flow.Flow, "add")
-    def test_migrate_ephemeral_storage(self, mock_flow_add):
+    def test_migrate_snapshot(self, mock_flow_add):
         store = {}
 
-        (flow, store) = snapshot.migrate_ephemeral_storage(
-            self.image,
+        (flow, store) = snapshot.migrate_snapshot(
+            self.src,
             self.dst,
             store,
-            self.dummy_id
+            self.test_server_id
         )
 
         self.assertEqual(mock_flow_add.call_count, 2)
