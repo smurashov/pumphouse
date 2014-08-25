@@ -17,6 +17,7 @@ import logging
 from taskflow.patterns import linear_flow
 
 from pumphouse import task
+from pumphouse.tasks import utils as task_utils
 from pumphouse import utils
 
 
@@ -64,6 +65,7 @@ class TerminateServer(task.BaseCloudTask):
 
 
 def reprovision_server(src, dst, store, server_id, image_id, flavor_id):
+    server_sync = "server-{}-sync".format(server_id)
     server_binding = "server-{}".format(server_id)
     server_retrieve = "server-{}-retrieve".format(server_id)
     server_suspend = "server-{}-suspend".format(server_id)
@@ -72,6 +74,8 @@ def reprovision_server(src, dst, store, server_id, image_id, flavor_id):
     image_ensure = "image-{}-ensure".format(image_id)
     flavor_ensure = "flavor-{}-ensure".format(flavor_id)
     flow = linear_flow.Flow("migrate-server-{}".format(server_id))
+    flow.add(task_utils.SyncPoint(name=server_sync,
+                                  requires=[image_ensure, flavor_ensure]))
     flow.add(RetrieveServer(src,
                             name=server_binding,
                             provides=server_retrieve,
