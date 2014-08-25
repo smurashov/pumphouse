@@ -17,6 +17,7 @@ import logging
 from pumphouse import flows
 from pumphouse.tasks import server as server_tasks
 from pumphouse.tasks import image as image_tasks
+from pumphouse.tasks import snapshot as snapshot_tasks
 from pumphouse.tasks import flavor as flavor_tasks
 
 
