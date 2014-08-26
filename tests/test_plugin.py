@@ -13,7 +13,7 @@ class PluginTestCase(unittest.TestCase):
         impl = lambda x: x
         added = self.plugin.add("impl")(impl)
         self.assertIs(added, impl)
-        self.assertIn("impl", self.plugin.implements)
+        self.assertIn("impl", self.plugin.implementations)
 
     def test_add_already_registerd_fail(self):
         self.plugin.add("impl")(lambda x: x)
