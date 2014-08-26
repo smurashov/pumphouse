@@ -1,6 +1,8 @@
 import collections
 import unittest
 
+from mock import Mock
+
 from pumphouse import exceptions as excs
 from pumphouse import plugin
 
@@ -37,12 +39,16 @@ class PluginTestCase(unittest.TestCase):
         self.assertEqual("unknown", err.name)
 
     def test_plugin_iter(self):
-        self.plugin.add("test_plugin1")
-        self.plugin.add("test_plugin2")
+        test_impl1 = Mock()
+        test_impl2 = Mock()
+        decorator1 = self.plugin.add("test_impl1")
+        decorator2 = self.plugin.add("test_impl2")
+        decorator1(test_impl1)
+        decorator2(test_impl2)
         self.assertIsInstance(self.plugin, collections.Iterable)
         plgs = list(self.plugin)
         self.assertEqual(sorted(plgs),
-                         ["test_plugin1", "test_plugin2"])
+                         ["test_impl1", "test_impl2"])
 
 
 class RegistryTestCase(unittest.TestCase):
