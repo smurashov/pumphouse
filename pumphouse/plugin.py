@@ -80,16 +80,19 @@ class Plugin(object):
         def decorate(func):
             # TODO(akscram): The func should be inspected here by number of
             #                argument.
-            self.implements[name] = func
+            self.implementations[name] = func
             return func
 
-        if name in self.implements:
+        if name in self.implementations:
             raise exceptions.FuncAlreadyRegisterError(target=self.target,
                                                       name=name)
         return decorate
 
     def select(self, name):
-        if name not in self.implements:
+        if name not in self.implementations:
             raise exceptions.FuncNotFoundError(target=self.target,
                                                name=name)
-        return self.implements[name]
+        return self.implementations[name]
+
+    def __iter__(self):
+        return iter(self.implementations)

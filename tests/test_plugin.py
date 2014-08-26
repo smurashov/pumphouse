@@ -36,6 +36,14 @@ class PluginTestCase(unittest.TestCase):
         self.assertEqual("test", err.target)
         self.assertEqual("unknown", err.name)
 
+    def test_plugin_iter(self):
+        self.plugin.add("test_plugin1")
+        self.plugin.add("test_plugin2")
+        self.assertIsInstance(self.plugin, collections.Iterable)
+        plgs = list(self.plugin)
+        self.assertEqual(sorted(plgs),
+                         ["test_plugin1", "test_plugin2"])
+
 
 class RegistryTestCase(unittest.TestCase):
     def setUp(self):
