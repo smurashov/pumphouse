@@ -88,14 +88,14 @@ def migrate_floating_ip(src, dst, store, address):
     floating_ip_retrieve = "floating-ip-{}-retrieve".format(address)
     floating_ip_bulk_ensure = "floating-ip-bulk-{}-ensure".format(address)
     flow = linear_flow.Flow("migrate-floating-ip-{}".format(address))
-    flow.add(tasks.RetrieveFloatingIP(src,
-                                      name=floating_ip_retrieve,
-                                      provides=floating_ip_retrieve,
-                                      rebind=[floating_ip_binding]))
-    flow.add(tasks.EnsureFloatingIPBulk(dst,
-                                        name=floating_ip_bulk_ensure,
-                                        provides=floating_ip_bulk_ensure,
-                                        rebind=[floating_ip_retrieve]))
+    flow.add(RetrieveFloatingIP(src,
+                                name=floating_ip_retrieve,
+                                provides=floating_ip_retrieve,
+                                rebind=[floating_ip_binding]))
+    flow.add(EnsureFloatingIPBulk(dst,
+                                  name=floating_ip_bulk_ensure,
+                                  provides=floating_ip_bulk_ensure,
+                                  rebind=[floating_ip_retrieve]))
     store[floating_ip_binding] = address
     return flow, store
 
@@ -109,9 +109,9 @@ def associate_floating_ip_server(src, dst, store, floating_ip_address,
     floating_ip_ensure = "flotaing-ip-{}-ensure".format(floating_ip_address)
     flow = linear_flow.Flow("associate-floating-ip-{}-server-{}"
                             .format(floating_ip_address, server_id))
-    flow.add(tasks.EnsureFloatingIP(dst,
-                                    name=floating_ip_binding,
-                                    provides=floating_ip_ensure,
-                                    rebind=[server_ensure,
-                                              floating_ip_binding]))
+    flow.add(EnsureFloatingIP(dst,
+                              name=floating_ip_binding,
+                              provides=floating_ip_ensure,
+                              rebind=[server_ensure,
+                                      floating_ip_binding]))
     return flow, store
