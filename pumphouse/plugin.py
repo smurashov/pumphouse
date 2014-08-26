@@ -65,7 +65,7 @@ class Plugin(object):
     #                implementations.
     def __init__(self, target):
         self.target = target
-        self.implements = {}
+        self.implementations = {}
 
     def add(self, name):
         """Register a function.
