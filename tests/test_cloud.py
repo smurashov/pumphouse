@@ -1,9 +1,9 @@
 import unittest
 
 from pumphouse import cloud
-from mock import patch, Mock, MagicMock
-from keystoneclient.v2_0 import client as keystone_client
+from mock import patch, MagicMock
 import sqlalchemy as sqla
+
 
 class NamespaceTestCase(unittest.TestCase):
     def setUp(self):
@@ -40,15 +40,13 @@ class IdentityTestCase(unittest.TestCase):
     def setUp(self):
         with patch.object(sqla, 'create_engine') as mock:
             fakeEngine = MagicMock()
-            fakeEngine.execute.return_value =  [(None, "passw0rd")];
+            fakeEngine.execute.return_value = [(None, "passw0rd")]
             fakeEngine.begin.return_value = fakeEngine
-
 
             mock.create_engine.return_value = fakeEngine
             self.identity = cloud.Identity(None)
 
             self.identity.engine = fakeEngine
-
 
     def testInit(self):
         self.assertIsInstance(self.identity, cloud.Identity)
@@ -57,11 +55,9 @@ class IdentityTestCase(unittest.TestCase):
         self.assertTrue(self.identity.fetch("user") == "passw0rd")
 
     def testUpdate(self):
-        self.identity.update([ ("user", "passw0rd") ] )
-        self.identity.update([ ("user2", "passw0rd") ] )
+        self.identity.update([("user", "passw0rd")])
+        self.identity.update([("user2", "passw0rd")])
 
-#    def testPush(self):
-#        self.identity.push()
     def testGetter(self):
         self.identity["user"]
         self.identity["user"]
@@ -72,22 +68,5 @@ class IdentityTestCase(unittest.TestCase):
         iter(self.identity)
 
 
-
-#class CloudTestCase(unittest.TestCase):
-#    def setUp(self):
-#        self.nspace = cloud.Namespace(
-#            username="user",
-#            password="password",
-#            tenant_name="tenant",
-#            auth_url="auth",
-#        )
-#
-#        self.identity = Mock()
-#
-#    @patch.object(keystone_client.Client, 'authenticate' )
-#    def testInit(self, mock_path):
-#        mock_path.authenticate.return_value = True
-#        self.assertIsInstance(cloud.Cloud(self.nspace, self.identity), cloud.Cloud)
-
 if __name__ == '__main__':
-   unittest.main()
+    unittest.main()
