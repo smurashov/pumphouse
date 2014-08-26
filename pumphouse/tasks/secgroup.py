@@ -59,9 +59,11 @@ class EnsureSecGroupRules(task.BaseCloudTask):
                     cidr=rule["ip_range"]["cidr"])
             except exceptions.nova_excs.BadRequest:
                 LOG.warn("Duplicate rule: %s", rule)
+                raise
             except exceptions.nova_excs.NotFound:
                 LOG.exception("No such security group exist: %s",
                               secgroup_info)
+                raise
             else:
                 LOG.info("Created: %s", rule)
                 return rule.to_dict()
