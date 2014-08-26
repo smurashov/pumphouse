@@ -91,11 +91,11 @@ def migrate_floating_ip(src, dst, store, address):
     flow.add(tasks.RetrieveFloatingIP(src,
                                       name=floating_ip_retrieve,
                                       provides=floating_ip_retrieve,
-                                      requires=[floating_ip_binding]))
+                                      rebind=[floating_ip_binding]))
     flow.add(tasks.EnsureFloatingIPBulk(dst,
                                         name=floating_ip_bulk_ensure,
                                         provides=floating_ip_bulk_ensure,
-                                        requires=[floating_ip_retrieve]))
+                                        rebind=[floating_ip_retrieve]))
     store[floating_ip_binding] = address
     return flow, store
 
@@ -112,6 +112,6 @@ def associate_floating_ip_server(src, dst, store, floating_ip_address,
     flow.add(tasks.EnsureFloatingIP(dst,
                                     name=floating_ip_binding,
                                     provides=floating_ip_ensure,
-                                    requires=[server_ensure,
+                                    rebind=[server_ensure,
                                               floating_ip_binding]))
     return flow, store
