@@ -27,6 +27,7 @@ from pumphouse.tasks import tenant as tenant_tasks
 from pumphouse.tasks import user as user_tasks
 from pumphouse.tasks import role as role_tasks
 from pumphouse.tasks import identity as identity_tasks
+from pumphouse.tasks import resources as resources_tasks
 
 from taskflow.patterns import graph_flow
 
@@ -196,6 +197,14 @@ def migrate_identity(src, dst, flow, store, ids):
     return flow, store
 
 
+def migrate_resources(src, dst, flow, store, ids):
+    for tenant_id in ids:
+        resources_flow, store = resources_tasks.migrate_resources(
+            src, dst, store, tenant_id)
+        flow.add(resources_flow)
+    return flow, store
+
+
 def evacuate(cloud, host):
     binary = "nova-compute"
     try:
@@ -307,6 +316,7 @@ RESOURCES_MIGRATIONS = collections.OrderedDict([
     ("servers", migrate_servers),
     ("roles", migrate_roles),
     ("identity", migrate_identity),
+    ("resources", migrate_resources),
 ])
 
 
@@ -346,7 +356,7 @@ def main():
         dst = init_client(dst_config,
                           Cloud,
                           Identity)
-        migrate_resources = RESOURCES_MIGRATIONS[args.resource]
+        migrate_function = RESOURCES_MIGRATIONS[args.resource]
         if args.ids:
             ids = args.ids
         elif args.tenant:
@@ -355,7 +365,7 @@ def main():
             ids = get_ids_by_host(src, args.resource, args.host)
         else:
             ids = get_all_resource_ids(src, args.resource)
-        resources_flow, store = migrate_resources(src, dst, flow, store, ids)
+        resources_flow, store = migrate_function(src, dst, flow, store, ids)
         flows.run_flow(resources_flow, store)
     elif args.action == "cleanup":
         cloud_config = args.config[args.target]
