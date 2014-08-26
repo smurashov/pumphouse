@@ -17,9 +17,16 @@ import logging
 from taskflow.patterns import graph_flow
 
 from pumphouse import task
+from pumphouse.tasks import utils as task_utils
 
 
 LOG = logging.getLogger(__name__)
+
+
+class LogReporter(task_utils.UploadReporter):
+    def report(self, absolute):
+        LOG.info("Image %r uploaded on %3.2f%%",
+                 self.context["id"], absolute * 100)
 
 
 class EnsureImage(task.BaseCloudsTask):
@@ -52,12 +59,9 @@ class EnsureImage(task.BaseCloudsTask):
             #                parameters which are skipped now.
             image = self.dst_cloud.glance.images.create(**parameters)
             LOG.info("Image created: %s", image["id"])
-            # TODO(akscram): Chunked request is preferred. So in the
-            #                future we can control this for generating
-            #                the progress of the upload by a custom
-            #                file-file object.
             data = self.src_cloud.glance.images.data(image_info["id"])
-            self.dst_cloud.glance.images.upload(image["id"], data._resp)
+            img_data = task_utils.FileProxy(data, LogReporter(image))
+            self.dst_cloud.glance.images.upload(image["id"], img_data)
             image = self.dst_cloud.glance.images.get(image["id"])
             LOG.info("Image uploaded: %s", image["id"])
         return dict(image)
