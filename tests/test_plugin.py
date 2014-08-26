@@ -1,3 +1,4 @@
+import collections
 import unittest
 
 from pumphouse import exceptions as excs
@@ -55,3 +56,11 @@ class RegistryTestCase(unittest.TestCase):
         with self.assertRaises(excs.PluginNotFoundError) as cm:
             self.registry.get("plg")
         self.assertEqual("plg", cm.exception.target)
+
+    def test_register_iter(self):
+        self.registry.register("test_plugin1")
+        self.registry.register("test_plugin2")
+        self.assertIsInstance(self.registry, collections.Iterable)
+        plgs = list(self.registry)
+        self.assertEqual(sorted(plgs),
+                         ["test_plugin1", "test_plugin2"])

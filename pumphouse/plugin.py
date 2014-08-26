@@ -49,6 +49,10 @@ class Registry(object):
         return self.plugins[target]
 
 
+    def __iter__(self):
+        return iter(self.plugins)
+
+
 class Plugin(object):
     """Represents plugabble functions.
 
