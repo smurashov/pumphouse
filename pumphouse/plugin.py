@@ -48,7 +48,6 @@ class Registry(object):
             raise exceptions.PluginNotFoundError(target=target)
         return self.plugins[target]
 
-
     def __iter__(self):
         return iter(self.plugins)
 
