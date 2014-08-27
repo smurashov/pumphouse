@@ -54,7 +54,7 @@ class BootServerFromImage(task.BaseCloudTask):
                                                 flavor_info["id"])
         server = utils.wait_for(server, self.cloud.nova.servers.get,
                                 value="ACTIVE")
-        LOG.info("Server spawned: %s", server_info["id"])
+        LOG.info("Server spawned: %s", server.id)
         return server.to_dict()
 
 
