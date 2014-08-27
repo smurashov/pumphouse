@@ -27,7 +27,7 @@ LOG = logging.getLogger(__name__)
 class EnsureSnapshot(task.BaseCloudTask):
     def execute(self, server_id):
         try:
-            snapshot_id = self.cloud.servers.create_image(
+            snapshot_id = self.cloud.nova.servers.create_image(
                 server_id,
                 "pumphouse-snapshot-{}"
                 .format(server_id))
@@ -53,8 +53,8 @@ def migrate_snapshot(src, dst, store, server_id):
                             name=snapshot_binding,
                             provides=snapshot_binding,
                             rebind=[server_binding]))
-    flow.add(image_tasks.EnsureImage(src, dst,
-                                     name=snapshot_ensure,
-                                     provides=snapshot_ensure,
-                                     rebind=[snapshot_binding]))
+    flow.add(image_tasks.EnsureSingleImage(src, dst,
+                                           name=snapshot_ensure,
+                                           provides=snapshot_ensure,
+                                           rebind=[snapshot_binding]))
     return flow, store
