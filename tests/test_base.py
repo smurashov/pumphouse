@@ -22,7 +22,7 @@ class TestBase(unittest.TestCase):
             "urls": ["a", "b", "c"],
             "endpoint": self.cloud_config
         }
-        self.target = Mock()
+        self.target = "fakecloud"
         self.driver = Mock(return_value=self.identity)
         self.driver.return_value = self.identity
         self.driver.from_dict.return_value = ()
@@ -63,12 +63,14 @@ class TestService(TestBase):
         self.service.make(identity=None)
         self.identity_driver.assert_called_once_with(a=self.identity)
         self.identity_driver.from_dict.assert_called_once_with(
-            identity=self.identity, endpoint=self.cloud_config)
+            name=self.target, identity=self.identity,
+            endpoint=self.cloud_config)
 
     def test_make(self):
         self.service.make(identity=self.identity2)
         self.identity_driver.from_dict.assert_called_once_with(
-            identity=self.identity2, endpoint=self.cloud_config)
+            name=self.target, identity=self.identity2,
+            endpoint=self.cloud_config)
 
     @patch("pumphouse.management.cleanup")
     @patch("pumphouse.management.setup")

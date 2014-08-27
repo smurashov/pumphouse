@@ -37,7 +37,8 @@ class Service(object):
     def make(self, identity=None):
         if identity is None:
             identity = self.identity_driver(**self.identity_config)
-        cloud = self.cloud_driver.from_dict(identity=identity,
+        cloud = self.cloud_driver.from_dict(name=self.target,
+                                            identity=identity,
                                             **self.cloud_config)
         LOG.info("Cloud client initialized for endpoint: %s",
                  self.cloud_config["endpoint"]["auth_url"])
