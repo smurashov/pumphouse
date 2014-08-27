@@ -17,11 +17,14 @@ import logging
 from taskflow.patterns import linear_flow
 
 from pumphouse import task
+from pumphouse import flows
 from pumphouse.tasks import utils as task_utils
 from pumphouse import utils
 
 
 LOG = logging.getLogger(__name__)
+
+provision_server = flows.register("provision_server")
 
 
 class RetrieveServer(task.BaseCloudTask):
@@ -64,6 +67,7 @@ class TerminateServer(task.BaseCloudTask):
         LOG.info("Server terminated: %s", server_info["id"])
 
 
+@provision_server.add("image")
 def reprovision_server(src, dst, store, server_id, image_id, flavor_id):
     server_sync = "server-{}-sync".format(server_id)
     server_binding = "server-{}".format(server_id)
@@ -72,6 +76,40 @@ def reprovision_server(src, dst, store, server_id, image_id, flavor_id):
     server_boot = "server-{}-boot".format(server_id)
     server_terminate = "server-{}-terminate".format(server_id)
     image_ensure = "image-{}-ensure".format(image_id)
+    flavor_ensure = "flavor-{}-ensure".format(flavor_id)
+    flow = linear_flow.Flow("migrate-server-{}".format(server_id))
+    flow.add(task_utils.SyncPoint(name=server_sync,
+                                  requires=[image_ensure, flavor_ensure]))
+    flow.add(RetrieveServer(src,
+                            name=server_binding,
+                            provides=server_retrieve,
+                            rebind=[server_binding]))
+    flow.add(SuspendServer(src,
+                           name=server_retrieve,
+                           provides=server_suspend,
+                           rebind=[server_retrieve]))
+    flow.add(BootServerFromImage(dst,
+                                 name=server_boot,
+                                 provides=server_boot,
+                                 rebind=[server_suspend, image_ensure,
+                                         flavor_ensure]
+                                 ))
+    flow.add(TerminateServer(src,
+                             name=server_terminate,
+                             rebind=[server_suspend]))
+    store[server_binding] = server_id
+    return (flow, store)
+
+
+@provision_server.add("snapshot")
+def reprovision_server_with_snapshot(src, dst, store, server_id, flavor_id):
+    server_sync = "server-{}-sync".format(server_id)
+    server_binding = "server-{}".format(server_id)
+    server_retrieve = "server-{}-retrieve".format(server_id)
+    server_suspend = "server-{}-suspend".format(server_id)
+    server_boot = "server-{}-boot".format(server_id)
+    server_terminate = "server-{}-terminate".format(server_id)
+    image_ensure = "snapshot-{}-ensure".format(server_id)
     flavor_ensure = "flavor-{}-ensure".format(flavor_id)
     flow = linear_flow.Flow("migrate-server-{}".format(server_id))
     flow.add(task_utils.SyncPoint(name=server_sync,

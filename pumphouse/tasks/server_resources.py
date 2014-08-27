@@ -64,6 +64,6 @@ def migrate_server_with_snapshot(src, dst, store, server_id):
         flavor_flow, store = flavor_tasks.migrate_flavor(src, dst, store,
                                                          flavor_id)
         resources.append(flavor_flow)
-    server_flow, store = server_tasks.reprovision_server(
-        src, dst, store, server.id, store[snapshot_retrieve], flavor_id)
+    server_flow, store = server_tasks.reprovision_server_with_snapshot(
+        src, dst, store, server.id, flavor_id)
     return resources, server_flow, store
