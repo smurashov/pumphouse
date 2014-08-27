@@ -22,7 +22,7 @@ import flask
 from . import evacuation
 from . import hooks
 from pumphouse import flows
-from pumphouse.tasks import identity as identity_tasks
+from pumphouse.tasks import resources as resource_tasks
 
 
 LOG = logging.getLogger(__name__)
@@ -169,11 +169,12 @@ def migrate_tenant(tenant_id):
         src = hooks.source.connect()
         dst = hooks.destination.connect()
         store = {}
-        identity_flow, store = identity_tasks.migrate_identity(src, dst, store,
-                                                               tenant_id)
-        LOG.debug("Migration flow: %s", identity_flow)
-        result = flows.run_flow(identity_flow, store)
-        LOG.info("Result of migration: %s", result)
+        flow, store = resource_tasks.migrate_resources(src, dst, store,
+                                                       tenant_id)
+        LOG.debug("Migration flow: %s", flow)
+        result = flows.run_flow(flow, store)
+        LOG.debug("Result of migration: %s", result)
+
     gevent.spawn(migrate)
     return flask.make_response()
 
