@@ -12,7 +12,41 @@
 # See the License for the specific language governing permissions and#
 # limitations under the License.
 
+from keystoneclient.openstack.common.apiclient import (exceptions  # NOQA
+                                                       as keystone_excs)  # NOQA
+from novaclient import exceptions as nova_excs  # NOQA
+from glanceclient import exc as glance_excs  # NOQA
+
+
 class Error(Exception):
+    pass
+
+
+class PluginError(Error):
+    def __init__(self, target, *args, **kwargs):
+        super(PluginError, self).__init__(*args, **kwargs)
+        self.target = target
+
+
+class PluginAlreadyRegisterError(PluginError):
+    pass
+
+
+class PluginNotFoundError(PluginError):
+    pass
+
+
+class PluginFuncError(PluginError):
+    def __init__(self, target, name, *args, **kwargs):
+        super(PluginFuncError, self).__init__(target, *args, **kwargs)
+        self.name = name
+
+
+class FuncNotFoundError(PluginFuncError):
+    pass
+
+
+class FuncAlreadyRegisterError(PluginFuncError):
     pass
 
 

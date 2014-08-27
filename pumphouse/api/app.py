@@ -48,7 +48,7 @@ def start_app(config=None, **kwargs):
             return (host, port)
         return (None, None)
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     app = create_app()
     app.config.setdefault("CLOUDS_RESET", False)
     app.config.setdefault("BIND_HOST", None)

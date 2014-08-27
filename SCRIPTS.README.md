@@ -85,7 +85,7 @@ $ pumphouse --help
 
 To migrate resources from one cloud to another, add configuration of endpoints
 of source and destination clouds to configuration file `config.yaml`. See
-example in `devstack/config.yaml` file.
+example in [`doc/samples/config.yaml`](doc/samples/config.yaml) file.
 
 Now prepare your source cloud for the test run by adding certain resources to
 it. Use `setup` flag of the migration script:

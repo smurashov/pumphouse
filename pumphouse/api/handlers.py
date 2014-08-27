@@ -21,7 +21,8 @@ import flask
 
 from . import evacuation
 from . import hooks
-from . import migration
+from pumphouse import flows
+from pumphouse.tasks import resources as resource_tasks
 
 
 LOG = logging.getLogger(__name__)
@@ -163,11 +164,17 @@ def resources():
 def migrate_tenant(tenant_id):
     @flask.copy_current_request_context
     def migrate():
-        parameters = flask.current_app.config.get("PARAMETERS")
-        source = hooks.source.connect()
-        destination = hooks.destination.connect()
-        migration.migrate_resources(parameters, hooks.events, source,
-                                    destination, tenant_id)
+        # FIXME(akscram): The params don't support yet.
+        # parameters = flask.current_app.config.get("PARAMETERS")
+        src = hooks.source.connect()
+        dst = hooks.destination.connect()
+        store = {}
+        flow, store = resource_tasks.migrate_resources(src, dst, store,
+                                                       tenant_id)
+        LOG.debug("Migration flow: %s", flow)
+        result = flows.run_flow(flow, store)
+        LOG.debug("Result of migration: %s", result)
+
     gevent.spawn(migrate)
     return flask.make_response()
 

@@ -35,6 +35,9 @@ class AttrDict(dict):
         self._info = self
         self.manager = manager
 
+    def to_dict(self):
+        return self.copy()
+
 
 class TenantAttrDict(AttrDict):
     def list_users(self):
@@ -510,6 +513,10 @@ class User(KeystoneResource):
         }, **kwargs)
         self.objects[user.id] = user
         return user
+
+    def list_roles(self, id, tenant=None):
+        user = self.objects[id]
+        return user['roles']
 
 
 class Role(KeystoneResource):
