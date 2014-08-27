@@ -720,7 +720,8 @@ class Cloud(object):
 
     def restrict(self, **kwargs):
         namespace = self.namespace.restrict(**kwargs)
-        return self.__class__(namespace, self.identity, data=self.data)
+        return self.__class__(self.name, namespace, self.identity,
+                              data=self.data)
 
     @classmethod
     def from_dict(cls, name, endpoint, identity, **kwargs):
