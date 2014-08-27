@@ -28,7 +28,8 @@ class TestSnapshot(unittest.TestCase):
         self.src = Mock()
 
         self.cloud = Mock()
-        self.cloud.nova.servers.create_image.return_value = self.test_snapshot_id
+        self.cloud.nova.servers.create_image.return_value = \
+            self.test_snapshot_id
         self.cloud.glance.images.get.return_value = self.test_snapshot_info
 
         self.utils = Mock()
@@ -48,7 +49,7 @@ class TestEnsureSnapshot(TestSnapshot):
         self.assertEqual(snapshot_id, self.test_snapshot_id)
 
     def test_execute_exception(self):
-        self.cloud.servers.create_image.side_effect = Exception
+        self.cloud.nova.servers.create_image.side_effect = Exception
 
         with self.assertRaises(Exception):
             snapshot.EnsureSnapshot(self.cloud).execute(self.test_server_id)
