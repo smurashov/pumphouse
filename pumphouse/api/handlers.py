@@ -21,6 +21,8 @@ import flask
 
 from . import evacuation
 from . import hooks
+
+from pumphouse import events
 from pumphouse import flows
 from pumphouse.tasks import resources as resource_tasks
 
@@ -136,11 +138,11 @@ def reset():
 
     @flask.copy_current_request_context
     def reset_source():
-        hooks.source.reset(hooks.events)
+        hooks.source.reset(events)
 
     @flask.copy_current_request_context
     def reset_destination():
-        hooks.destination.reset(hooks.events)
+        hooks.destination.reset(events)
     gevent.spawn(reset_destination)
     gevent.spawn(reset_source)
     return flask.make_response("", 201)
@@ -184,12 +186,12 @@ def evacuate_host(host_name):
     @flask.copy_current_request_context
     def evacuate():
         source = hooks.source.connect()
-        evacuation.evacuate_servers(hooks.events, source, host_name)
+        evacuation.evacuate_servers(events, source, host_name)
     gevent.spawn(evacuate)
     return flask.make_response()
 
 
 # XXX(akscram): Nothing works without this.
-@hooks.events.on("connect", namespace="/events")
+@events.on("connect", namespace="/events")
 def handle_events_connection():
     LOG.debug("Client connected to '/events'.")

@@ -614,7 +614,8 @@ class Cloud(object):
     default_num_hypervisors = 2
     default_delays = False
 
-    def __init__(self, namespace, identity, data=None, fake=None):
+    def __init__(self, name, namespace, identity, data=None, fake=None):
+        self.name = name
         self.namespace = namespace
         self.fake = fake or {}
         self.delays = self.fake.get("delays", self.default_delays)
@@ -722,14 +723,14 @@ class Cloud(object):
         return self.__class__(namespace, self.identity, data=self.data)
 
     @classmethod
-    def from_dict(cls, endpoint, identity, **kwargs):
+    def from_dict(cls, name, endpoint, identity, **kwargs):
         namespace = pump_cloud.Namespace(
             username=endpoint["username"],
             password=endpoint["password"],
             tenant_name=endpoint["tenant_name"],
             auth_url=endpoint["auth_url"],
         )
-        cloud = cls(namespace, identity, **kwargs)
+        cloud = cls(name, namespace, identity, **kwargs)
         return cloud
 
     def __repr__(self):

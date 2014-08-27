@@ -19,6 +19,8 @@ import flask
 from . import handlers
 from . import hooks
 
+from pumphouse import events
+
 
 def create_app():
     """Creates a WSGI application.
@@ -54,11 +56,11 @@ def start_app(config=None, **kwargs):
     app.config.setdefault("BIND_HOST", None)
     if config is not None:
         app.config.update(config)
-    hooks.events.init_app(app)
+    events.init_app(app)
     hooks.source.init_app(app)
     hooks.destination.init_app(app)
     host, port = get_bind_host()
-    hooks.events.run(app, policy_server=False, host=host, port=port)
+    events.run(app, policy_server=False, host=host, port=port)
 
 
 if __name__ == "__main__":

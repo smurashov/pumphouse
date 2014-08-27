@@ -325,12 +325,12 @@ class Events(object):
         pass
 
 
-def init_client(config, client_class, identity_class):
+def init_client(config, name, client_class, identity_class):
     endpoint_config = config.get("endpoint")
     identity_config = config.get("identity")
     connection = identity_config.get("connection")
     identity = identity_class(connection)
-    client = client_class.from_dict(endpoint_config, identity)
+    client = client_class.from_dict(name, endpoint_config, identity)
     return client
 
 
@@ -346,6 +346,7 @@ def main():
         store = {}
         src_config = args.config["source"]
         src = init_client(src_config,
+                          "source",
                           Cloud,
                           Identity)
         if args.setup:
@@ -354,6 +355,7 @@ def main():
                              args.num_servers, workloads)
         dst_config = args.config["destination"]
         dst = init_client(dst_config,
+                          "destination",
                           Cloud,
                           Identity)
         migrate_function = RESOURCES_MIGRATIONS[args.resource]
@@ -370,12 +372,14 @@ def main():
     elif args.action == "cleanup":
         cloud_config = args.config[args.target]
         cloud = init_client(cloud_config,
+                            args.target,
                             Cloud,
                             Identity)
         management.cleanup(events, cloud, args.target)
     elif args.action == "setup":
         src_config = args.config["source"]
         src = init_client(src_config,
+                          "source",
                           Cloud,
                           Identity)
         workloads = args.config["source"].get("workloads", {})
@@ -384,6 +388,7 @@ def main():
     elif args.action == "evacuate":
         cloud_config = args.config["source"]
         cloud = init_client(cloud_config,
+                            "source",
                             Cloud,
                             Identity)
         evacuate(cloud, args.host)

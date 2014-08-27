@@ -16,7 +16,6 @@ import gevent.lock
 import logging
 
 import flask
-from flask.ext import socketio
 
 from pumphouse import utils
 
@@ -116,6 +115,5 @@ class Cloud(object):
             return service.cloud_urls
 
 
-events = socketio.SocketIO()
 source = Cloud("source")
 destination = Cloud("destination")
