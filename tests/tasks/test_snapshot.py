@@ -28,7 +28,7 @@ class TestSnapshot(unittest.TestCase):
         self.src = Mock()
 
         self.cloud = Mock()
-        self.cloud.servers.create_image.return_value = self.test_snapshot_id
+        self.cloud.nova.servers.create_image.return_value = self.test_snapshot_id
         self.cloud.glance.images.get.return_value = self.test_snapshot_info
 
         self.utils = Mock()
@@ -41,7 +41,7 @@ class TestEnsureSnapshot(TestSnapshot):
         self.assertIsInstance(ensure_snapshot, task.BaseCloudTask)
 
         snapshot_id = ensure_snapshot.execute(self.test_server_id)
-        self.cloud.servers.create_image.assert_called_once_with(
+        self.cloud.nova.servers.create_image.assert_called_once_with(
             self.test_server_id,
             "pumphouse-snapshot-%s" % self.test_server_id)
 
