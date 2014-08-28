@@ -69,6 +69,6 @@ class FileProxy(object):
 
     def read(self, amt=None):
         data = self.resp.read(amt)
-        if data:
+        if data and self.reporter.size:
             self.reporter.update(len(data))
         return data
