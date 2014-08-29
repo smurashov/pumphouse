@@ -42,12 +42,11 @@ class EnsureSecGroup(task.BaseCloudTask):
             LOG.info("Created: %s", secgroup.to_dict())
         else:
             LOG.warn("Already exists: %s", secgroup.to_dict())
+        secgroup = self._add_rules(secgroup_info)
         return secgroup.to_dict()
 
-
-class EnsureSecGroupRules(task.BaseCloudTask):
-    """Create rules in the target instance of the given security group"""
-    def execute(self, secgroup_info):
+    def _add_rules(self, secgroup_info):
+    """This helper function recreates all rules from security group"""
         rules_list = secgroup_info["rules"]
         for rule in rules_list:
             try:
@@ -59,33 +58,29 @@ class EnsureSecGroupRules(task.BaseCloudTask):
                     cidr=rule["ip_range"]["cidr"])
             except exceptions.nova_excs.BadRequest:
                 LOG.warn("Duplicate rule: %s", rule)
-                raise
+                pass
             except exceptions.nova_excs.NotFound:
                 LOG.exception("No such security group exist: %s",
                               secgroup_info)
                 raise
             else:
                 LOG.info("Created: %s", rule)
-                return rule.to_dict()
+        secgroup = self.cloud.nova.security_groups.get(secgroup_info["id"])
+        return secgroup
 
 
 def migrate_secgroup(src, dst, store, secgroup_id):
     secgroup_binding = "secgroup-{}".format(secgroup_id)
     secgroup_retrieve = "{}-retrieve".format(secgroup_binding)
     secgroup_ensure = "{}-ensure".format(secgroup_binding)
-    secgroup_rules_ensure = "secgroup-rules-{}-ensure".format(secgroup_id)
     flow = linear_flow.Flow("migrate-secgroup-{}".format(secgroup_id))
     flow.add(RetrieveSecGroup(src,
                               name=secgroup_retrieve,
-                              provides=secgroup_retrieve,
-                              rebind=[secgroup_binding]))
+                              provides=secgroup_binding,
+                              rebind=[secgroup_retrieve]))
     flow.add(EnsureSecGroup(dst,
                             name=secgroup_ensure,
                             provides=secgroup_ensure,
-                            rebind=[secgroup_retrieve]))
-    flow.add(EnsureSecGroupRules(dst,
-                                 name=secgroup_rules_ensure,
-                                 provides=secgroup_rules_ensure,
-                                 rebind=[secgroup_ensure]))
-    store[secgroup_binding] = secgroup_id
+                            rebind=[secgroup_binding]))
+    store[secgroup_retrieve] = secgroup_id
     return flow, store
