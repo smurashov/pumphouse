@@ -35,8 +35,9 @@ class TestLoadClass(unittest.TestCase):
         )
 
     def test_load_class_exc(self):
-        with self.assertRaises(ImportError):
+        with self.assertRaises(ImportError) as ec:
             utils.load_class(self.incorrect_import_path)
+        self.assertEqual(ec.exception.args[0], "No module named dummy")
 
 
 class TestWaitFor(unittest.TestCase):
