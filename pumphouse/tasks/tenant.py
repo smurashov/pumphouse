@@ -16,6 +16,7 @@ import logging
 
 from taskflow.patterns import linear_flow
 
+from pumphouse import events
 from pumphouse import exceptions
 from pumphouse import task
 
