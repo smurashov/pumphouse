@@ -1,0 +1,40 @@
+ipmi_default: &ipmi_default
+    user: ipmi_user
+    password: passwd
+
+ethernet_description: &ethernet_description
+    ip: []   # [] | [ ip1, ip2 ] | [ DHCP ]
+    hwaddr:
+    vlan: []
+    tags: []   # interface notes
+
+default_gw: &default_gw
+    ip: 10.0.0.1
+
+default_ns: &default_ns
+    - 10.0.0.1
+
+ipmi:
+    host.example.com: &host-ipmi
+        auth: *ipmi_default
+        host: host.example.com
+
+hosts:
+    host:
+        gw: *default_gw
+        ns: *default_ns
+        ipmi: *host-ipmi
+        notes:
+            - fuel.master
+        interfaces:
+            eth0:
+                <<: *ethernet_description
+                ip: [ 10.0.0.2 ]
+                vlan: [ 100 ]
+                hwaddr: 00:25:90:E7:46:D0
+                tags:
+                    - fuel.api
+            eth1:
+                <<: *ethernet_description
+                vlan: [ 101 ]
+                hwaddr: 00:25:90:E7:46:D1

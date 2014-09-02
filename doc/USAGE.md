@@ -73,7 +73,7 @@ Use standard OpenStack clients (installed as dependencies with `pumphouse`
 package) to find and identify resources you`d like to migrate. 
 
 In version 0.1, you can use `migration.py` script to move resources about. See
-usage details in [`scripts/README.md`](../scripts/README.md) file.
+usage details in [`README.md`](README.md) file.
 
 In future versions, we will implement subcommands-based CLI for atomic
 operations and Web-based UI.
@@ -97,7 +97,7 @@ migration or evacuate/rebuild.
 Both are implemented in `scripts/migration.py` script. Move designated resources
 to Mirantis OpenStack with `migrate` subcommand. Move remaining resources within
 Source cloud with `evacuate` subcommand. See details in
-[`scripts/README.md`](../scripts/README.md) file.
+[`README.md`](README.md) file.
 
 ## Upgrade host
 
@@ -105,7 +105,7 @@ Use `nova hypervisor-list`, `nova hypervisor-show` commands to identify which
 hosts are cleansed from all work load. To decomission host from the existing
 cloud and move it to Mirantis OpenStack, use script `scripts/migrate_host.py`.
 See usage details for that script in 
-[`scripts/README.md`](../scripts/README.md) document.
+[`README.md`](README.md) document.
 
 To perform the upgrade, you have to connect the host to Fuel-managed PXE network,
 reboot it into PXE bootstrap, configure it in the Fuel API and start deployment.
