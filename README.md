@@ -106,7 +106,7 @@ $ pumphouse-bm [-h] [-i INVENTORY] [-e ENV] hostname
 ```
 
 `INVENTORY` is a YaML formatted file with the inventory of hardware present in
-the environment and some additional configuration information. See `samples/`
+the environment and some additional configuration information. See `doc/samples/`
 for the example of inventory file. Defaults to `./inventory.yaml`.
 `ENV` is an identifier number of the target Mirantis OpenStack cluster in
 Fuel. Defaults to `1`.
@@ -154,6 +154,8 @@ with `cleanup` command and specify which cloud you want to clean up:
 ```sh
 $ pumphouse config.yaml cleanup { source | destination }
 ```
+
+See detailed usage scenario in [USAGE](doc/USAGE.md) document.
 
 ## User Interface
 
