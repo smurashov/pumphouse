@@ -40,7 +40,16 @@ class EnsureTenant(task.BaseCloudTask):
                 enabled=tenant_info["enabled"],
             )
             LOG.info("Created tenant: %s", tenant)
+            self.created_event(tenant)
         return tenant.to_dict()
+
+    def created_event(self, tenant):
+        LOG.info("Tenant created: %s", tenant.id)
+        events.emit("tenant created", {
+            "id": tenant.id,
+            "name": tenant.name,
+            "cloud": self.cloud.name,
+        }, namespace="/events")
 
 
 def migrate_tenant(src, dst, store, tenant_id):
