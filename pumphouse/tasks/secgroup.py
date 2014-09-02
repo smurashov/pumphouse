@@ -46,7 +46,7 @@ class EnsureSecGroup(task.BaseCloudTask):
         return secgroup.to_dict()
 
     def _add_rules(self, secgroup_info):
-    """This helper function recreates all rules from security group"""
+        """This helper function recreates all rules from security group"""
         rules_list = secgroup_info["rules"]
         for rule in rules_list:
             try:
