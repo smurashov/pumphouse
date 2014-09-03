@@ -17,6 +17,7 @@ import logging
 from taskflow.patterns import linear_flow
 
 from pumphouse import exceptions
+from pumphouse import events
 from pumphouse import task
 
 
@@ -47,8 +48,16 @@ class EnsureFlavor(task.BaseCloudTask):
                 rxtx_factor=flavor_info["rxtx_factor"],
                 is_public=flavor_info["os-flavor-access:is_public"]
             )
-            LOG.info("Flavor created: %s", flavor.id)
+            self.created_event(flavor)
         return flavor.to_dict()
+
+    def created_event(self, flavor):
+        LOG.info("Flavor created: %s", flavor.id)
+        events.emit("flavor created", {
+            "id": flavor.id,
+            "name": flavor.name,
+            "cloud": self.cloud.name
+        }, namespace="/events")
 
 
 def migrate_flavor(src, dst, store, flavor_id):
