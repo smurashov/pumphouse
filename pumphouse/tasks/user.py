@@ -80,7 +80,7 @@ class EnsureUserRole(task.BaseCloudTask):
 
     def role_assigned_event(self, role_info, user_info, tenant_info):
         LOG.info("Created role %s assignment for user %s in tenant %s",
-                     role_info["id"], user_info["id"], tenant_info["id"])
+                 role_info["id"], user_info["id"], tenant_info["id"])
         events.emit("user role assigned", {
             "id": user.id,
             "name": user.name,
