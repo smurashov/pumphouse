@@ -7,6 +7,20 @@ CLOUD_SERVICE: pumphouse.fake.Service
 CLOUDS_RESET: true
 PARAMETERS:
     ephemeral_storage: true
+
+cmds:
+    ping: &ping
+        cmd: "ping %"
+
+    ssh: &ssh
+        cmd: "echo y | nc % 22"
+
+    customerMonitoring: &customerMonitoring
+        cmd: "curl '$MONITORING_URL/status.cgi?=%'"
+
+    simpleWebCheck: &simpleWebCheck
+        cmd: "curl http://%/$REQUEST_URI"
+
 CLOUDS:
     source:
         endpoint:
@@ -51,10 +65,28 @@ CLOUDS:
                 username: pumphouse-test-user-0001
                 servers:
                   - name: pumphouse-test-instance-0001
-                    flavor: 
+                    flavor:
                       <<: *small
                     image:
                       <<: *image
+                    pre-actions: &health_checks
+                        -
+                            - <<: *ping
+                              input:
+                                  - public
+                                  - private
+                            - <<: *ssh
+                              input:
+                                  - public
+                                  - private
+                        - <<: *customerMonitoring
+                          env:
+                                MONITORING_URL: "http://monitoring.customer.int/cgi-bin"
+                        - <<: *simpleWebCheck
+                          env:
+                                REQUEST_URI: "/index2.html"
+                    post-actions:
+                        <<: *health_checks
                   - name: pumphouse-test-instance-0002
                     flavor:
                       <<: *medium
@@ -79,3 +111,4 @@ CLOUDS:
         fake:
             delays: true
             num_hypervisors: 4
+
