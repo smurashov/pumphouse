@@ -17,6 +17,7 @@ import logging
 from taskflow.patterns import graph_flow
 
 from pumphouse import task
+from pumphouse import events
 from pumphouse.tasks import utils as task_utils
 
 
@@ -27,6 +28,10 @@ class LogReporter(task_utils.UploadReporter):
     def report(self, absolute):
         LOG.info("Image %r uploaded on %3.2f%%",
                  self.context["id"], absolute * 100)
+        events.emit("image uploading", {
+            "id": self.context["id"],
+            "progress": round(absolute * 100)
+        }, namespace="/events")
 
 
 class EnsureImage(task.BaseCloudsTask):
@@ -58,13 +63,28 @@ class EnsureImage(task.BaseCloudsTask):
             # TODO(akscram): Some image can contain additional
             #                parameters which are skipped now.
             image = self.dst_cloud.glance.images.create(**parameters)
-            LOG.info("Image created: %s", image["id"])
+            self.created_event(image)
+
             data = self.src_cloud.glance.images.data(image_info["id"])
             img_data = task_utils.FileProxy(data, LogReporter(image))
             self.dst_cloud.glance.images.upload(image["id"], img_data)
             image = self.dst_cloud.glance.images.get(image["id"])
-            LOG.info("Image uploaded: %s", image["id"])
+            self.uploaded_event(image)
         return dict(image)
+
+    def created_event(self, image):
+        LOG.info("Image created: %s", image["id"])
+        events.emit("image created", {
+            "id": image["id"],
+            "name": image["name"],
+            "cloud": self.cloud.name
+        }, namespace="/events")
+
+    def uploaded_event(self, image):
+        LOG.info("Image uploaded: %s", image["id"])
+        events.emit("image uploaded", {
+            "id": image["id"]
+        }, namespace="/events")
 
 
 class EnsureImageWithKernel(EnsureImage):

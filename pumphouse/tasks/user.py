@@ -17,6 +17,7 @@ import logging
 from taskflow.patterns import linear_flow
 
 from pumphouse import exceptions
+from pumphouse import events
 from pumphouse import task
 
 
@@ -48,8 +49,16 @@ class EnsureUser(task.BaseCloudTask):
                 tenant_id=tenant_info["id"] if tenant_info else None,
                 enabled=user_info["enabled"],
             )
-            LOG.info("Created user: %s", user)
+            created_event(user)
         return user.to_dict()
+
+    def created_event(self, user):
+        LOG.info("Created user: %s", user)
+        events.emit("user created", {
+            "id": user.id,
+            "name": user.name,
+            "cloud": self.cloud.name
+        }, namespace="/events")
 
 
 class EnsureOrphanUser(EnsureUser):
@@ -66,9 +75,18 @@ class EnsureUserRole(task.BaseCloudTask):
         except exceptions.keystone_excs.Conflict:
             pass
         else:
-            LOG.info("Created assinment role %s for user %s in tenant %s",
-                     role_info["id"], user_info["id"], tenant_info["id"])
+            role_assigned_event(role_info, user_info, tenant_info)
         return user_info
+
+    def role_assigned_event(self, role_info, user_info, tenant_info):
+        LOG.info("Created role %s assignment for user %s in tenant %s",
+                     role_info["id"], user_info["id"], tenant_info["id"])
+        events.emit("user role assigned", {
+            "id": user.id,
+            "name": user.name,
+            "tenant_id": tenant_info["id"],
+            "cloud": self.cloud.name
+        }, namespace="/events")
 
 
 def migrate_membership(src, dst, store, user_id, role_id, tenant_id):
