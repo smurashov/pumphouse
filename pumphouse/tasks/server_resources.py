@@ -53,8 +53,6 @@ def migrate_server_with_image(src, dst, store, server_id):
                                                          server.id,
                                                          image_id,
                                                          flavor_id)
-    print resources
-    print store
     return resources, server_flow, store
 
 
