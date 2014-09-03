@@ -49,7 +49,7 @@ class EnsureUser(task.BaseCloudTask):
                 tenant_id=tenant_info["id"] if tenant_info else None,
                 enabled=user_info["enabled"],
             )
-            created_event(user)
+            self.created_event(user)
         return user.to_dict()
 
     def created_event(self, user):
@@ -75,15 +75,15 @@ class EnsureUserRole(task.BaseCloudTask):
         except exceptions.keystone_excs.Conflict:
             pass
         else:
-            role_assigned_event(role_info, user_info, tenant_info)
+            self.role_assigned_event(role_info, user_info, tenant_info)
         return user_info
 
     def role_assigned_event(self, role_info, user_info, tenant_info):
         LOG.info("Created role %s assignment for user %s in tenant %s",
                  role_info["id"], user_info["id"], tenant_info["id"])
         events.emit("user role assigned", {
-            "id": user.id,
-            "name": user.name,
+            "id": user_info["id"],
+            "name": user_info["name"],
             "tenant_id": tenant_info["id"],
             "cloud": self.cloud.name
         }, namespace="/events")
