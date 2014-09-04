@@ -79,7 +79,7 @@ def cleanup(events, cloud, target):
                          floating_ip._info)
         cloud.nova.servers.delete(server)
         utils.wait_for(server, cloud.nova.servers.get,
-                       stop_excs=(nova_excs.NotFound,))
+                       expect_excs=(nova_excs.NotFound,))
         LOG.info("Deleted server: %s", server._info)
         hostname = getattr(server, "OS-EXT-SRV-ATTR:hypervisor_hostname")
         events.emit("server delete", {
