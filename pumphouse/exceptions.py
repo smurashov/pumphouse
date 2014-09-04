@@ -77,4 +77,3 @@ class UsageError(Error):
 class CheckError(Error):
     def __init__(self, failList):
         self.failList = failList
-
