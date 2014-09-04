@@ -113,12 +113,22 @@ def cloud_resources(client):
             "status": "",
             "name": image["name"],
         } for image in cloud.glance.images.list()
+        ] + [{
+            "id": user.id,
+            "type": "user",
+            "name": user.name
+        } for user in cloud.keystone.users.list()
+        ] + [{
+            "id": flavor.id,
+            "type": "flavor",
+            "name": flavor.name
+        } for flavor in cloud.nova.flavors.list()
         ],
         "hosts": [{
             "name": hyperv.service["host"],
             "status": get_host_status(hyperv.service["host"]),
         } for hyperv in cloud.nova.hypervisors.list()
-        ],
+        ]
     }
     return resources
 
