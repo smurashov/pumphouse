@@ -18,6 +18,7 @@ from taskflow.patterns import linear_flow
 
 from pumphouse import task
 from pumphouse import utils
+from pumphouse import events
 from pumphouse.tasks import image as image_tasks
 
 
@@ -40,7 +41,15 @@ class EnsureSnapshot(task.BaseCloudTask):
                                       self.cloud.glance.images.get,
                                       value='active')
             LOG.info("Created: %s", snapshot)
+            self.created_event(snapshot)
             return snapshot.id
+
+    def created_event(self, snapshot):
+        events.emit("image created", {
+            "id": snapshot.id,
+            "name": snapshot.name,
+            "cloud": self.cloud.name,
+        }, namespace="/events")
 
 
 def migrate_snapshot(src, dst, store, server_id):

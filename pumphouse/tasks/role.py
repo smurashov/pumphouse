@@ -17,6 +17,7 @@ import logging
 from taskflow.patterns import linear_flow
 
 from pumphouse import exceptions
+from pumphouse import events
 from pumphouse import task
 
 
@@ -38,7 +39,15 @@ class EnsureRole(task.BaseCloudTask):
                 name=role_info["name"],
             )
             LOG.info("Created role: %s", role)
+            self.created_event(role_info)
         return role.to_dict()
+
+    def created_event(self, role_info):
+        events.emit("role created", {
+            "id": role_info["id"],
+            "name": role_info["name"],
+            "cloud": self.cloud.name
+        }, namespace="/events")
 
 
 def migrate_role(src, dst, store, role_id):
