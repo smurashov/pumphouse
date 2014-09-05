@@ -47,7 +47,6 @@ class EnsureSnapshot(task.BaseCloudTask):
     def created_event(self, snapshot):
         events.emit("image created", {
             "id": snapshot.id,
-            "name": snapshot.name,
             "cloud": self.cloud.name,
         }, namespace="/events")
 
