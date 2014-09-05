@@ -77,7 +77,7 @@ class EnsureImage(task.BaseCloudsTask):
         events.emit("image created", {
             "id": image["id"],
             "name": image["name"],
-            "cloud": self.cloud.name
+            "cloud": self.dst_cloud.name
         }, namespace="/events")
 
     def uploaded_event(self, image):
