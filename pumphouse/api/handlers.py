@@ -123,6 +123,16 @@ def cloud_resources(client):
             "type": "flavor",
             "name": flavor.name
         } for flavor in cloud.nova.flavors.list()
+        ] + [{
+            "id": role.id,
+            "type": "role",
+            "name": role.name
+        } for role in cloud.keystone.roles.list()
+        ] + [{
+            "id": secgroup.id,
+            "type": "secgroup",
+            "name": secgroup.name
+        } for secgroup in cloud.nova.security_groups.list()
         ],
         "hosts": [{
             "name": hyperv.service["host"],
