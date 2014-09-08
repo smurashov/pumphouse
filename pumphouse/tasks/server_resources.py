@@ -37,9 +37,9 @@ def migrate_server_with_image(src, dst, store, server_id):
     flavor_retrieve = "flavor-{}-retrieve".format(flavor_id)
     image_retrieve = "image-{}-retrieve".format(image_id)
     resources = []
-    tenant_ensure = "tenant-{}-ensure".format(tenant_id)
+    tenant_ensure = "tenant-{}-retrieve".format(tenant_id)
     tenant_name = store[tenant_ensure]["name"]
-    user_ensure = "user-{}-ensure".format(user_id)
+    user_ensure = "user-{}-retrieve".format(user_id)
     username = store[user_ensure]["name"]
     restricted_dst = dst.restrict(username=username,
                             tenant_name=tenant_name,
