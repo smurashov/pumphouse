@@ -88,11 +88,4 @@ def migrate_identity(src, dst, store, tenant_id):
             role_flow, store = role_tasks.migrate_role(src, dst, store,
                                                        role_id)
             flow.add(role_flow)
-    # TODO(akcram): All users' passwords should be restored when all
-    #               migration operations ended.
-    users_passwords_flow, store = migrate_passwords(src, dst,
-                                                    store,
-                                                    users_ids,
-                                                    tenant_id)
-    flow.add(users_passwords_flow)
-    return (flow, store)
+    return (users_ids, flow, store)

@@ -28,8 +28,9 @@ def migrate_resources(src, dst, store, tenant_id):
         "tenant_id": tenant_id,
     })
     flow = graph_flow.Flow("migrate-resources-{}".format(tenant_id))
-    identity_flow, store = identity.migrate_identity(src, dst, store,
-                                                     tenant_id)
+    users_ids, identity_flow, store = identity.migrate_identity(src, dst,
+                                                                store,
+                                                                tenant_id)
     flow.add(identity_flow)
     servers_flow = unordered_flow.Flow("migrate-servers-{}".format(tenant_id))
     migrate_server = server_resources.migrate_server.select("image")
@@ -41,4 +42,11 @@ def migrate_resources(src, dst, store, tenant_id):
             flow.add(*resources)
             servers_flow.add(server_flow)
     flow.add(servers_flow)
+    # TODO(akcram): All users' passwords should be restored when all
+    #               migration operations ended.
+    users_passwords_flow, store = identity.migrate_passwords(src, dst,
+                                                             store,
+                                                             users_ids,
+                                                             tenant_id)
+    flow.add(users_passwords_flow)
     return flow, store
