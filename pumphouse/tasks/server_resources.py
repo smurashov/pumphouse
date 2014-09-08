@@ -33,15 +33,24 @@ migrate_server = flows.register("server")
 def migrate_server_with_image(src, dst, store, server_id):
     server = src.nova.servers.get(server_id)
     image_id, flavor_id = server.image["id"], server.flavor["id"]
+    tenant_id, user_id = server.tenant_id, server.user_id
     flavor_retrieve = "flavor-{}-retrieve".format(flavor_id)
     image_retrieve = "image-{}-retrieve".format(image_id)
     resources = []
+    tenant_ensure = "tenant-{}-ensure".format(tenant_id)
+    tenant_name = store[tenant_ensure]["name"]
+    user_ensure = "user-{}-ensure".format(user_id)
+    username = store[user_ensure]["name"]
+    restricted_dst = dst.restrict(username=username,
+                            tenant_name=tenant_name,
+                            password="default")
+    restricted_src = src.restrict(tenant_name=tenant_name)
     for name in [sg["name"] for sg in server.security_groups]:
         secgroup = src.nova.security_groups.find(name=name)
         secgroup_retrieve = "secgroup-{}-retrieve".format(secgroup.id)
         if secgroup_retrieve not in store:
             secgroup_flow, store = secgroup_tasks.migrate_secgroup(
-                src, dst, store, secgroup.id)
+                restricted_src, restricted_dst, store, secgroup.id)
             resources.append(secgroup_flow)
     for floating_ip in [addr["addr"]
                         for addr in server.addresses.values().pop()
@@ -52,14 +61,16 @@ def migrate_server_with_image(src, dst, store, server_id):
                 src, dst, store, floating_ip)
         resources.append(floating_ip_flow)
     if image_retrieve not in store:
-        image_flow, store = image_tasks.migrate_image(src, dst, store,
+        image_flow, store = image_tasks.migrate_image(src, restricted_dst,
+                                                      store,
                                                       image_id)
         resources.append(image_flow)
     if flavor_retrieve not in store:
         flavor_flow, store = flavor_tasks.migrate_flavor(src, dst, store,
                                                          flavor_id)
         resources.append(flavor_flow)
-    server_flow, store = server_tasks.reprovision_server(src, dst, store,
+    server_flow, store = server_tasks.reprovision_server(src, restricted_dst,
+                                                         store,
                                                          server.id,
                                                          image_id,
                                                          flavor_id)
