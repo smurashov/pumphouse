@@ -134,7 +134,7 @@ def cloud_resources(client):
             "name": secgroup.name
         } for secgroup in cloud.nova.security_groups.list()
         ] + [{
-            "id": floating_ip.addr,
+            "id": floating_ip.address,
             "type": "floating_ip"
         } for floating_ip in cloud.nova.floating_ips_bulk.list()
         ],
