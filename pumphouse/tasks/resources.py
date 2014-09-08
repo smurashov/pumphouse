@@ -16,7 +16,7 @@ import logging
 
 from taskflow.patterns import graph_flow, unordered_flow
 
-from pumphouse.tasks import server_resources
+from pumphouse.tasks import server_resources, identity
 
 
 LOG = logging.getLogger(__name__)
@@ -28,6 +28,9 @@ def migrate_resources(src, dst, store, tenant_id):
         "tenant_id": tenant_id,
     })
     flow = graph_flow.Flow("migrate-resources-{}".format(tenant_id))
+    identity_flow, store = identity.migrate_identity(src, dst, store,
+                                                     tenant_id)
+    flow.add(identity_flow)
     servers_flow = unordered_flow.Flow("migrate-servers-{}".format(tenant_id))
     migrate_server = server_resources.migrate_server.select("image")
     for server in servers:
