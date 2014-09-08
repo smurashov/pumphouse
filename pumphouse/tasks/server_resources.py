@@ -37,8 +37,8 @@ def migrate_server_with_image(src, dst, store, server_id):
     flavor_retrieve = "flavor-{}-retrieve".format(flavor_id)
     image_retrieve = "image-{}-retrieve".format(image_id)
     resources = []
-    tenant = src.cloud.keystone.tenants.get(tenant_id)
-    user = src.cloud.keystone.users.get(user_id)
+    tenant = src.keystone.tenants.get(tenant_id)
+    user = src.keystone.users.get(user_id)
     restricted_dst = dst.restrict(username=user.name,
                                   tenant_name=tenant.name,
                                   password="default")
