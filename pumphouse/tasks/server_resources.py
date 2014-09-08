@@ -37,14 +37,12 @@ def migrate_server_with_image(src, dst, store, server_id):
     flavor_retrieve = "flavor-{}-retrieve".format(flavor_id)
     image_retrieve = "image-{}-retrieve".format(image_id)
     resources = []
-    tenant_ensure = "tenant-{}-retrieve".format(tenant_id)
-    tenant_name = store[tenant_ensure]["name"]
-    user_ensure = "user-{}-retrieve".format(user_id)
-    username = store[user_ensure]["name"]
-    restricted_dst = dst.restrict(username=username,
-                            tenant_name=tenant_name,
-                            password="default")
-    restricted_src = src.restrict(tenant_name=tenant_name)
+    tenant = src.cloud.keystone.tenants.get(tenant_id)
+    user = src.cloud.keystone.users.get(user_id)
+    restricted_dst = dst.restrict(username=user.name,
+                                  tenant_name=tenant.name,
+                                  password="default")
+    restricted_src = src.restrict(tenant_name=tenant.name)
     for name in [sg["name"] for sg in server.security_groups]:
         secgroup = src.nova.security_groups.find(name=name)
         secgroup_retrieve = "secgroup-{}-retrieve".format(secgroup.id)
