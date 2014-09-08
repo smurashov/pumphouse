@@ -1,6 +1,6 @@
-#import exceptions
 import subprocess
-from . import exceptions
+from pumphouse import exceptions
+
 
 class PumpHouseCheck(object):
     config = None
@@ -11,24 +11,18 @@ class PumpHouseCheck(object):
     def run():
         raise NotImplementedError()
 
+
 class PumpHouseShellCheck(PumpHouseCheck):
-
-
     def __init__(self, config):
         try:
             if not(isinstance(config, dict) and
-                isinstance(config['input'], list) and
-                isinstance(config['env'], dict) and
-                isinstance(config['cmd'], str)):
-                    raise exceptions.UsageError()
-
-
-            super(PumpHouseShellCheck, self).__init__(config);
-
-
+                   isinstance(config['input'], list) and
+                   isinstance(config['env'], dict) and
+                   isinstance(config['cmd'], str)):
+                raise exceptions.UsageError()
+            super(PumpHouseShellCheck, self).__init__(config)
         except KeyError:
-            raise exceptions.ConfigError();
-
+            raise exceptions.ConfigError()
 
     def generateEnv(self, env):
         r = ""
@@ -42,15 +36,14 @@ class PumpHouseShellCheck(PumpHouseCheck):
     def run(self):
         inputStream = self.generateInputStream(self.config['input'])
         environment = self.generateEnv(self.config['env'])
-
-        command = "xargs -r -I%% -P16 sh -c \"(%s %s) >/dev/null 2>&1 || (echo %%; exit 255)\" 2>/dev/null" % (environment, self.config['cmd'])
-
-
-        proc = subprocess.Popen(command, shell=True , stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-
-        r =  proc.communicate(inputStream)[0].rstrip().split("\n");
-
+        command = ("xargs -r -I%% -P16 sh -c \"({} {})"
+                   " >/dev/null 2>&1 || (echo %%; exit 255)\" 2>/dev/null"
+                   .format(environment, self.config['cmd']))
+        proc = subprocess.Popen(command,
+                                shell=True,
+                                stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE)
+        r = proc.communicate(inputStream)[0].rstrip().split("\n")
         if (r[0]):
-            raise exceptions.CheckError(r);
-
+            raise exceptions.CheckError(r)
         return 1
