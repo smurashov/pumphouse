@@ -136,7 +136,7 @@ def cloud_resources(client):
         ] + [{
             "id": floating_ip.addr,
             "type": "floating_ip"
-        } for floating_ip in cloud.nova.floating_ips_bulk.list(search_opts={"all_tenants": 1})
+        } for floating_ip in cloud.nova.floating_ips_bulk.list()
         ],
         "hosts": [{
             "name": hyperv.service["host"],
