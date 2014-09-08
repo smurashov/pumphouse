@@ -123,6 +123,20 @@ def cloud_resources(client):
             "type": "flavor",
             "name": flavor.name
         } for flavor in cloud.nova.flavors.list()
+        ] + [{
+            "id": role.id,
+            "type": "role",
+            "name": role.name
+        } for role in cloud.keystone.roles.list()
+        ] + [{
+            "id": secgroup.id,
+            "type": "secgroup",
+            "name": secgroup.name
+        } for secgroup in cloud.nova.security_groups.list()
+        ] + [{
+            "id": floating_ip.addr,
+            "type": "floating_ip"
+        } for floating_ip in cloud.nova.floating_ips_bulk.list(search_opts={"all_tenants": 1})
         ],
         "hosts": [{
             "name": hyperv.service["host"],

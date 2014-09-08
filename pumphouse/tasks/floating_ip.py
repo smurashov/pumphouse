@@ -17,6 +17,7 @@ import logging
 from taskflow.patterns import linear_flow
 
 from pumphouse import task
+from pumphouse import events
 from pumphouse import exceptions
 from pumphouse.tasks import utils as task_utils
 
@@ -45,14 +46,26 @@ class EnsureFloatingIPBulk(task.BaseCloudTask):
                     address=address)
             except exceptions.nova_excs.NotFound:
                 LOG.exception("Not added: %s", address)
-                raise  # TODO(ogelbukh): emit event here
+                self.not_added_event(address)
+                raise
             else:
                 LOG.info("Created: %s", floating_ip.to_dict())
-                pass  # TODO(ogelbukh): emit event here
+                self.created_event(address)
         else:
             LOG.warn("Already exists, %s", floating_ip.to_dict())
-            pass  # TODO(ogelbukh): emit event here
         return floating_ip.to_dict()
+
+    def created_event(self, address):
+        events.emit("floating_ip created", {
+            "id": address,
+            "cloud": self.cloud.name
+        }, namespace="/events")
+
+    def not_added_event(self, address):
+        events.emit("floating_ip error", {
+            "id": address,
+            "cloud": self.cloud.name
+        }, namespace="/events")
 
 
 class EnsureFloatingIP(task.BaseCloudTask):
@@ -84,10 +97,12 @@ class EnsureFloatingIP(task.BaseCloudTask):
                         address=floating_ip_address)
                     LOG.info("Assigned floating ip: %s",
                              floating_ip.to_dict())
+                    self.assigned_event(floating_ip_address)
                     return floating_ip.to_dict()
             else:
                 LOG.exception("Unable to add floating ip: %s",
                               floating_ip.to_dict())
+                self.assigning_error_event(floating_ip_address)
                 raise exceptions.TimeoutException()
         elif floating_ip.instance_uuid == server_id:
             LOG.warn("Already associated: %s", floating_ip)
@@ -95,6 +110,18 @@ class EnsureFloatingIP(task.BaseCloudTask):
         else:
             LOG.exception("Duplicate association: %s", floating_ip)
             raise exceptions.Conflict()
+
+    def assigned_event(self, address):
+        events.emit("floating_ip assigned", {
+            "id": address,
+            "cloud": self.cloud.name
+        }, namespace="/events")
+
+    def assigning_error_event(self, address):
+        events.emit("floating_ip assign error", {
+            "id": address,
+            "cloud": self.cloud.name
+        }, namespace="/events")
 
 
 def migrate_floating_ip(src, dst, store, address):

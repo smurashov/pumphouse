@@ -17,6 +17,7 @@ import logging
 from taskflow.patterns import linear_flow
 
 from pumphouse import task
+from pumphouse import events
 from pumphouse import exceptions
 
 
@@ -40,10 +41,19 @@ class EnsureSecGroup(task.BaseCloudTask):
             secgroup = self.cloud.nova.security_groups.create(
                 secgroup_info["name"], secgroup_info["description"])
             LOG.info("Created: %s", secgroup.to_dict())
+            self.created_event(secgroup_info)
         else:
             LOG.warn("Already exists: %s", secgroup.to_dict())
         secgroup = self._add_rules(secgroup_info)
         return secgroup.to_dict()
+
+    def created_event(self, secgroup_info):
+        events.emit("secgroup created", {
+            "id": secgroup_info["id"],
+            "name": secgroup_info["name"],
+            "description": secgroup_info["description"],
+            "cloud": self.cloud.name
+        }, namespace="/events")
 
     def _add_rules(self, secgroup_info):
         """This helper function recreates all rules from security group"""
