@@ -44,7 +44,7 @@ class EnsureSecGroup(task.BaseCloudTask):
             self.created_event(secgroup_info)
         else:
             LOG.warn("Already exists: %s", secgroup.to_dict())
-        secgroup = self._add_rules(secgroup_info)
+        secgroup = self._add_rules(secgroup.id, secgroup_info)
         return secgroup.to_dict()
 
     def created_event(self, secgroup_info):
@@ -55,13 +55,13 @@ class EnsureSecGroup(task.BaseCloudTask):
             "cloud": self.cloud.name
         }, namespace="/events")
 
-    def _add_rules(self, secgroup_info):
+    def _add_rules(self, secgroup_id, secgroup_info):
         """This helper function recreates all rules from security group"""
         rules_list = secgroup_info["rules"]
         for rule in rules_list:
             try:
                 rule = self.cloud.nova.security_group_rules.create(
-                    secgroup_info["id"],
+                    secgroup_id,
                     ip_protocol=rule["ip_protocol"],
                     from_port=rule["from_port"],
                     to_port=rule["to_port"],
@@ -75,7 +75,7 @@ class EnsureSecGroup(task.BaseCloudTask):
                 raise
             else:
                 LOG.info("Created: %s", rule)
-        secgroup = self.cloud.nova.security_groups.get(secgroup_info["id"])
+        secgroup = self.cloud.nova.security_groups.get(secgroup_id)
         return secgroup
 
 
