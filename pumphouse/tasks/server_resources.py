@@ -27,6 +27,7 @@ from taskflow.patterns import unordered_flow
 LOG = logging.getLogger(__name__)
 
 migrate_server = flows.register("server")
+post_hooks = flows.register("post_server")
 
 
 @migrate_server.add("image")
@@ -103,16 +104,17 @@ def migrate_server_with_snapshot(src, dst,
                 src, dst, store, floating_ip)
         resources.append(floating_ip_flow)
     if snapshot_ensure not in store:
-        snapshot_flow, store = snapshot_tasks.migrate_snapshot(src, dst, store,
-                                                               server_id)
+        snapshot_flow, store = snapshot_tasks.migrate_snapshot(
+            src, restricted_dst, store, server_id)
         resources.append(snapshot_flow)
     server_flow, store = server_tasks.reprovision_server_with_snapshot(
-        src, dst, store, server.id, flavor_id)
+        src, restricted_dst, store, server.id, flavor_id)
     post_flow, store = restore_floating_ips(src, dst, store, server.to_dict())
     server_flow.add(post_flow)
     return resources, server_flow, store
 
 
+@post_hooks.add("post_server")
 def restore_floating_ips(src, dst, store, server_info):
     flow = unordered_flow.Flow("post-migration-{}".format(server_info["id"]))
     addresses = server_info["addresses"]
