@@ -23,18 +23,25 @@ LOG = logging.getLogger(__name__)
 
 
 def migrate_resources(src, dst, store, tenant_id):
-    servers = src.nova.servers.list(search_opts={
-        "all_tenants": 1,
-        "tenant_id": tenant_id,
-    })
+    tenant = src.keystone.tenants.get(tenant_id)
+    restricted_src = src.restrict(tenant_name=tenant.name)
+    servers = restricted_src.nova.servers.list()
     flow = graph_flow.Flow("migrate-resources-{}".format(tenant_id))
     servers_flow = unordered_flow.Flow("migrate-servers-{}".format(tenant_id))
     migrate_server = server_resources.migrate_server.select("image")
     for server in servers:
         server_binding = "server-{}".format(server.id)
         if server_binding not in store:
-            resources, server_flow, store = migrate_server(src, dst, store,
+            user = src.keystone.users.get(server.user_id)
+            restricted_dst = dst.restrict(username=user.name,
+                                          tenant_name=tenant.name,
+                                          password="default")
+            resources, server_flow, store = migrate_server(src, dst,
+                                                           restricted_src,
+                                                           restricted_dst,
+                                                           store,
                                                            server.id)
             flow.add(*resources)
             servers_flow.add(server_flow)
     flow.add(servers_flow)
+    return flow, store

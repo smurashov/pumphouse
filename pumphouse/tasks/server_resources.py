@@ -30,19 +30,15 @@ migrate_server = flows.register("server")
 
 
 @migrate_server.add("image")
-def migrate_server_with_image(src, dst, store, server_id):
+def migrate_server_with_image(src, dst,
+                              restricted_src, restricted_dst,
+                              store, server_id):
     server = src.nova.servers.get(server_id)
     image_id, flavor_id = server.image["id"], server.flavor["id"]
     tenant_id, user_id = server.tenant_id, server.user_id
     flavor_retrieve = "flavor-{}-retrieve".format(flavor_id)
     image_retrieve = "image-{}-retrieve".format(image_id)
     resources = []
-    tenant = src.keystone.tenants.get(tenant_id)
-    user = src.keystone.users.get(user_id)
-    restricted_dst = dst.restrict(username=user.name,
-                                  tenant_name=tenant.name,
-                                  password="default")
-    restricted_src = src.restrict(tenant_name=tenant.name)
     for name in [sg["name"] for sg in server.security_groups]:
         secgroup = src.nova.security_groups.find(name=name)
         secgroup_retrieve = "secgroup-{}-retrieve".format(secgroup.id)
@@ -78,7 +74,9 @@ def migrate_server_with_image(src, dst, store, server_id):
 
 
 @migrate_server.add("snapshot")
-def migrate_server_with_snapshot(src, dst, store, server_id):
+def migrate_server_with_snapshot(src, dst,
+                                 restricted_src, restricted_dst,
+                                 store, server_id):
     server = src.nova.servers.get(server_id)
     flavor_id = server.flavor["id"]
     flavor_retrieve = "flavor-{}-retrieve".format(flavor_id)
@@ -94,7 +92,7 @@ def migrate_server_with_snapshot(src, dst, store, server_id):
         secgroup_retrieve = "secgroup-{}-retrieve".format(secgroup.id)
         if secgroup_retrieve not in store:
             secgroup_flow, store = secgroup_tasks.migrate_secgroup(
-                src, dst, store, secgroup.id)
+                restricted_src, restricted_dst, store, secgroup.id)
             resources.append(secgroup_flow)
     for floating_ip in [addr["addr"]
                         for addr in server.addresses.values().pop()
