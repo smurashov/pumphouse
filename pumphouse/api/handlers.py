@@ -95,9 +95,8 @@ def cloud_resources(client):
             "description": tenant.description,
         } for tenant in cloud.keystone.tenants.list()
         ],
-        "resources": [{
+        "servers": [{
             "id": server.id,
-            "type": "server",
             "name": server.name,
             "status": server.status.lower(),
             "tenant_id": server.tenant_id,
@@ -107,15 +106,15 @@ def cloud_resources(client):
             "host_name": getattr(server,
                                  "OS-EXT-SRV-ATTR:hypervisor_hostname"),
         } for server in cloud.nova.servers.list(search_opts={"all_tenants": 1})
-        ] + [{
+        ],
+        "images": [{
             "id": image["id"],
-            "type": "image",
             "status": "",
             "name": image["name"],
         } for image in cloud.glance.images.list()
-        ] + [{
+        ],
+        "floating_ips": [{
             "id": floating_ip.address,
-            "type": "floating_ip",
             "server_id": floating_ip.instance_uuid
         } for floating_ip in cloud.nova.floating_ips_bulk.list()
         ],
