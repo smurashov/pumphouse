@@ -16,6 +16,7 @@ import logging
 
 from taskflow.patterns import graph_flow, unordered_flow
 
+from pumphouse import management
 from pumphouse.tasks import server_resources
 
 
@@ -33,6 +34,7 @@ def migrate_resources(src, dst, store, tenant_id):
         server_binding = "server-{}".format(server.id)
         if server_binding not in store:
             user = src.keystone.users.get(server.user_id)
+            management.become_admin_in_tenant(dst, user, tenant)
             restricted_dst = dst.restrict(username=user.name,
                                           tenant_name=tenant.name,
                                           password="default")
