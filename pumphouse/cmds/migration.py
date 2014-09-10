@@ -191,7 +191,7 @@ def migrate_roles(src, dst, flow, store, ids):
 
 def migrate_identity(src, dst, flow, store, ids):
     for tenant_id in ids:
-        identity_flow, store = identity_tasks.migrate_identity(
+        _, identity_flow, store = identity_tasks.migrate_identity(
             src, dst, store, tenant_id)
         flow.add(identity_flow)
     return flow, store

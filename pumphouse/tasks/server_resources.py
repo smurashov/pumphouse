@@ -27,12 +27,16 @@ from taskflow.patterns import unordered_flow
 LOG = logging.getLogger(__name__)
 
 migrate_server = flows.register("server")
+post_hooks = flows.register("post_server")
 
 
 @migrate_server.add("image")
-def migrate_server_with_image(src, dst, store, server_id):
+def migrate_server_with_image(src, dst,
+                              restricted_src, restricted_dst,
+                              store, server_id):
     server = src.nova.servers.get(server_id)
     image_id, flavor_id = server.image["id"], server.flavor["id"]
+    tenant_id, user_id = server.tenant_id, server.user_id
     flavor_retrieve = "flavor-{}-retrieve".format(flavor_id)
     image_retrieve = "image-{}-retrieve".format(image_id)
     resources = []
@@ -41,7 +45,7 @@ def migrate_server_with_image(src, dst, store, server_id):
         secgroup_retrieve = "secgroup-{}-retrieve".format(secgroup.id)
         if secgroup_retrieve not in store:
             secgroup_flow, store = secgroup_tasks.migrate_secgroup(
-                src, dst, store, secgroup.id)
+                restricted_src, restricted_dst, store, secgroup.id)
             resources.append(secgroup_flow)
     for floating_ip in [addr["addr"]
                         for addr in server.addresses.values().pop()
@@ -52,14 +56,16 @@ def migrate_server_with_image(src, dst, store, server_id):
                 src, dst, store, floating_ip)
         resources.append(floating_ip_flow)
     if image_retrieve not in store:
-        image_flow, store = image_tasks.migrate_image(src, dst, store,
+        image_flow, store = image_tasks.migrate_image(src, restricted_dst,
+                                                      store,
                                                       image_id)
         resources.append(image_flow)
     if flavor_retrieve not in store:
         flavor_flow, store = flavor_tasks.migrate_flavor(src, dst, store,
                                                          flavor_id)
         resources.append(flavor_flow)
-    server_flow, store = server_tasks.reprovision_server(src, dst, store,
+    server_flow, store = server_tasks.reprovision_server(src, restricted_dst,
+                                                         store,
                                                          server.id,
                                                          image_id,
                                                          flavor_id)
@@ -69,7 +75,9 @@ def migrate_server_with_image(src, dst, store, server_id):
 
 
 @migrate_server.add("snapshot")
-def migrate_server_with_snapshot(src, dst, store, server_id):
+def migrate_server_with_snapshot(src, dst,
+                                 restricted_src, restricted_dst,
+                                 store, server_id):
     server = src.nova.servers.get(server_id)
     flavor_id = server.flavor["id"]
     flavor_retrieve = "flavor-{}-retrieve".format(flavor_id)
@@ -85,7 +93,7 @@ def migrate_server_with_snapshot(src, dst, store, server_id):
         secgroup_retrieve = "secgroup-{}-retrieve".format(secgroup.id)
         if secgroup_retrieve not in store:
             secgroup_flow, store = secgroup_tasks.migrate_secgroup(
-                src, dst, store, secgroup.id)
+                restricted_src, restricted_dst, store, secgroup.id)
             resources.append(secgroup_flow)
     for floating_ip in [addr["addr"]
                         for addr in server.addresses.values().pop()
@@ -96,16 +104,17 @@ def migrate_server_with_snapshot(src, dst, store, server_id):
                 src, dst, store, floating_ip)
         resources.append(floating_ip_flow)
     if snapshot_ensure not in store:
-        snapshot_flow, store = snapshot_tasks.migrate_snapshot(src, dst, store,
-                                                               server_id)
+        snapshot_flow, store = snapshot_tasks.migrate_snapshot(
+            src, restricted_dst, store, server_id)
         resources.append(snapshot_flow)
     server_flow, store = server_tasks.reprovision_server_with_snapshot(
-        src, dst, store, server.id, flavor_id)
+        src, restricted_dst, store, server.id, flavor_id)
     post_flow, store = restore_floating_ips(src, dst, store, server.to_dict())
     server_flow.add(post_flow)
     return resources, server_flow, store
 
 
+@post_hooks.add("post_server")
 def restore_floating_ips(src, dst, store, server_info):
     flow = unordered_flow.Flow("post-migration-{}".format(server_info["id"]))
     addresses = server_info["addresses"]
