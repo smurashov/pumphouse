@@ -95,7 +95,7 @@ example in [`doc/samples/config.yaml`](doc/samples/config.yaml) file.
 Note that the format of configuration file for the script differs from one for
 the API service.
 
-### `pumphouse-bm` - Host upgrade to Mirantis OpenStack
+### `pumphouse-bm` - host upgrade to Mirantis OpenStack
 
 This script upgrades a hypervisor host from the source cloud to Mirantis
 OpenStack Compute node and attaches it to the target MOS cluster.
@@ -134,16 +134,11 @@ $ pumphouse config.yaml migrate <resource_class> --ids <ID> [<ID> ...]
 
 `<resource_class>` could be one of the following:
 
-* `servers` - migrate servers to admin tenant in destination cloud
-* `tenants` - replicate tenants from source cloud in destination cloud
-* `users` - copy users from source cloud to destination cloud
-* `roles` - replicate roles by names from source cloud to desintation
-* `flavors` - copy flavors from source to desintation cloud
 * `images` - replicate images from source to destination cloud
 * `identity` - replicate complete identity structure (including projects, users
   and roles with assignment) of the source cloud in the destination cloud
 * `resources` - migrate all resources that belong to the tenant/project
-  identified by its ID in source cloud to the destination cloud
+  identified by its ID in source cloud and all resources they depend on.
 
 You can obtain <ID>s of resources you want to migrate by using standard
 OpenStack clients or Horizon dashboard UI.

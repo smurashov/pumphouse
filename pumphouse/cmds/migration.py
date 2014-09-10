@@ -20,12 +20,7 @@ from pumphouse import exceptions
 from pumphouse import management
 from pumphouse import utils
 from pumphouse import flows
-from pumphouse.tasks import server as server_tasks
 from pumphouse.tasks import image as image_tasks
-from pumphouse.tasks import flavor as flavor_tasks
-from pumphouse.tasks import tenant as tenant_tasks
-from pumphouse.tasks import user as user_tasks
-from pumphouse.tasks import role as role_tasks
 from pumphouse.tasks import identity as identity_tasks
 from pumphouse.tasks import resources as resources_tasks
 
@@ -132,60 +127,12 @@ def get_parser():
     return parser
 
 
-def migrate_flavors(src, dst, flow, store, ids):
-    for flavor in src.nova.flavors.list():
-        if flavor.id in ids:
-            flavor_flow, store = flavor_tasks.migrate_flavor(
-                src, dst, store, flavor.id)
-            flow.add(flavor_flow)
-    return flow, store
-
-
 def migrate_images(src, dst, flow, store, ids):
     for image in src.glance.images.list():
         if image.id in ids:
             image_flow, store = image_tasks.migrate_image(
                 src, dst, store, image.id)
             flow.add(image_flow)
-    return flow, store
-
-
-def migrate_servers(src, dst, flow, store, ids):
-    search_opts = {"all_tenants": 1}
-    for server in src.nova.servers.list(search_opts=search_opts):
-        if server.id in ids:
-            server_flow, store = server_tasks.migrate_server(
-                src, dst, store, server.id,
-                server["image"]["id"],
-                server["flavor"]["id"])
-            flow.add(server_flow)
-    return flow, store
-
-
-def migrate_tenants(src, dst, flow, store, ids):
-    for tenant in src.keystone.tenants.list():
-        if tenant.id in ids:
-            tenant_flow, store = tenant_tasks.migrate_tenant(
-                src, dst, store, tenant.id)
-            flow.add(tenant_flow)
-    return flow, store
-
-
-def migrate_users(src, dst, flow, store, ids):
-    for user in src.keystone.users.list():
-        if user.id in ids:
-            user_flow, store = user_tasks.migrate_user(
-                src, dst, store, user.id, user.tenantId)
-            flow.add(user_flow)
-    return flow, store
-
-
-def migrate_roles(src, dst, flow, store, ids):
-    for role in src.keystone.roles.list():
-        if role.id in ids:
-            role_flow, store = role_tasks.migrate_role(
-                src, dst, store, role.id)
-            flow.add(role_flow)
     return flow, store
 
 
@@ -309,12 +256,7 @@ def get_all_resource_ids(cloud, resource_type):
 
 
 RESOURCES_MIGRATIONS = collections.OrderedDict([
-    ("tenants", migrate_tenants),
-    ("users", migrate_users),
     ("images", migrate_images),
-    ("flavors", migrate_flavors),
-    ("servers", migrate_servers),
-    ("roles", migrate_roles),
     ("identity", migrate_identity),
     ("resources", migrate_resources),
 ])
