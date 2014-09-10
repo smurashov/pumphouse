@@ -97,12 +97,12 @@ class EnsureFloatingIP(task.BaseCloudTask):
                         address=floating_ip_address)
                     LOG.info("Assigned floating ip: %s",
                              floating_ip.to_dict())
-                    self.assigned_event(floating_ip_address)
+                    self.assigned_event(floating_ip_address, server_id)
                     return floating_ip.to_dict()
             else:
                 LOG.exception("Unable to add floating ip: %s",
                               floating_ip.to_dict())
-                self.assigning_error_event(floating_ip_address)
+                self.assigning_error_event(floating_ip_address, server_id)
                 raise exceptions.TimeoutException()
         elif floating_ip.instance_uuid == server_id:
             LOG.warn("Already associated: %s", floating_ip)
@@ -111,15 +111,17 @@ class EnsureFloatingIP(task.BaseCloudTask):
             LOG.exception("Duplicate association: %s", floating_ip)
             raise exceptions.Conflict()
 
-    def assigned_event(self, address):
+    def assigned_event(self, address, server_id):
         events.emit("floating_ip assigned", {
             "id": address,
+            "server_id": server_id,
             "cloud": self.cloud.name
         }, namespace="/events")
 
-    def assigning_error_event(self, address):
+    def assigning_error_event(self, address, server_id):
         events.emit("floating_ip assign error", {
             "id": address,
+            "server_id": server_id,
             "cloud": self.cloud.name
         }, namespace="/events")
 
