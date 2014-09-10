@@ -416,6 +416,7 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
             "name": tenant.name,
             "description": tenant.description,
         }, namespace="/events")
+        
         for server_dict in tenant_dict["servers"]:
             server = setup_server(user_cloud, server_dict)
             LOG.info("Created server: %s", server._info)
@@ -438,7 +439,7 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
 
             events.emit("floating_ip assigned", {
                 "id": floating_ip.addr,
-                "server_id": server_id,
+                "server_id": server.id,
                 "cloud": target
             }, namespace="/events")
 
