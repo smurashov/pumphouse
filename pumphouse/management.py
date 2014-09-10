@@ -85,17 +85,28 @@ def cleanup(events, cloud, target):
         events.emit("server delete", {
             "cloud": target,
             "id": server.id,
-            "host_name": hostname,
+            "host_name": hostname
         }, namespace="/events")
+
     for flavor in cloud.nova.flavors.list():
         if is_prefixed(flavor.name):
             cloud.nova.flavors.delete(flavor)
             LOG.info("Deleted flavor: %s", flavor._info)
+            events.emit("flavor delete", {
+                "cloud": target,
+                "id": flavor.id,
+            }, namespace="/events")
+
     for image in cloud.glance.images.list():
         if not is_prefixed(image.name):
             continue
         cloud.glance.images.delete(image.id)
         LOG.info("Deleted image: %s", dict(image))
+        events.emit("image delete", {
+            "cloud": target,
+            "id": image.id
+        }, namespace="/events")
+
     for secgroup in cloud.nova.security_groups.list():
         if not is_prefixed(secgroup.name):
             continue
@@ -106,23 +117,48 @@ def cleanup(events, cloud, target):
         else:
             cloud.nova.security_groups.delete(secgroup.id)
             LOG.info("Deleted secgroup: %s", secgroup._info)
+        events.emit("secgroup delete", {
+            "cloud": target,
+            "id": secgroup.id
+        }, namespace="/events")
+
     for floating_ip in cloud.nova.floating_ips_bulk.list():
         cloud.nova.floating_ips_bulk.delete(floating_ip.address)
         LOG.info("Deleted floating ip: %s", floating_ip._info)
+        events.emit("floating_ip delete", {
+            "cloud": target,
+            "id": floating_ip.address
+        }, namespace="/events")
+
     for network in cloud.nova.networks.list():
         if not is_prefixed(network.label):
             continue
         cloud.nova.networks.disassociate(network)
         cloud.nova.networks.delete(network)
         LOG.info("Deleted network: %s", network._info)
+        events.emit("network delete", {
+            "cloud": target,
+            "id": network.id
+        }, namespace="/events")
+
     for user in cloud.keystone.users.list():
         if is_prefixed(user.name):
             cloud.keystone.users.delete(user)
             LOG.info("Deleted user: %s", user._info)
+            events.emit("user delete", {
+                "cloud": target,
+                "id": user.id
+            }, namespace="/events")
+
     for role in cloud.keystone.roles.list():
         if is_prefixed(role.name):
             cloud.keystone.roles.delete(role)
             LOG.info("Deleted role: %s", role._info)
+            events.emit("role delete", {
+                "cloud": target,
+                "id": role.id
+            }, namespace="/events")
+
     for tenant in cloud.keystone.tenants.list():
         if is_prefixed(tenant.name):
             cloud.keystone.tenants.delete(tenant)
@@ -131,6 +167,7 @@ def cleanup(events, cloud, target):
                 "cloud": target,
                 "id": tenant.id,
             }, namespace="/events")
+
     services = cloud.nova.services.list(binary="nova-compute")
     for service in services:
         if service.status == "disabled":
@@ -265,6 +302,11 @@ def setup_server_floating_ip(cloud, server):
         raise
     else:
         server = cloud.nova.servers.get(server)
+        events.emit("floating_ip assigned", {
+            "id": floating_ip.address,
+            "server_id": server.id
+        }, namespace="/events")
+
         return server, floating_ip
 
 
@@ -305,6 +347,12 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
     for image_dict in images:
         image = setup_image(cloud, image_dict.copy())
         LOG.info("Created: %s", dict(image))
+        events.emit("image created", {
+            "id": image["id"],
+            "name": image["name"],
+            "cloud": target
+        }, namespace="/events")
+
     for flavor_dict in flavors:
         flavor = cloud.nova.flavors.create(
             flavor_dict["name"],
@@ -313,6 +361,12 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
             flavor_dict["disk"],
             is_public=True)
         LOG.info("Created: %s", flavor._info)
+        events.emit("flavor created", {
+            "id": flavor.id,
+            "name": flavor.name,
+            "cloud": target
+        }, namespace="/events")
+
     if FLATDHCP:
         try:
             net = cloud.nova.networks.find(project_id=None)
@@ -326,6 +380,7 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
             LOG.info("Already exists: %s", net._info)
     else:
         raise NotImplementedError()
+
     for pool in floating_ips:
         for poolname in pool:
             addr_list = pool[poolname]
@@ -333,6 +388,11 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
                 floating_ip_dict = {"pool": poolname, "addr": addr}
                 ip_range = setup_floating_ip(cloud, floating_ip_dict)
                 LOG.info("Created: %s", ip_range._info)
+                events.emit("floating_ip created", {
+                    "id": addr,
+                    "cloud": target
+                }, namespace="/events")
+
     for tenant_dict in tenants:
         tenant = cloud.keystone.tenants.create(
             tenant_dict["name"],
@@ -375,3 +435,10 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
                 "host_name": hostname,
                 "status": server.status.lower(),
             }, namespace="/events")
+
+            events.emit("floating_ip assigned", {
+                "id": floating_ip.addr,
+                "server_id": server_id,
+                "cloud": target
+            }, namespace="/events")
+
