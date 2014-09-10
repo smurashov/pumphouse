@@ -438,7 +438,7 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
             }, namespace="/events")
 
             events.emit("floating_ip assigned", {
-                "id": floating_ip.addr,
+                "id": floating_ip.address,
                 "server_id": server.id,
                 "cloud": target
             }, namespace="/events")
