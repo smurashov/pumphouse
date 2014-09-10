@@ -302,11 +302,6 @@ def setup_server_floating_ip(cloud, server):
         raise
     else:
         server = cloud.nova.servers.get(server)
-        events.emit("floating_ip assigned", {
-            "id": floating_ip.address,
-            "server_id": server.id
-        }, namespace="/events")
-
         return server, floating_ip
 
 
