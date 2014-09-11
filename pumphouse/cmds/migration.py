@@ -145,6 +145,8 @@ def migrate_identity(src, dst, flow, store, ids):
 
 
 def migrate_resources(src, dst, flow, store, ids):
+    identity_flow, store = migrate_identity(src, dst, flow, store, ids)
+    flows.run_flow(identity_flow, store)
     for tenant_id in ids:
         resources_flow, store = resources_tasks.migrate_resources(
             src, dst, store, tenant_id)
