@@ -20,6 +20,7 @@ from pumphouse import events
 from pumphouse import task
 from pumphouse import flows
 from pumphouse.tasks import utils as task_utils
+from pumphouse.tasks import check as check_tasks
 from pumphouse import utils
 
 
@@ -137,6 +138,8 @@ class TerminateServer(task.BaseCloudTask):
 
 @provision_server.add("image")
 def reprovision_server(src, dst, store, server_id, image_id, flavor_id):
+    server_start_event = "server-{}-start-event".format(server_id)
+    server_finish_event = "server-{}-finish-event".format(server_id)
     server_sync = "server-{}-sync".format(server_id)
     server_binding = "server-{}".format(server_id)
     server_retrieve = "server-{}-retrieve".format(server_id)
@@ -148,6 +151,9 @@ def reprovision_server(src, dst, store, server_id, image_id, flavor_id):
     flow = linear_flow.Flow("migrate-server-{}".format(server_id))
     flow.add(task_utils.SyncPoint(name=server_sync,
                                   requires=[image_ensure, flavor_ensure]))
+    flow.add(ServerStartMigrationEvent(src,
+                                       name=server_start_event,
+                                       rebind=[server_binding]))
     flow.add(RetrieveServer(src,
                             name=server_binding,
                             provides=server_retrieve,
@@ -162,9 +168,15 @@ def reprovision_server(src, dst, store, server_id, image_id, flavor_id):
                                  rebind=[server_suspend, image_ensure,
                                          flavor_ensure]
                                  ))
+    dst_check_task = check_tasks.run_checks(src, dst, store, server_id)
+    flow.add(dst_check_task)
     flow.add(TerminateServer(src,
                              name=server_terminate,
                              rebind=[server_suspend]))
+    flow.add(ServerSuccessMigrationEvent(src, dst,
+                                         name=server_finish_event,
+                                         rebind=[server_retrieve,
+                                                 server_boot]))
     store[server_binding] = server_id
     return (flow, store)
 
@@ -201,6 +213,8 @@ def reprovision_server_with_snapshot(src, dst, store, server_id, flavor_id):
                                  rebind=[server_suspend, image_ensure,
                                          flavor_ensure]
                                  ))
+    dst_check_task = check_tasks.run_checks(src, dst, store, server_id)
+    flow.add(dst_check_task)
     flow.add(TerminateServer(src,
                              name=server_terminate,
                              rebind=[server_suspend]))
