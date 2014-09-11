@@ -63,7 +63,9 @@ class Service(object):
         except Exception:
             # TODO: Treat reset exceptions properly
             pass
-        else:
-            events.emit("reset completed", {}, namespace="/events")
+
+        events.emit("reset completed", {
+            "cloud": cloud
+        }, namespace="/events")
 
         return cloud
