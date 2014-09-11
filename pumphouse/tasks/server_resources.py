@@ -21,7 +21,6 @@ from pumphouse.tasks import snapshot as snapshot_tasks
 from pumphouse.tasks import flavor as flavor_tasks
 from pumphouse.tasks import secgroup as secgroup_tasks
 from pumphouse.tasks import floating_ip as fip_tasks
-from taskflow.patterns import unordered_flow
 
 
 LOG = logging.getLogger(__name__)
@@ -64,13 +63,8 @@ def migrate_server_with_image(src, dst,
         flavor_flow, store = flavor_tasks.migrate_flavor(src, dst, store,
                                                          flavor_id)
         resources.append(flavor_flow)
-    server_flow, store = server_tasks.reprovision_server(src, restricted_dst,
-                                                         store,
-                                                         server.id,
-                                                         image_id,
-                                                         flavor_id)
-    post_flow, store = restore_floating_ips(src, dst, store, server.to_dict())
-    server_flow.add(post_flow)
+    server_flow, store = server_tasks.reprovision_server_with_image(
+        src, restricted_dst, store, server)
     return resources, server_flow, store
 
 
@@ -108,25 +102,5 @@ def migrate_server_with_snapshot(src, dst,
             src, restricted_dst, store, server_id)
         resources.append(snapshot_flow)
     server_flow, store = server_tasks.reprovision_server_with_snapshot(
-        src, restricted_dst, store, server.id, flavor_id)
-    post_flow, store = restore_floating_ips(src, dst, store, server.to_dict())
-    server_flow.add(post_flow)
+        src, restricted_dst, store, server)
     return resources, server_flow, store
-
-
-@post_hooks.add("post_server")
-def restore_floating_ips(src, dst, store, server_info):
-    flow = unordered_flow.Flow("post-migration-{}".format(server_info["id"]))
-    addresses = server_info["addresses"]
-    for label in addresses:
-        fixed_ip = addresses[label][0]
-        for floating_ip in [addr["addr"] for addr in addresses[label]
-                            if addr['OS-EXT-IPS:type'] == 'floating']:
-            fip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
-            if fip_retrieve not in store:
-                fip_flow, store = fip_tasks.associate_floating_ip_server(
-                    src, dst, store,
-                    floating_ip, fixed_ip,
-                    server_info["id"])
-                flow.add(fip_flow)
-    return flow, store
