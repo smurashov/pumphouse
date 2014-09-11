@@ -438,4 +438,3 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
                 "cloud": target
             }, namespace="/events")
 
-    events.emit("reset completed", {}, namespace="/events")

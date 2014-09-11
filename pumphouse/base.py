@@ -48,15 +48,21 @@ class Service(object):
         return cloud.ping()
 
     def reset(self, events, cloud):
-        management.cleanup(events, cloud, self.target)
-        if isinstance(self.workloads_config, dict):
-            management.setup(events, cloud, self.target,
-                             workloads=self.workloads_config)
-        elif isinstance(self.populate_config, dict):
-            num_tenants = self.populate_config.get("num_tenants",
-                                                   self.default_num_tenants)
-            num_servers = self.populate_config.get("num_servers",
-                                                   self.default_num_servers)
-            management.setup(events, cloud, self.target, num_tenants,
-                             num_servers)
+        try:
+            management.cleanup(events, cloud, self.target)
+            if isinstance(self.workloads_config, dict):
+                management.setup(events, cloud, self.target,
+                                workloads=self.workloads_config)
+            elif isinstance(self.populate_config, dict):
+                num_tenants = self.populate_config.get("num_tenants",
+                                                    self.default_num_tenants)
+                num_servers = self.populate_config.get("num_servers",
+                                                    self.default_num_servers)
+                management.setup(events, cloud, self.target, num_tenants,
+                                num_servers)
+        except Exception:
+            # TODO: Treat reset exceptions properly
+            pass
+
+        events.emit("reset completed", {}, namespace="/events")
         return cloud
