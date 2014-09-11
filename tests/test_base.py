@@ -31,7 +31,7 @@ class TestBase(unittest.TestCase):
         self.identity_driver = self.driver
 
         self.cloud = Mock()
-        self.events = []
+        self.events = Mock()
 
         self.service = base.Service(
             self.config.copy(),
