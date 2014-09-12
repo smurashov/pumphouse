@@ -35,7 +35,7 @@ def migrate_resources(src, dst, store, tenant_id):
         server_binding = "server-{}".format(server.id)
         if server_binding not in store:
             user = src.keystone.users.get(server.user_id)
-            user_ensure = dst.keystone.users.find(name=tenant.name)
+            user_ensure = dst.keystone.users.find(name=user.name)
             restricted_dst = dst.restrict(username=user.name,
                                           tenant_name=tenant.name,
                                           password="default")
