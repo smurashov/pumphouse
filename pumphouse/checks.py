@@ -16,7 +16,8 @@ import subprocess
 import signal
 from pumphouse import exceptions
 
-CHECK_TIMELIMIT=7
+CHECK_TIMELIMIT = 7
+
 
 class PumpHouseCheck(object):
     config = None
@@ -27,8 +28,10 @@ class PumpHouseCheck(object):
     def run():
         raise NotImplementedError()
 
+
 def alarm_handler(signum, frame):
-  raise exceptions.CheckTimeout() 
+    raise exceptions.CheckTimeout()
+
 
 class PumpHouseShellCheck(PumpHouseCheck):
     def __init__(self, config):
@@ -58,21 +61,21 @@ class PumpHouseShellCheck(PumpHouseCheck):
                    " >/dev/null 2>&1 || (echo %; exit 255)\" 2>/dev/null"
                    .format(environment, self.config['cmd']))
         try:
-          proc = subprocess.Popen(command,
-                                shell=True,
-                                stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE)
+            proc = subprocess.Popen(command,
+                                    shell=True,
+                                    stdin=subprocess.PIPE,
+                                    stdout=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
-          raise exceptions.CheckRunError() 
+            raise exceptions.CheckRunError()
 
         signal.signal(signal.SIGALRM, alarm_handler)
         signal.alarm(CHECK_TIMELIMIT)
         try:
-          r = proc.communicate(inputStream)[0].rstrip().split("\n")
-          signal.alarm(0) 
+            r = proc.communicate(inputStream)[0].rstrip().split("\n")
+            signal.alarm(0)
         except exceptions.CheckTimeout:
-          raise 
-          
+            raise
+
         if (r[0]):
             raise exceptions.CheckError(r)
 

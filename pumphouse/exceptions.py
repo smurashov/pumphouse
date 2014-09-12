@@ -78,8 +78,10 @@ class CheckError(Error):
     def __init__(self, failList):
         self.failList = failList
 
+
 class CheckRunError(Error):
     pass
+
 
 class CheckTimeout(Error):
     pass

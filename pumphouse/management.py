@@ -437,4 +437,3 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
                 "server_id": server.id,
                 "cloud": target
             }, namespace="/events")
-
