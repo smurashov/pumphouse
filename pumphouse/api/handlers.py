@@ -180,11 +180,6 @@ def migrate_tenant(tenant_id):
         src = hooks.source.connect()
         dst = hooks.destination.connect()
         store = {}
-        users_ids, identity_flow, store = identity_tasks.migrate_identity(
-            src, dst, store, tenant_id)
-        LOG.debug("Identity migration flow: %s", identity_flow)
-        result = flows.run_flow(identity_flow, store)
-        LOG.debug("Result of identity migration: %s", result)
         flow, store = resource_tasks.migrate_resources(src, dst, store,
                                                        tenant_id)
         LOG.debug("Migration flow: %s", flow)
@@ -192,11 +187,6 @@ def migrate_tenant(tenant_id):
         LOG.debug("Result of migration: %s", result)
         # TODO(akcram): All users' passwords should be restored when all
         #               migration operations ended.
-        users_passwords_flow, store = identity_tasks.migrate_passwords(
-            src, dst, store, users_ids, tenant_id)
-        LOG.debug("Passwords flow: %s", flow)
-        result = flows.run_flow(users_passwords_flow, store)
-        LOG.debug("Result of passwords migration: %s", result)
 
     gevent.spawn(migrate)
     return flask.make_response()
