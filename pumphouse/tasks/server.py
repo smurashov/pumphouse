@@ -14,12 +14,14 @@
 
 import logging
 
-from taskflow.patterns import linear_flow
+from taskflow.patterns import linear_flow, unordered_flow
 
 from pumphouse import events
 from pumphouse import task
 from pumphouse import flows
 from pumphouse.tasks import utils as task_utils
+from pumphouse.tasks import check as check_tasks
+from pumphouse.tasks import floating_ip as fip_tasks
 from pumphouse import utils
 
 
@@ -135,42 +137,9 @@ class TerminateServer(task.BaseCloudTask):
         }, namespace="/events")
 
 
-@provision_server.add("image")
-def reprovision_server(src, dst, store, server_id, image_id, flavor_id):
-    server_sync = "server-{}-sync".format(server_id)
-    server_binding = "server-{}".format(server_id)
-    server_retrieve = "server-{}-retrieve".format(server_id)
-    server_suspend = "server-{}-suspend".format(server_id)
-    server_boot = "server-{}-boot".format(server_id)
-    server_terminate = "server-{}-terminate".format(server_id)
-    image_ensure = "image-{}-ensure".format(image_id)
-    flavor_ensure = "flavor-{}-ensure".format(flavor_id)
-    flow = linear_flow.Flow("migrate-server-{}".format(server_id))
-    flow.add(task_utils.SyncPoint(name=server_sync,
-                                  requires=[image_ensure, flavor_ensure]))
-    flow.add(RetrieveServer(src,
-                            name=server_binding,
-                            provides=server_retrieve,
-                            rebind=[server_binding]))
-    flow.add(SuspendServer(src,
-                           name=server_retrieve,
-                           provides=server_suspend,
-                           rebind=[server_retrieve]))
-    flow.add(BootServerFromImage(dst,
-                                 name=server_boot,
-                                 provides=server_boot,
-                                 rebind=[server_suspend, image_ensure,
-                                         flavor_ensure]
-                                 ))
-    flow.add(TerminateServer(src,
-                             name=server_terminate,
-                             rebind=[server_suspend]))
-    store[server_binding] = server_id
-    return (flow, store)
-
-
-@provision_server.add("snapshot")
-def reprovision_server_with_snapshot(src, dst, store, server_id, flavor_id):
+def _reprovision_server(src, dst, store, server, image_ensure):
+    server_id = server.id
+    image_id, flavor_id = server.image["id"], server.flavor["id"]
     server_start_event = "server-{}-start-event".format(server_id)
     server_finish_event = "server-{}-finish-event".format(server_id)
     server_sync = "server-{}-sync".format(server_id)
@@ -179,7 +148,6 @@ def reprovision_server_with_snapshot(src, dst, store, server_id, flavor_id):
     server_suspend = "server-{}-suspend".format(server_id)
     server_boot = "server-{}-boot".format(server_id)
     server_terminate = "server-{}-terminate".format(server_id)
-    image_ensure = "snapshot-{}-ensure".format(server_id)
     flavor_ensure = "flavor-{}-ensure".format(flavor_id)
     flow = linear_flow.Flow("migrate-server-{}".format(server_id))
     flow.add(task_utils.SyncPoint(name=server_sync,
@@ -201,6 +169,12 @@ def reprovision_server_with_snapshot(src, dst, store, server_id, flavor_id):
                                  rebind=[server_suspend, image_ensure,
                                          flavor_ensure]
                                  ))
+    dst_check_task, store = check_tasks.run_checks(src, dst, store,
+                                                   server_id)
+    flow.add(dst_check_task)
+    floating_ips_flow, store = restore_floating_ips(src, dst, store,
+                                                    server.to_dict())
+    flow.add(floating_ips_flow)
     flow.add(TerminateServer(src,
                              name=server_terminate,
                              rebind=[server_suspend]))
@@ -210,3 +184,36 @@ def reprovision_server_with_snapshot(src, dst, store, server_id, flavor_id):
                                                  server_boot]))
     store[server_binding] = server_id
     return (flow, store)
+
+
+@provision_server.add("image")
+def reprovision_server_with_image(src, dst, store, server):
+    image_id = server.image["id"]
+    image_ensure = "image-{}-ensure".format(image_id)
+    flow, store = _reprovision_server(src, dst, store, server, image_ensure)
+    return flow, store
+
+
+@provision_server.add("snapshot")
+def reprovision_server_with_snapshot(src, dst, store, server):
+    server_id = server.id
+    image_ensure = "snapshot-{}-ensure".format(server_id)
+    flow, store = _reprovision_server(src, dst, store, server, image_ensure)
+    return (flow, store)
+
+
+def restore_floating_ips(src, dst, store, server_info):
+    flow = unordered_flow.Flow("post-migration-{}".format(server_info["id"]))
+    addresses = server_info["addresses"]
+    for label in addresses:
+        fixed_ip = addresses[label][0]
+        for floating_ip in [addr["addr"] for addr in addresses[label]
+                            if addr['OS-EXT-IPS:type'] == 'floating']:
+            fip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
+            if fip_retrieve not in store:
+                fip_flow, store = fip_tasks.associate_floating_ip_server(
+                    src, dst, store,
+                    floating_ip, fixed_ip,
+                    server_info["id"])
+                flow.add(fip_flow)
+    return flow, store

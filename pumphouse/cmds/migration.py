@@ -82,7 +82,7 @@ def get_parser():
                                 help="Specify a type of resources to migrate "
                                      "to the destination cloud.")
     migrate_filter = migrate_parser.add_mutually_exclusive_group(
-        required=False)
+        required=True)
     migrate_filter.add_argument("-i", "--ids",
                                 nargs="*",
                                 help="A list of IDs of resource to migrate to "
@@ -145,6 +145,8 @@ def migrate_identity(src, dst, flow, store, ids):
 
 
 def migrate_resources(src, dst, flow, store, ids):
+    identity_flow, store = migrate_identity(src, dst, flow, store, ids)
+    flows.run_flow(identity_flow, store)
     for tenant_id in ids:
         resources_flow, store = resources_tasks.migrate_resources(
             src, dst, store, tenant_id)
@@ -308,7 +310,7 @@ def main():
         elif args.host:
             ids = get_ids_by_host(src, args.resource, args.host)
         else:
-            ids = get_all_resource_ids(src, args.resource)
+            raise exceptions.UsageError("Missing tenant ID")
         resources_flow, store = migrate_function(src, dst, flow, store, ids)
         flows.run_flow(resources_flow, store)
     elif args.action == "cleanup":
