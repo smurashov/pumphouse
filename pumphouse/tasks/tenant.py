@@ -46,7 +46,7 @@ class EnsureTenant(task.BaseCloudTask):
 
     def created_event(self, tenant):
         LOG.info("Tenant created: %s", tenant.id)
-        events.emit("tenant created", {
+        events.emit("tenant create", {
             "id": tenant.id,
             "name": tenant.name,
             "cloud": self.cloud.name,
