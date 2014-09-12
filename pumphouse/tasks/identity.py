@@ -46,6 +46,47 @@ def migrate_passwords(src, dst, store, users_ids, tenant_id):
     return (task, store)
 
 
+def migrate_server_identity(src, dst, store, server_info):
+    server_id = server_info["id"]
+    flow = graph_flow.Flow("server-identity-{}".format(server_id))
+    tenant_id = server_info["tenant_id"]
+    user_id = server_info["user_id"]
+    tenant_retrieve = "tenant-{}-retrieve".format(tenant_id)
+    user_retrieve = "user-{}-retrive".format(user_id)
+    if tenant_retrieve not in store:
+        tenant_flow, store = tenant_tasks.migrate_tenant(src, dst, store,
+                                                         tenant_id)
+        flow.add(tenant_flow)
+    if user_retrieve not in store:
+        user = src.keystone.users.get(user_id)
+        user_tenant_id = getattr(user, "tenantId", None)
+        user_flow, store = user_tasks.migrate_user(src, dst, store,
+                                                   user_id,
+                                                   tenant_id=user_tenant_id)
+        flow.add(user_flow)
+    for role in src.keystone.users.list_roles(user_id, tenant=tenant_id):
+        role_id = role.id
+        role_retrieve = "role-{}-retrieve".format(role_id)
+        if role_retrieve not in store:
+            role_flow, store = role_tasks.migrate_role(src, dst, store,
+                                                       role_id)
+            flow.add(role_flow)
+        if role.name.startswith("_"):
+            continue
+        user_role_ensure = "user-role-{}-{}-{}-ensure".format(user_id,
+                                                              role_id,
+                                                              tenant_id)
+        if user_role_ensure in store:
+            continue
+        membership_flow, store = user_tasks.migrate_membership(src, dst,
+                                                               store,
+                                                               user_id,
+                                                               role_id,
+                                                               tenant_id)
+        flow.add(membership_flow)
+    return flow, store
+
+
 def migrate_identity(src, dst, store, tenant_id):
     flow = graph_flow.Flow("identity-{}".format(tenant_id))
     tenant_retrieve = "tenant-{}-retrieve".format(tenant_id)

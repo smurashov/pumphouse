@@ -21,6 +21,7 @@ from pumphouse.tasks import snapshot as snapshot_tasks
 from pumphouse.tasks import flavor as flavor_tasks
 from pumphouse.tasks import secgroup as secgroup_tasks
 from pumphouse.tasks import floating_ip as fip_tasks
+from pumphouse.tasks import identity as identity_tasks
 
 
 LOG = logging.getLogger(__name__)
@@ -35,10 +36,12 @@ def migrate_server_with_image(src, dst,
                               store, server_id):
     server = src.nova.servers.get(server_id)
     image_id, flavor_id = server.image["id"], server.flavor["id"]
-    tenant_id, user_id = server.tenant_id, server.user_id
     flavor_retrieve = "flavor-{}-retrieve".format(flavor_id)
     image_retrieve = "image-{}-retrieve".format(image_id)
     resources = []
+    identity_flow, store = identity_tasks.migrate_server_identity(
+        src, dst, store, server.to_dict())
+    resources.append(identity_flow)
     for name in [sg["name"] for sg in server.security_groups]:
         secgroup = src.nova.security_groups.find(name=name)
         secgroup_retrieve = "secgroup-{}-retrieve".format(secgroup.id)
@@ -78,6 +81,9 @@ def migrate_server_with_snapshot(src, dst,
     snapshot_retrieve = "snapshot-{}".format(server_id)
     snapshot_ensure = "snapshot-{}-ensure".format(server_id)
     resources = []
+    identity_flow, store = identity_tasks.migrate_server_identity(
+        src, dst, store, server.to_dict())
+    resources.append(identity_flow)
     if flavor_retrieve not in store:
         flavor_flow, store = flavor_tasks.migrate_flavor(src, dst, store,
                                                          flavor_id)
