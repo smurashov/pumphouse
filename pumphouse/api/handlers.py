@@ -150,6 +150,10 @@ def reset():
         hooks.destination.reset(events)
     gevent.spawn(reset_destination)
     gevent.spawn(reset_source)
+
+    events.emit("reset start", {
+    }, namespace="/events")
+
     return flask.make_response("", 201)
 
 
