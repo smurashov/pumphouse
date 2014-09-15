@@ -52,7 +52,7 @@ def migrate_server_identity(src, dst, store, server_info):
     tenant_id = server_info["tenant_id"]
     user_id = server_info["user_id"]
     tenant_retrieve = "tenant-{}-retrieve".format(tenant_id)
-    user_retrieve = "user-{}-retrive".format(user_id)
+    user_retrieve = "user-{}-retrieve".format(user_id)
     if tenant_retrieve not in store:
         tenant_flow, store = tenant_tasks.migrate_tenant(src, dst, store,
                                                          tenant_id)

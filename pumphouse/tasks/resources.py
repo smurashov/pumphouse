@@ -16,7 +16,6 @@ import logging
 
 from taskflow.patterns import graph_flow, unordered_flow
 
-from pumphouse import management
 from pumphouse.tasks import server_resources
 
 
@@ -24,27 +23,15 @@ LOG = logging.getLogger(__name__)
 
 
 def migrate_resources(src, dst, store, tenant_id):
-    tenant = src.keystone.tenants.get(tenant_id)
-    tenant_ensure = dst.keystone.tenants.find(name=tenant.name)
-    restricted_src = src.restrict(tenant_name=tenant.name)
-    servers = restricted_src.nova.servers.list()
+    servers = src.nova.servers.list(search_opts={'all_tenants': 1,
+                                                 'tenant_id': tenant_id})
     flow = graph_flow.Flow("migrate-resources-{}".format(tenant_id))
     servers_flow = unordered_flow.Flow("migrate-servers-{}".format(tenant_id))
-    migrate_server = server_resources.migrate_server.select("image")
+    migrate_server = server_resources.migrate_server
     for server in servers:
         server_binding = "server-{}".format(server.id)
         if server_binding not in store:
-            user = src.keystone.users.get(server.user_id)
-            user_ensure = dst.keystone.users.find(name=user.name)
-            restricted_dst = dst.restrict(username=user.name,
-                                          tenant_name=tenant.name,
-                                          password="default")
-            management.become_admin_in_tenant(dst,
-                                              user_ensure,
-                                              tenant_ensure)
             resources, server_flow, store = migrate_server(src, dst,
-                                                           restricted_src,
-                                                           restricted_dst,
                                                            store,
                                                            server.id)
             flow.add(*resources)

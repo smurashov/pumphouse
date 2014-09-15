@@ -25,7 +25,6 @@ from . import hooks
 from pumphouse import events
 from pumphouse import flows
 from pumphouse.tasks import resources as resource_tasks
-from pumphouse.tasks import identity as identity_tasks
 
 
 LOG = logging.getLogger(__name__)
