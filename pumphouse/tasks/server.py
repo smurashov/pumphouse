@@ -93,11 +93,16 @@ class SuspendServer(task.BaseCloudTask):
 
 
 class BootServerFromImage(task.BaseCloudTask):
-    def execute(self, server_info, image_info, flavor_info):
+    def execute(self, server_info, image_info, flavor_info, user_info,
+                tenant_info):
         # TODO(akscram): Network information doesn't saved.
-        server = self.cloud.nova.servers.create(server_info["name"],
-                                                image_info["id"],
-                                                flavor_info["id"])
+        restrict_cloud = self.cloud.restrict(
+            username=user_info["name"],
+            tenant_name=tenant_info["name"],
+            password="default")
+        server = restrict_cloud.nova.servers.create(server_info["name"],
+                                                    image_info["id"],
+                                                    flavor_info["id"])
         server = utils.wait_for(server, self.cloud.nova.servers.get,
                                 value="ACTIVE")
         self.spawn_event(server)
@@ -139,6 +144,7 @@ class TerminateServer(task.BaseCloudTask):
 
 def _reprovision_server(src, dst, store, server, image_ensure):
     server_id = server.id
+    user_id, tenant_id = server.user_id, server.tenant_id
     image_id, flavor_id = server.image["id"], server.flavor["id"]
     server_start_event = "server-{}-start-event".format(server_id)
     server_finish_event = "server-{}-finish-event".format(server_id)
@@ -149,6 +155,8 @@ def _reprovision_server(src, dst, store, server, image_ensure):
     server_boot = "server-{}-boot".format(server_id)
     server_terminate = "server-{}-terminate".format(server_id)
     flavor_ensure = "flavor-{}-ensure".format(flavor_id)
+    user_ensure = "user-{}-ensure".format(user_id)
+    tenant_ensure = "tenant-{}-ensure".format(tenant_id)
     flow = linear_flow.Flow("migrate-server-{}".format(server_id))
     flow.add(task_utils.SyncPoint(name=server_sync,
                                   requires=[image_ensure, flavor_ensure]))
@@ -167,7 +175,8 @@ def _reprovision_server(src, dst, store, server, image_ensure):
                                  name=server_boot,
                                  provides=server_boot,
                                  rebind=[server_suspend, image_ensure,
-                                         flavor_ensure]
+                                         flavor_ensure, user_ensure,
+                                         tenant_ensure]
                                  ))
     dst_check_task, store = check_tasks.run_checks(src, dst, store,
                                                    server_id)
