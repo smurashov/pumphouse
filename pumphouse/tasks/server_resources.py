@@ -39,12 +39,14 @@ def migrate_server(src, dst, store, server_id):
     identity_flow, store = identity_tasks.migrate_server_identity(
         src, dst, store, server.to_dict())
     resources.append(identity_flow)
+    tenant = src.keystone.tenants.get(server.tenant_id)
+    restrict_src = src.restrict(tenant_name=tenant.name)
     for name in [sg["name"] for sg in server.security_groups]:
-        secgroup = src.nova.security_groups.find(name=name)
+        secgroup = restrict_src.nova.security_groups.find(name=name)
         secgroup_retrieve = "secgroup-{}-retrieve".format(secgroup.id)
         if secgroup_retrieve not in store:
             secgroup_flow, store = secgroup_tasks.migrate_secgroup(
-                src, dst, store, secgroup.id)
+                src, dst, store, secgroup.id, tenant.id, server.user_id)
             resources.append(secgroup_flow)
     for floating_ip in [addr["addr"]
                         for addr in server.addresses.values().pop()
