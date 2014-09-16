@@ -18,28 +18,27 @@ from pumphouse import checks
 from pumphouse import exceptions
 from pumphouse import task
 
+from taskflow.patterns import unordered_flow
+
 
 LOG = logging.getLogger(__name__)
 
 
-class RunChecks(task.BaseCloudTask):
-    def execute(self, server_info, commands):
-        if not commands:
+class RunCheck(task.BaseCloudTask):
+    def execute(self, server_info, command):
+        check_config = {
+            "input": self._get_ip_list(server_info),
+            "env": {},
+            "cmd": command
+        }
+        check = checks.PumpHouseShellCheck(check_config)
+        try:
+            result = check.run()
+        except exceptions.CheckError as exc:
+            LOG.exception("Check failed: %s", exc.message)
+            raise
+        else:
             return True
-        for command in commands:
-            check_config = {
-                "input": self._get_ip_list(server_info),
-                "env": {},
-                "cmd": command
-            }
-            check = checks.PumpHouseShellCheck(check_config)
-            try:
-                result = check.run()
-            except exceptions.CheckError as exc:
-                LOG.exception("Check failed: %s", exc.message)
-                raise
-            else:
-                return True
 
     def _get_ip_list(self, server_info):
         ip_list = []
@@ -51,13 +50,17 @@ class RunChecks(task.BaseCloudTask):
 
 
 def run_checks(src, dst, store, server_id, commands=None):
+    if not commands:
+        commands = []
+    flow = unordered_flow.Flow("check-server-{}".format(server_id))
     server_ensure = "server-{}-boot".format(server_id)
-    check_binding = "checks-{}".format(server_id)
-    commands_binding = "check-commands-{}".format(server_id)
-    task = RunChecks(src,
-                     name=check_binding,
-                     provides=check_binding,
-                     rebind=[server_ensure,
-                             commands_binding])
-    store[commands_binding] = commands
-    return task, store
+    for num, command in enumerate(commands):
+        check_binding = "check-server-{}-{}".format(server_id, num)
+        command_binding = "check-command-{}-{}".format(server_id, num)
+        flow.add(RunCheck(src,
+                          name=check_binding,
+                          provides=check_binding,
+                          rebind=[server_ensure,
+                                  command_binding]))
+        store[command_binding] = command
+    return flow, store
