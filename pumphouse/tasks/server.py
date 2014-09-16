@@ -142,7 +142,7 @@ class TerminateServer(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def _reprovision_server(src, dst, store, server, image_ensure):
+def reprovision_server(src, dst, store, server, image_ensure):
     server_id = server.id
     user_id, tenant_id = server.user_id, server.tenant_id
     image_id, flavor_id = server.image["id"], server.flavor["id"]
@@ -192,22 +192,6 @@ def _reprovision_server(src, dst, store, server, image_ensure):
                                          rebind=[server_retrieve,
                                                  server_boot]))
     store[server_binding] = server_id
-    return (flow, store)
-
-
-@provision_server.add("image")
-def reprovision_server_with_image(src, dst, store, server):
-    image_id = server.image["id"]
-    image_ensure = "image-{}-ensure".format(image_id)
-    flow, store = _reprovision_server(src, dst, store, server, image_ensure)
-    return flow, store
-
-
-@provision_server.add("snapshot")
-def reprovision_server_with_snapshot(src, dst, store, server):
-    server_id = server.id
-    image_ensure = "snapshot-{}-ensure".format(server_id)
-    flow, store = _reprovision_server(src, dst, store, server, image_ensure)
     return (flow, store)
 
 

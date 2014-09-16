@@ -61,10 +61,10 @@ def migrate_server(src, dst, store, server_id):
                                                          flavor_id)
         resources.append(flavor_flow)
     migrate_disk_func = migrate_disk.select("image")
-    resources, store = migrate_disk_func(src, dst, store,
-                                         resources, server)
-    provision_server = server_tasks.provision_server.select("image")
-    server_flow, store = provision_server(src, dst, store, server)
+    image_ensure, resources, store = migrate_disk_func(src, dst, store,
+                                                       resources, server)
+    server_flow, store = server_tasks.reprovision_server(src, dst, store,
+                                                         server, image_ensure)
     return resources, server_flow, store
 
 
@@ -72,6 +72,7 @@ def migrate_server(src, dst, store, server_id):
 def migrate_disk_with_image(src, dst, store, resources, server):
     image_id = server.image["id"]
     image_retrieve = "image-{}-retrieve".format(image_id)
+    image_ensure = "image-{}-ensure".format(image_id)
     if image_retrieve not in store:
         image_flow, store = image_tasks.migrate_image(src, dst, store,
                                                       image_id)
@@ -87,4 +88,4 @@ def migrate_disk_with_snapshot(src, dst, store, resources, server):
         snapshot_flow, store = snapshot_tasks.migrate_snapshot(src, dst, store,
                                                                server.id)
         resources.append(snapshot_flow)
-    return resources, store
+    return snapshot_ensure, resources, store
