@@ -26,7 +26,7 @@ LOG = logging.getLogger(__name__)
 
 class RetrieveSecGroup(task.BaseCloudTask):
     """Retrieve security group data from cloud by ID"""
-    def execute(self, secgroup_id, tenant_info):
+    def execute(self, secgroup_id, tenant_info, user_info):
         self.cloud = self.cloud.restrict(tenant_name=tenant_info["name"])
         secgroup = self.cloud.nova.security_groups.get(secgroup_id)
         return secgroup.to_dict()
@@ -34,8 +34,10 @@ class RetrieveSecGroup(task.BaseCloudTask):
 
 class EnsureSecGroup(task.BaseCloudTask):
     """Create security group with given parameters in cloud"""
-    def execute(self, secgroup_info, tenant_info):
-        self.cloud = self.cloud.restrict(tenant_name=tenant_info["name"])
+    def execute(self, secgroup_info, tenant_info, user_info):
+        self.cloud = self.cloud.restrict(tenant_name=tenant_info["name"],
+                                         username=user_info["name"],
+                                         password="default")
         try:
             secgroup = self.cloud.nova.security_groups.find(
                 name=secgroup_info["name"])
@@ -81,22 +83,26 @@ class EnsureSecGroup(task.BaseCloudTask):
         return secgroup
 
 
-def migrate_secgroup(src, dst, store, secgroup_id, tenant_id):
+def migrate_secgroup(src, dst, store, secgroup_id, tenant_id, user_id):
     secgroup_binding = "secgroup-{}".format(secgroup_id)
     secgroup_retrieve = "{}-retrieve".format(secgroup_binding)
     secgroup_ensure = "{}-ensure".format(secgroup_binding)
     tenant_binding = "tenant-{}".format(tenant_id)
     tenant_ensure = "{}-ensure".format(tenant_binding)
+    user_binding = "user-{}".format(user_id)
+    user_ensure = "{}-ensure".format(user_binding)
     flow = linear_flow.Flow("migrate-secgroup-{}".format(secgroup_id))
     flow.add(RetrieveSecGroup(src,
                               name=secgroup_retrieve,
                               provides=secgroup_binding,
                               rebind=[secgroup_retrieve,
-                                      tenant_binding]))
+                                      tenant_binding,
+                                      user_binding]))
     flow.add(EnsureSecGroup(dst,
                             name=secgroup_ensure,
                             provides=secgroup_ensure,
                             rebind=[secgroup_binding,
-                                    tenant_ensure]))
+                                    tenant_ensure,
+                                    user_ensure]))
     store[secgroup_retrieve] = secgroup_id
     return flow, store
