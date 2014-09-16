@@ -113,7 +113,8 @@ class EnsureSingleImage(EnsureImage):
                                                       None, None)
 
 
-def migrate_image_task(src, dst, store, task_class, image_id, user_id, *rebind):
+def migrate_image_task(src, dst, store, task_class, image_id, user_id,
+                       *rebind):
     image_retrieve = "image-{}-retrieve".format(image_id)
     image_ensure = "image-{}-ensure".format(image_id)
     user_ensure = "user-{}-ensure".format(user_id)
@@ -148,7 +149,8 @@ def migrate_image(src, dst, store, image_id):
                                                 store, image["ramdisk_id"],
                                                 user_id)
             image, store = migrate_image_task(src, dst, EnsureImage, store,
-                                              image_id, user_id, kernel.provides,
+                                              image_id, user_id,
+                                              kernel.provides,
                                               ramdisk.provides)
             flow.add(kernel, ramdisk, image)
         elif hasattr(image, "kernel_id"):
