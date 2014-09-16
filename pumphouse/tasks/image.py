@@ -26,10 +26,12 @@ LOG = logging.getLogger(__name__)
 
 class LogReporter(task_utils.UploadReporter):
     def report(self, absolute):
+        src_image, dst_image = self.context
         LOG.info("Image %r uploaded on %3.2f%%",
-                 self.context["id"], absolute * 100)
+                 dst_image["id"], absolute * 100)
         events.emit("image uploading", {
-            "id": self.context["id"],
+            "id": dst_image["id"],
+            "source_id": src_image["id"],
             "progress": round(absolute * 100)
         }, namespace="/events")
 
@@ -66,7 +68,8 @@ class EnsureImage(task.BaseCloudsTask):
             self.created_event(image)
 
             data = self.src_cloud.glance.images.data(image_info["id"])
-            img_data = task_utils.FileProxy(data, LogReporter(image))
+            img_data = task_utils.FileProxy(data, LogReporter((image_info,
+                                                               image)))
             self.dst_cloud.glance.images.upload(image["id"], img_data)
             image = self.dst_cloud.glance.images.get(image["id"])
             self.uploaded_event(image)
