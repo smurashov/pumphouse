@@ -77,7 +77,7 @@ def migrate_disk_with_image(src, dst, store, resources, server):
         image_flow, store = image_tasks.migrate_image(src, dst, store,
                                                       image_id)
         resources.append(image_flow)
-    return resources, store
+    return image_ensure, resources, store
 
 
 @migrate_disk.add("snapshot")
