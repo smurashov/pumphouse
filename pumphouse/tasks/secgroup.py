@@ -27,22 +27,22 @@ LOG = logging.getLogger(__name__)
 class RetrieveSecGroup(task.BaseCloudTask):
     """Retrieve security group data from cloud by ID"""
     def execute(self, secgroup_id, tenant_info, user_info):
-        self.cloud = self.cloud.restrict(tenant_name=tenant_info["name"])
-        secgroup = self.cloud.nova.security_groups.get(secgroup_id)
+        cloud = self.cloud.restrict(tenant_name=tenant_info["name"])
+        secgroup = cloud.nova.security_groups.get(secgroup_id)
         return secgroup.to_dict()
 
 
 class EnsureSecGroup(task.BaseCloudTask):
     """Create security group with given parameters in cloud"""
     def execute(self, secgroup_info, tenant_info, user_info):
-        self.cloud = self.cloud.restrict(tenant_name=tenant_info["name"],
-                                         username=user_info["name"],
-                                         password="default")
+        cloud = self.cloud.restrict(tenant_name=tenant_info["name"],
+                                    username=user_info["name"],
+                                    password="default")
         try:
-            secgroup = self.cloud.nova.security_groups.find(
+            secgroup = cloud.nova.security_groups.find(
                 name=secgroup_info["name"])
         except exceptions.nova_excs.NotFound:
-            secgroup = self.cloud.nova.security_groups.create(
+            secgroup = cloud.nova.security_groups.create(
                 secgroup_info["name"], secgroup_info["description"])
             LOG.info("Created: %s", secgroup.to_dict())
             self.created_event(secgroup_info)
