@@ -178,12 +178,12 @@ def reprovision_server(src, dst, store, server, image_ensure):
                                          flavor_ensure, user_ensure,
                                          tenant_ensure]
                                  ))
-    dst_check_task, store = check_tasks.run_checks(src, dst, store,
-                                                   server_id, None)
-    flow.add(dst_check_task)
     floating_ips_flow, store = restore_floating_ips(src, dst, store,
                                                     server.to_dict())
     flow.add(floating_ips_flow)
+    dst_check_task, store = check_tasks.run_checks(src, dst, store,
+                                                   server_id, None)
+    flow.add(dst_check_task)
     flow.add(TerminateServer(src,
                              name=server_terminate,
                              rebind=[server_suspend]))
