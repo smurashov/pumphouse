@@ -181,11 +181,24 @@ def migrate_tenant(tenant_id):
         store = {}
         flow, store = resource_tasks.migrate_resources(src, dst, store,
                                                        tenant_id)
-        LOG.debug("Migration flow: %s", flow)
-        result = flows.run_flow(flow, store)
-        LOG.debug("Result of migration: %s", result)
-        # TODO(akcram): All users' passwords should be restored when all
-        #               migration operations ended.
+        status = ""
+        events.emit("tenant migrate", {
+            "id": tenant_id
+        }, namespace="/events")
+
+        try:
+            LOG.debug("Migration flow: %s", flow)
+            result = flows.run_flow(flow, store)
+            LOG.debug("Result of migration: %s", result)
+            # TODO(akcram): All users' passwords should be restored when all
+            #               migration operations ended.
+        except e:
+            status = "error"
+        else:
+            events.emit("tenant migrated", {
+                "id": tenant_id,
+                "status": status
+            }, namespace="/events")
 
     gevent.spawn(migrate)
     return flask.make_response()
