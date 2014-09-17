@@ -41,6 +41,8 @@ class UploadReporter(object):
         self.step_size = self.size * self.period
 
     def update(self, chunk):
+        if not self.size:
+            return
         self.uploaded += chunk
         steps = int((self.uploaded - self.last_step) / self.step_size)
         if steps > 0:
@@ -69,6 +71,6 @@ class FileProxy(object):
 
     def read(self, amt=None):
         data = self.resp.read(amt)
-        if data and self.reporter.size:
+        if data:
             self.reporter.update(len(data))
         return data

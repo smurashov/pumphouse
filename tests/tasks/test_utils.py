@@ -22,6 +22,10 @@ class UploadReporterTestCase(unittest.TestCase):
                     0.625, 0.75, 0.8125, 0.9375, 1.0]
         self.assertEqual(expected, self.reports)
 
+    def test_zero_size(self):
+        self.reporter.update(1024)
+        self.assertEqual([], self.reports)
+
 
 class SyncPointTestCase(unittest.TestCase):
     def setUp(self):
