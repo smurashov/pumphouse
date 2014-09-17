@@ -23,6 +23,7 @@ class TestSnapshot(unittest.TestCase):
             "id": self.test_snapshot_id,
             "status": "active"
         })
+        self.test_user_id = '777'
 
         self.dst = Mock()
         self.src = Mock()
@@ -64,7 +65,8 @@ class TestMigrateEphemeralStorage(TestSnapshot):
             self.src,
             self.dst,
             store,
-            self.test_server_id
+            self.test_server_id,
+            self.test_user_id
         )
 
         self.assertEqual(mock_flow_add.call_count, 2)

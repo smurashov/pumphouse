@@ -86,6 +86,7 @@ def migrate_disk_with_snapshot(src, dst, store, resources, server):
     snapshot_ensure = "snapshot-{}-ensure".format(server.id)
     if snapshot_ensure not in store:
         snapshot_flow, store = snapshot_tasks.migrate_snapshot(src, dst, store,
-                                                               server.id)
+                                                               server.id,
+                                                               server.user_id)
         resources.append(snapshot_flow)
     return snapshot_ensure, resources, store
