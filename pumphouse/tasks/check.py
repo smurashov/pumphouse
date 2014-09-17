@@ -18,7 +18,7 @@ from pumphouse import checks
 from pumphouse import exceptions
 from pumphouse import task
 
-from taskflow.patterns import unordered_flow
+from taskflow.patterns import linear_flow
 
 
 LOG = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ class RunCheck(task.BaseCloudTask):
 def run_checks(src, dst, store, server_id, commands=None):
     if not commands:
         commands = []
-    flow = unordered_flow.Flow("check-server-{}".format(server_id))
+    flow = linear_flow.Flow("check-server-{}".format(server_id))
     server_ensure = "server-{}-boot".format(server_id)
     for num, command in enumerate(commands):
         check_binding = "check-server-{}-{}".format(server_id, num)
