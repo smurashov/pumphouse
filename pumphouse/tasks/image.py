@@ -39,8 +39,10 @@ class LogReporter(task_utils.UploadReporter):
 class EnsureImage(task.BaseCloudsTask):
     def execute(self, image_id, user_info, kernel_info, ramdisk_info):
         if user_info:
+            tenant = self.dst_cloud.keystone.tenants.get(user_info["tenantId"])
             dst_cloud = self.dst_cloud.restrict(username=user_info["name"],
-                                                password='default')
+                                                password='default',
+                                                tenant_name=tenant.name)
         else:
             dst_cloud = self.dst_cloud
         image_info = self.src_cloud.glance.images.get(image_id)
