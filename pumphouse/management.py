@@ -30,7 +30,7 @@ RO_SECURITY_GROUPS = ['default']
 TEST_IMAGE_URL = ("http://download.cirros-cloud.net/0.3.2/"
                   "cirros-0.3.2-x86_64-disk.img")
 TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
-TEST_RESOURCE_PREFIX = "pumphouse-test"
+TEST_RESOURCE_PREFIX = "pumphouse-"
 FLOATING_IP_STRING = "172.16.0.{}"
 # TODO(ogelbukh): make FLATDHCP actual configuration parameter and/or
 # command-line parameter, maybe autodetected in future
