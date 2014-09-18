@@ -366,6 +366,8 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
         try:
             net = cloud.nova.networks.find(project_id=None)
         except nova_excs.NotFound:
+            net = None
+        if net is None or net.label != "novanetwork":
             net = cloud.nova.networks.create(
                 label="novanetwork",
                 cidr="10.10.0.0/24",
