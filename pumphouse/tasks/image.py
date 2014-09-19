@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and#
 # limitations under the License.
 
+import itertools
 import logging
 
 from taskflow.patterns import graph_flow
@@ -120,7 +121,7 @@ def migrate_image_task(src, dst, store, task_class, image_id, user_id,
     image_retrieve = "image-{}-retrieve".format(image_id)
     image_ensure = "image-{}-ensure".format(image_id)
     user_ensure = "user-{}-ensure".format(user_id)
-    rebind = set((image_retrieve, user_ensure)).union(*rebind)
+    rebind = itertools.chain((image_retrieve, user_ensure), *rebind)
     task = task_class(src, dst,
                       name=image_ensure,
                       provides=image_ensure,

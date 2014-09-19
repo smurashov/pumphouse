@@ -32,7 +32,7 @@ LOG = logging.getLogger(__name__)
 pump = flask.Blueprint("pumphouse", __name__)
 
 
-def crossdomain(origin=None, methods=None, headers=None,
+def crossdomain(origin='*', methods=None, headers=('Accept', 'Content-Type'),
                 max_age=21600, attach_to_all=True,
                 automatic_options=True):
     if methods is not None:
@@ -70,6 +70,7 @@ def crossdomain(origin=None, methods=None, headers=None,
             return resp
 
         f.provide_automatic_options = False
+        f.required_methods = ['OPTIONS']
         return functools.update_wrapper(wrapped_function, f)
     return decorator
 
@@ -135,6 +136,7 @@ def index():
 
 
 @pump.route("/reset", methods=["POST"])
+@crossdomain()
 def reset():
     reset = flask.current_app.config["CLOUDS_RESET"]
     if not reset:
@@ -157,7 +159,7 @@ def reset():
 
 
 @pump.route("/resources")
-@crossdomain(origin='*.mirantis.com')
+@crossdomain()
 def resources():
     return flask.jsonify(
         reset=flask.current_app.config["CLOUDS_RESET"],
@@ -171,6 +173,7 @@ def resources():
 
 
 @pump.route("/tenants/<tenant_id>", methods=["POST"])
+@crossdomain()
 def migrate_tenant(tenant_id):
     @flask.copy_current_request_context
     def migrate():
@@ -208,6 +211,7 @@ def migrate_tenant(tenant_id):
 
 
 @pump.route("/hosts/<host_name>", methods=["POST"])
+@crossdomain()
 def evacuate_host(host_name):
     @flask.copy_current_request_context
     def evacuate():
