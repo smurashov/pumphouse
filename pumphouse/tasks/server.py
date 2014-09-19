@@ -20,7 +20,6 @@ from pumphouse import events
 from pumphouse import task
 from pumphouse import flows
 from pumphouse.tasks import utils as task_utils
-from pumphouse.tasks import check as check_tasks
 from pumphouse.tasks import floating_ip as fip_tasks
 from pumphouse import utils
 
