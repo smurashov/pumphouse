@@ -37,16 +37,16 @@ class RepairUsersPasswords(task.BaseCloudsTask):
         self.dst_cloud.identity.push()
 
 
-def migrate_passwords(src, dst, store, users_ids, tenant_id):
+def migrate_passwords(context, store, users_ids, tenant_id):
     users_ensure = ["user-{}-ensure".format(user_id) for user_id in users_ids]
     passwords_repair = "repair-{}".format(tenant_id)
-    task = RepairUsersPasswords(src, dst,
+    task = RepairUsersPasswords(context.src_cloud, context.dst_cloud,
                                 name=passwords_repair,
                                 requires=users_ensure)
     return (task, store)
 
 
-def migrate_server_identity(src, dst, store, server_info):
+def migrate_server_identity(context, store, server_info):
     server_id = server_info["id"]
     flow = graph_flow.Flow("server-identity-{}".format(server_id))
     tenant_id = server_info["tenant_id"]
@@ -54,22 +54,23 @@ def migrate_server_identity(src, dst, store, server_info):
     tenant_retrieve = "tenant-{}-retrieve".format(tenant_id)
     user_retrieve = "user-{}-retrieve".format(user_id)
     if tenant_retrieve not in store:
-        tenant_flow, store = tenant_tasks.migrate_tenant(src, dst, store,
+        tenant_flow, store = tenant_tasks.migrate_tenant(context, store,
                                                          tenant_id)
         flow.add(tenant_flow)
     if user_retrieve not in store:
-        user = src.keystone.users.get(user_id)
+        user = context.src_cloud.keystone.users.get(user_id)
         user_tenant_id = getattr(user, "tenantId", None)
-        user_flow, store = user_tasks.migrate_user(src, dst, store,
+        user_flow, store = user_tasks.migrate_user(context, store,
                                                    user_id,
                                                    tenant_id=user_tenant_id)
         flow.add(user_flow)
-    for role in src.keystone.users.list_roles(user_id, tenant=tenant_id):
+    roles = context.src_cloud.keystone.users.list_roles(user_id,
+                                                        tenant=tenant_id)
+    for role in roles:
         role_id = role.id
         role_retrieve = "role-{}-retrieve".format(role_id)
         if role_retrieve not in store:
-            role_flow, store = role_tasks.migrate_role(src, dst, store,
-                                                       role_id)
+            role_flow, store = role_tasks.migrate_role(context, store, role_id)
             flow.add(role_flow)
         if role.name.startswith("_"):
             continue
@@ -78,7 +79,7 @@ def migrate_server_identity(src, dst, store, server_info):
                                                               tenant_id)
         if user_role_ensure in store:
             continue
-        membership_flow, store = user_tasks.migrate_membership(src, dst,
+        membership_flow, store = user_tasks.migrate_membership(context,
                                                                store,
                                                                user_id,
                                                                role_id,
@@ -87,27 +88,30 @@ def migrate_server_identity(src, dst, store, server_info):
     return flow, store
 
 
-def migrate_identity(src, dst, store, tenant_id):
+def migrate_identity(context, store, tenant_id):
     flow = graph_flow.Flow("identity-{}".format(tenant_id))
     tenant_retrieve = "tenant-{}-retrieve".format(tenant_id)
     if tenant_retrieve not in store:
-        tenant_flow, store = tenant_tasks.migrate_tenant(src, dst, store,
+        tenant_flow, store = tenant_tasks.migrate_tenant(context, store,
                                                          tenant_id)
         flow.add(tenant_flow)
     users_ids, roles_ids = set(), set()
     # XXX(akscram): Due to the bug #1308218 users duplication can be here.
-    for user in src.keystone.users.list(tenant_id):
+    users = context.src_cloud.keystone.users.list(tenant_id)
+    for user in users:
         user_retrieve = "user-{}-retrieve".format(user.id)
-        if (user.id == src.keystone.auth_ref.user_id or
+        if (user.id == context.src_cloud.keystone.auth_ref.user_id or
                 user.id in users_ids or
                 user_retrieve in store):
             continue
         user_tenant_id = getattr(user, "tenantId", None)
-        user_flow, store = user_tasks.migrate_user(src, dst, store, user.id,
+        user_flow, store = user_tasks.migrate_user(context, store, user.id,
                                                    tenant_id=user_tenant_id)
         flow.add(user_flow)
         users_ids.add(user.id)
-        for role in src.keystone.users.list_roles(user.id, tenant=tenant_id):
+        user_roles = context.src_cloud.keystone.users.list_roles(
+            user.id, tenant=tenant_id)
+        for role in user_roles:
             # NOTE(akscram): Actually all roles which started with
             #                underscore are hidden.
             if role.name.startswith("_"):
@@ -118,7 +122,7 @@ def migrate_identity(src, dst, store, tenant_id):
                                                                   tenant_id)
             if user_role_ensure in store:
                 continue
-            membership_flow, store = user_tasks.migrate_membership(src, dst,
+            membership_flow, store = user_tasks.migrate_membership(context,
                                                                    store,
                                                                    user.id,
                                                                    role.id,
@@ -127,7 +131,6 @@ def migrate_identity(src, dst, store, tenant_id):
     for role_id in roles_ids:
         role_retrieve = "role-{}-retrieve".format(role_id)
         if role_retrieve not in store:
-            role_flow, store = role_tasks.migrate_role(src, dst, store,
-                                                       role_id)
+            role_flow, store = role_tasks.migrate_role(context, store, role_id)
             flow.add(role_flow)
     return (users_ids, flow, store)

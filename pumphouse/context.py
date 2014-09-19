@@ -19,11 +19,7 @@ LOG = logging.getLogger(__name__)
 
 
 class Context(object):
-    def __init__(self, config, src, dst, store, events):
+    def __init__(self, config, src_cloud, dst_cloud):
         self.config = config
-        self.src = src
-        self.dst = dst
-        self.tenant = None
-        self.user = None
-        self.store = store
-        self.events = events
+        self.src_cloud = src_cloud
+        self.dst_cloud = dst_cloud

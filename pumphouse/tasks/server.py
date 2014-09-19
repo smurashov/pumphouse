@@ -141,7 +141,7 @@ class TerminateServer(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def reprovision_server(src, dst, store, server, image_ensure):
+def reprovision_server(context, store, server, image_ensure):
     server_id = server.id
     user_id, tenant_id = server.user_id, server.tenant_id
     image_id, flavor_id = server.image["id"], server.flavor["id"]
@@ -159,31 +159,31 @@ def reprovision_server(src, dst, store, server, image_ensure):
     flow = linear_flow.Flow("migrate-server-{}".format(server_id))
     flow.add(task_utils.SyncPoint(name=server_sync,
                                   requires=[image_ensure, flavor_ensure]))
-    flow.add(ServerStartMigrationEvent(src,
+    flow.add(ServerStartMigrationEvent(context.src_cloud,
                                        name=server_start_event,
                                        rebind=[server_binding]))
-    flow.add(RetrieveServer(src,
+    flow.add(RetrieveServer(context.src_cloud,
                             name=server_binding,
                             provides=server_retrieve,
                             rebind=[server_binding]))
-    flow.add(SuspendServer(src,
+    flow.add(SuspendServer(context.src_cloud,
                            name=server_retrieve,
                            provides=server_suspend,
                            rebind=[server_retrieve]))
-    flow.add(BootServerFromImage(dst,
+    flow.add(BootServerFromImage(context.dst_cloud,
                                  name=server_boot,
                                  provides=server_boot,
                                  rebind=[server_suspend, image_ensure,
                                          flavor_ensure, user_ensure,
                                          tenant_ensure]
                                  ))
-    floating_ips_flow, store = restore_floating_ips(src, dst, store,
+    floating_ips_flow, store = restore_floating_ips(context, store,
                                                     server.to_dict())
     flow.add(floating_ips_flow)
-    flow.add(TerminateServer(src,
+    flow.add(TerminateServer(context.src_cloud,
                              name=server_terminate,
                              rebind=[server_suspend]))
-    flow.add(ServerSuccessMigrationEvent(src, dst,
+    flow.add(ServerSuccessMigrationEvent(context.src_cloud, context.dst_cloud,
                                          name=server_finish_event,
                                          rebind=[server_retrieve,
                                                  server_boot]))
@@ -191,7 +191,7 @@ def reprovision_server(src, dst, store, server, image_ensure):
     return (flow, store)
 
 
-def restore_floating_ips(src, dst, store, server_info):
+def restore_floating_ips(context, store, server_info):
     flow = unordered_flow.Flow("post-migration-{}".format(server_info["id"]))
     addresses = server_info["addresses"]
     for label in addresses:
@@ -201,7 +201,7 @@ def restore_floating_ips(src, dst, store, server_info):
             fip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
             if fip_retrieve not in store:
                 fip_flow, store = fip_tasks.associate_floating_ip_server(
-                    src, dst, store,
+                    context, store,
                     floating_ip, fixed_ip,
                     server_info["id"])
                 flow.add(fip_flow)

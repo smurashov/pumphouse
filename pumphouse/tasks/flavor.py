@@ -60,16 +60,16 @@ class EnsureFlavor(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def migrate_flavor(src, dst, store, flavor_id):
+def migrate_flavor(context, store, flavor_id):
     flavor_binding = "flavor-{}".format(flavor_id)
     flavor_retrieve = "{}-retrieve".format(flavor_binding)
     flavor_ensure = "{}-ensure".format(flavor_binding)
     flow = linear_flow.Flow("migrate-flavor-{}".format(flavor_id)).add(
-        RetrieveFlavor(src,
+        RetrieveFlavor(context.src_cloud,
                        name=flavor_retrieve,
                        provides=flavor_binding,
                        rebind=[flavor_retrieve]),
-        EnsureFlavor(dst,
+        EnsureFlavor(context.dst_cloud,
                      name=flavor_ensure,
                      provides=flavor_ensure,
                      rebind=[flavor_binding])

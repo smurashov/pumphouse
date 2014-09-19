@@ -1,9 +1,9 @@
+import mock
 import unittest
 
 from pumphouse.exceptions import nova_excs
 from pumphouse.tasks import flavor
 from pumphouse import task
-from mock import patch, Mock
 from taskflow.patterns import linear_flow
 
 
@@ -22,12 +22,12 @@ class TestFlavor(unittest.TestCase):
             "os-flavor-access:is_public": True
         }
 
-        self.flavor = Mock()
+        self.flavor = mock.Mock()
         self.flavor.to_dict.return_value = {}
 
-        self.dst = Mock()
+        self.context = mock.Mock()
 
-        self.cloud = Mock()
+        self.cloud = mock.Mock()
         self.cloud.nova.flavors.get.return_value = self.flavor
         self.cloud.nova.flavors.create.return_value = self.flavor
 
@@ -75,17 +75,16 @@ class TestEnsureFlavor(TestFlavor):
 
 class TestMigrateFlavor(TestFlavor):
 
-    @patch.object(linear_flow.Flow, "add")
+    @mock.patch.object(linear_flow.Flow, "add")
     def test_migrate_flavor(self, mock_flow):
         mock_flow.return_value = self.dummy_id
 
         store = {}
 
         (flow, store) = flavor.migrate_flavor(
-            self.flavor,
-            self.dst,
+            self.context,
             store,
-            self.dummy_id
+            self.dummy_id,
         )
 
         self.assertTrue(mock_flow.called)

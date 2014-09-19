@@ -116,13 +116,12 @@ class EnsureSingleImage(EnsureImage):
                                                       None, None)
 
 
-def migrate_image_task(src, dst, store, task_class, image_id, user_id,
-                       *rebind):
+def migrate_image_task(context, store, task_class, image_id, user_id, *rebind):
     image_retrieve = "image-{}-retrieve".format(image_id)
     image_ensure = "image-{}-ensure".format(image_id)
     user_ensure = "user-{}-ensure".format(user_id)
     rebind = itertools.chain((image_retrieve, user_ensure), *rebind)
-    task = task_class(src, dst,
+    task = task_class(context.src_cloud, context.dst_cloud,
                       name=image_ensure,
                       provides=image_ensure,
                       rebind=list(rebind))
@@ -132,8 +131,8 @@ def migrate_image_task(src, dst, store, task_class, image_id, user_id,
 
 # XXX(akscram): We should to simplify this function. The cascade of
 #               if-statements looks ugly.
-def migrate_image(src, dst, store, image_id):
-    image = src.glance.images.get(image_id)
+def migrate_image(context, store, image_id):
+    image = context.src_cloud.glance.images.get(image_id)
     user_id = None
     if image["visibility"] == "private":
         user_id = image.get("owner")
@@ -145,34 +144,34 @@ def migrate_image(src, dst, store, image_id):
                                                hasattr(image, "ramdisk_id")):
         flow = graph_flow.Flow("migrate-image-{}".format(image_id))
         if hasattr(image, "kernel_id") and hasattr(image, "ramdisk_id"):
-            kernel, store = migrate_image_task(src, dst, EnsureSingleImage,
+            kernel, store = migrate_image_task(context, EnsureSingleImage,
                                                store, image["kernel_id"],
                                                user_id)
-            ramdisk, store = migrate_image_task(src, dst, EnsureSingleImage,
+            ramdisk, store = migrate_image_task(context, EnsureSingleImage,
                                                 store, image["ramdisk_id"],
                                                 user_id)
-            image, store = migrate_image_task(src, dst, EnsureImage, store,
+            image, store = migrate_image_task(context, EnsureImage, store,
                                               image_id, user_id,
                                               kernel.provides,
                                               ramdisk.provides)
             flow.add(kernel, ramdisk, image)
         elif hasattr(image, "kernel_id"):
-            kernel, store = migrate_image_task(src, dst, EnsureSingleImage,
+            kernel, store = migrate_image_task(context, EnsureSingleImage,
                                                store, image["kernel_id"],
                                                user_id)
-            image, store = migrate_image_task(src, dst, EnsureImageWithKernel,
+            image, store = migrate_image_task(context, EnsureImageWithKernel,
                                               store, image_id, user_id,
                                               kernel.provides)
             flow.add(kernel, image)
         else:
-            ramdisk, store = migrate_image_task(src, dst, EnsureSingleImage,
+            ramdisk, store = migrate_image_task(context, EnsureSingleImage,
                                                 store, image["ramdisk_id"],
                                                 user_id)
-            image, store = migrate_image_task(src, dst, EnsureImageWithRamdisk,
+            image, store = migrate_image_task(context, EnsureImageWithRamdisk,
                                               store, image_id, user_id,
                                               ramdisk.provides)
             flow.add(ramdisk, image)
     else:
-        flow, store = migrate_image_task(src, dst, store, EnsureSingleImage,
+        flow, store = migrate_image_task(context, store, EnsureSingleImage,
                                          image_id, user_id)
     return flow, store

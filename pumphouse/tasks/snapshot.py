@@ -51,18 +51,19 @@ class EnsureSnapshot(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def migrate_snapshot(src, dst, store, server_id, user_id):
+def migrate_snapshot(context, store, server_id, user_id):
     server_binding = "server-{}".format(server_id)
     snapshot_binding = "snapshot-{}".format(server_id)
     snapshot_ensure = "snapshot-{}-ensure".format(server_id)
     user_ensure = "user-{}-ensure".format(user_id)
     flow = linear_flow.Flow("migrate-ephemeral-storage-server-{}"
                             .format(server_id))
-    flow.add(EnsureSnapshot(src,
+    flow.add(EnsureSnapshot(context.src_cloud,
                             name=snapshot_binding,
                             provides=snapshot_binding,
                             rebind=[server_binding]))
-    flow.add(image_tasks.EnsureSingleImage(src, dst,
+    flow.add(image_tasks.EnsureSingleImage(context.src_cloud,
+                                           context.dst_cloud,
                                            name=snapshot_ensure,
                                            provides=snapshot_ensure,
                                            rebind=[snapshot_binding,

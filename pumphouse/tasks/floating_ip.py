@@ -126,17 +126,17 @@ class EnsureFloatingIP(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def migrate_floating_ip(src, dst, store, address):
+def migrate_floating_ip(context, store, address):
     """Replicate Floating IP from source cloud to destination cloud"""
     floating_ip_binding = "floating-ip-{}".format(address)
     floating_ip_retrieve = "floating-ip-{}-retrieve".format(address)
     floating_ip_bulk_ensure = "floating-ip-bulk-{}-ensure".format(address)
     flow = linear_flow.Flow("migrate-floating-ip-{}".format(address))
-    flow.add(RetrieveFloatingIP(src,
+    flow.add(RetrieveFloatingIP(context.src_cloud,
                                 name=floating_ip_retrieve,
                                 provides=floating_ip_retrieve,
                                 rebind=[floating_ip_binding]))
-    flow.add(EnsureFloatingIPBulk(dst,
+    flow.add(EnsureFloatingIPBulk(context.dst_cloud,
                                   name=floating_ip_bulk_ensure,
                                   provides=floating_ip_bulk_ensure,
                                   rebind=[floating_ip_retrieve]))
@@ -144,7 +144,7 @@ def migrate_floating_ip(src, dst, store, address):
     return flow, store
 
 
-def associate_floating_ip_server(src, dst, store, floating_ip_address,
+def associate_floating_ip_server(context, store, floating_ip_address,
                                  fixed_ip_info, server_id):
     """Associates Floating IP to Nova instance"""
     floating_ip_binding = "floating-ip-{}".format(floating_ip_address)
@@ -158,7 +158,7 @@ def associate_floating_ip_server(src, dst, store, floating_ip_address,
     flow.add(task_utils.SyncPoint(name=floating_ip_sync,
                                   requires=[floating_ip_binding,
                                             server_boot]))
-    flow.add(EnsureFloatingIP(dst,
+    flow.add(EnsureFloatingIP(context.dst_cloud,
                               name=floating_ip_binding,
                               provides=floating_ip_ensure,
                               rebind=[server_boot,
