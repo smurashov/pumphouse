@@ -61,8 +61,7 @@ class Service(object):
                 management.setup(events, cloud, self.target, num_tenants,
                                  num_servers)
         except Exception:
-            # TODO: Treat reset exceptions properly
-            pass
+            LOG.exception("Unexpected exception during cloud reset")
 
         events.emit("reset completed", {
             "cloud": cloud.name
