@@ -153,12 +153,12 @@ class TestEnsureFloatingIP(TestFloatingIP):
     def test_execute_duplicate_association(self):
         """Test duplicated association of single floating ip address
 
-        Simulate attempt to assign a server floating ip address that already has
-        some value in "instance_uuid" field, i.e. already assigned to some other
-        virtual server.
+        Simulate attempt to assign a server floating ip address that already
+        has value in "instance_uuid" field, i.e. already assigned to some
+        other virtual server.
         """
         ensure_floating_ip = floating_ip.EnsureFloatingIP(self.cloud)
-        self.floating_ip_unassgined.instance_uuid = "999"
+        self.floating_ip_unassigned.instance_uuid = "999"
         self.cloud.nova.floating_ips_bulk.find.return_value = \
             self.floating_ip_unassigned
 
