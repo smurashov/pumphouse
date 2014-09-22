@@ -13,12 +13,14 @@
 # limitations under the License.
 
 import unittest
-from mock import Mock
+from mock import Mock, patch
 
 from pumphouse import task
 from pumphouse import events
 from pumphouse import exceptions
 from pumphouse.tasks import secgroup
+
+from taskflow.patterns import linear_flow
 
 
 class SecGroupTestCase(unittest.TestCase):
@@ -63,6 +65,10 @@ class SecGroupTestCase(unittest.TestCase):
         self.cloud.nova.security_groups.find.return_value = self.secgroup
         self.cloud.nova.security_group_rules.create.return_value = \
             self.test_rule_id
+
+        self.src = Mock()
+
+        self.dst = Mock()
 
 
 class TestRetrieveSecGroup(SecGroupTestCase):
@@ -172,3 +178,26 @@ class TestEnsureSecGroup(SecGroupTestCase):
         secgroup_obj = ensure_secgroup._add_rules(self.test_secgroup_id,
                                                   self.secgroup_info)
         self.assertEqual(self.secgroup, secgroup_obj)
+
+
+class TestMigrateSecGroup(SecGroupTestCase):
+
+    @patch.object(linear_flow.Flow, "add")
+    def test_migrate_secgroup(self, mock_flow):
+        secgroup_binding = "secgroup-{}".format(self.test_secgroup_id)
+        secgroup_retrieve = "{}-retrieve".format(secgroup_binding)
+        mock_flow.return_value = self.secgroup_info
+
+        store = {}
+
+        (flow, store) = secgroup.migrate_secgroup(
+            self.src,
+            self.dst,
+            store,
+            self.test_secgroup_id,
+            self.test_tenant_id,
+            self.test_user_id)
+
+        self.assertTrue(mock_flow.called)
+        self.assertEqual({secgroup_retrieve: self.test_secgroup_id},
+                         store)
