@@ -201,3 +201,7 @@ class TestMigrateSecGroup(SecGroupTestCase):
         self.assertTrue(mock_flow.called)
         self.assertEqual({secgroup_retrieve: self.test_secgroup_id},
                          store)
+
+
+if __name__ == '__main__':
+    unittest.main()
