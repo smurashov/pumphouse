@@ -1,7 +1,7 @@
 import unittest
 
 from pumphouse.tasks import user
-from mock import patch, Mock
+from mock import patch, Mock, call
 from pumphouse import task
 from pumphouse.exceptions import keystone_excs
 
@@ -28,7 +28,7 @@ class TestUser(unittest.TestCase):
         self.user.id = self.user_id
         self.user.to_dict.return_value = self.user_info
 
-        self.dst = Mock()
+        self.context = Mock()
 
         self.cloud = Mock()
         self.users = self.cloud.keystone.users
@@ -118,8 +118,7 @@ class TestMigrateMembership(TestUser):
     def test_migrate_membership(self, ensure_user_role_mock):
         store = {}
         (task, store) = user.migrate_membership(
-            self.user,
-            self.dst,
+            self.context,
             store,
             self.user_id,
             self.role_id,
@@ -130,45 +129,60 @@ class TestMigrateMembership(TestUser):
         self.assertNotEqual(store, {})
 
 
-class TestMigrateUser(TestUser):
+class TestMigrateUser(unittest.TestCase):
+    def setUp(self):
+        self.user_id = "uid123"
+        self.tenant_id = "tid456"
+        self.context = Mock()
+        self.flow = Mock(return_value=Mock())
+
     @patch.object(user, "EnsureUser")
     @patch.object(user, "RetrieveUser")
     @patch("taskflow.patterns.linear_flow.Flow")
     def test_migrate_user(self, flow_mock,
                           retrieve_user_mock, ensure_user_mock):
-
+        flow_mock.return_value = self.flow
         store = {}
         (flow, store) = user.migrate_user(
-            self.user,
-            self.dst,
+            self.context,
             store,
             self.user_id,
-            self.tenant_id
+            tenant_id=self.tenant_id,
         )
 
         flow_mock.assert_called_once_with("migrate-user-%s" % self.user_id)
+
         self.assertEqual(retrieve_user_mock.call_count, 1)
         self.assertEqual(ensure_user_mock.call_count, 1)
-        self.assertNotEqual(store, {})
+        self.assertEqual(
+            self.flow.add.call_args_list,
+            [call(retrieve_user_mock()), call(ensure_user_mock())]
+        )
+        self.assertEqual(store,
+                         {"user-%s-retrieve" % self.user_id: self.user_id})
 
     @patch.object(user, "EnsureOrphanUser")
     @patch.object(user, "RetrieveUser")
     @patch("taskflow.patterns.linear_flow.Flow")
     def test_migrate_orphan_user(self, flow_mock,
                                  retrieve_user_mock, ensure_orphan_user_mock):
+        flow_mock.return_value = self.flow
         store = {}
         (flow, store) = user.migrate_user(
-            self.user,
-            self.dst,
+            self.context,
             store,
             self.user_id,
-            None
         )
 
         flow_mock.assert_called_once_with("migrate-user-%s" % self.user_id)
         self.assertEqual(retrieve_user_mock.call_count, 1)
         self.assertEqual(ensure_orphan_user_mock.call_count, 1)
-        self.assertNotEqual(store, {})
+        self.assertEqual(
+            self.flow.add.call_args_list,
+            [call(retrieve_user_mock()), call(ensure_orphan_user_mock())]
+        )
+        self.assertEqual(store,
+                         {"user-%s-retrieve" % self.user_id: self.user_id})
 
 
 if __name__ == '__main__':

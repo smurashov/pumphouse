@@ -18,7 +18,7 @@ class TestRoleCase(unittest.TestCase):
         self.role.to_dict.return_value = dict(self.role_info,
                                               id=self.dummy_id)
 
-        self.dst = Mock()
+        self.context = Mock()
 
         self.cloud = Mock()
         self.cloud.keystone.roles.get.return_value = self.role
@@ -71,10 +71,9 @@ class TestMigrateRole(TestRoleCase):
         store = {}
 
         (flow, store) = role.migrate_role(
-            self.role,
-            self.dst,
+            self.context,
             store,
-            self.dummy_id
+            self.dummy_id,
         )
         # Assures linear_flow.Flow().add is called
         self.assertTrue(mock_flow.called)

@@ -54,6 +54,7 @@ def start_app(config=None, **kwargs):
     app = create_app()
     app.config.setdefault("CLOUDS_RESET", False)
     app.config.setdefault("BIND_HOST", None)
+    app.config.setdefault("PLUGINS", None)
     if config is not None:
         app.config.update(config)
     events.init_app(app)

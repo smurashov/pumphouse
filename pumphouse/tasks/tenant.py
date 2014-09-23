@@ -53,16 +53,16 @@ class EnsureTenant(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def migrate_tenant(src, dst, store, tenant_id):
+def migrate_tenant(context, store, tenant_id):
     tenant_binding = "tenant-{}".format(tenant_id)
     tenant_retrieve = "{}-retrieve".format(tenant_binding)
     tenant_ensure = "{}-ensure".format(tenant_binding)
     flow = linear_flow.Flow("migrate-tenant-{}".format(tenant_id)).add(
-        RetrieveTenant(src,
+        RetrieveTenant(context.src_cloud,
                        name=tenant_retrieve,
                        provides=tenant_binding,
                        rebind=[tenant_retrieve]),
-        EnsureTenant(dst,
+        EnsureTenant(context.dst_cloud,
                      name=tenant_ensure,
                      provides=tenant_ensure,
                      rebind=[tenant_binding]),

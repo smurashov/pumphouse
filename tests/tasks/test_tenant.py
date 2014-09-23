@@ -20,7 +20,7 @@ class TenantTestCase(unittest.TestCase):
         self.tenant.to_dict.return_value = dict(self.tenant_info,
                                                 id=self.dummy_id)
 
-        self.dst = Mock()
+        self.context = Mock()
 
         self.cloud = Mock()
         self.cloud.keystone.tenants.get.return_value = self.tenant
@@ -78,10 +78,9 @@ class TestMigrateTenant(TenantTestCase):
         store = {}
 
         (flow, store) = tenant.migrate_tenant(
-            self.tenant,
-            self.dst,
+            self.context,
             store,
-            self.dummy_id
+            self.dummy_id,
         )
         # Assures linear_flow.Flow().add is called
         self.assertTrue(mock_flow.called)
