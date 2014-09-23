@@ -158,7 +158,7 @@ class TestMigrateUser(unittest.TestCase):
             self.flow.add.call_args_list,
             [call(retrieve_user_mock()), call(ensure_user_mock())]
         )
-        self.assertEqual(store, 
+        self.assertEqual(store,
                          {"user-%s-retrieve" % self.user_id: self.user_id})
 
     @patch.object(user, "EnsureOrphanUser")
@@ -181,7 +181,7 @@ class TestMigrateUser(unittest.TestCase):
             self.flow.add.call_args_list,
             [call(retrieve_user_mock()), call(ensure_orphan_user_mock())]
         )
-        self.assertEqual(store, 
+        self.assertEqual(store,
                          {"user-%s-retrieve" % self.user_id: self.user_id})
 
 
