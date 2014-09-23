@@ -1,10 +1,9 @@
-import mock
+from mock import Mock, patch, call
 import unittest
 
 from pumphouse.exceptions import nova_excs
 from pumphouse.tasks import flavor
 from pumphouse import task
-from taskflow.patterns import linear_flow
 
 
 class TestFlavor(unittest.TestCase):
@@ -22,12 +21,12 @@ class TestFlavor(unittest.TestCase):
             "os-flavor-access:is_public": True
         }
 
-        self.flavor = mock.Mock()
+        self.flavor = Mock()
         self.flavor.to_dict.return_value = {}
 
-        self.context = mock.Mock()
+        self.context = Mock()
 
-        self.cloud = mock.Mock()
+        self.cloud = Mock()
         self.cloud.nova.flavors.get.return_value = self.flavor
         self.cloud.nova.flavors.create.return_value = self.flavor
 
@@ -35,29 +34,28 @@ class TestFlavor(unittest.TestCase):
 class TestRetrieveFlavor(TestFlavor):
     def test_execute(self):
         retrieve_flavor = flavor.RetrieveFlavor(self.cloud)
-        self.assertIsInstance(retrieve_flavor, task.BaseCloudTask)
-
         retrieve_flavor.execute(self.dummy_id)
+
+        self.assertIsInstance(retrieve_flavor, task.BaseCloudTask)
         self.cloud.nova.flavors.get.assert_called_once_with(self.dummy_id)
 
 
 class TestEnsureFlavor(TestFlavor):
     def test_execute(self):
         ensure_flavor = flavor.EnsureFlavor(self.cloud)
+        ensure_flavor.execute(self.flavor_info)
 
         self.assertIsInstance(ensure_flavor, task.BaseCloudTask)
-
-        ensure_flavor.execute(self.flavor_info)
+        self.cloud.nova.flavors.get.assert_called_once_with(
+            self.flavor_info["id"]
+        )
         self.assertFalse(self.cloud.nova.flavors.create.called)
 
     def test_execute_not_found(self):
-        ensure_flavor = flavor.EnsureFlavor(self.cloud)
-
-        # In case if Not Found exception is raised by ...find call
-        # assures that cloud.nova.flavors.create is called
         self.cloud.nova.flavors.get.side_effect = nova_excs.NotFound(
             "404 Flavor Not Found")
 
+        ensure_flavor = flavor.EnsureFlavor(self.cloud)
         ensure_flavor.execute(self.flavor_info)
 
         self.cloud.nova.flavors.create.assert_called_once_with(
@@ -75,10 +73,11 @@ class TestEnsureFlavor(TestFlavor):
 
 class TestMigrateFlavor(TestFlavor):
 
-    @mock.patch.object(linear_flow.Flow, "add")
-    def test_migrate_flavor(self, mock_flow):
-        mock_flow.return_value = self.dummy_id
-
+    @patch.object(flavor, "EnsureFlavor")
+    @patch.object(flavor, "RetrieveFlavor")
+    @patch("taskflow.patterns.linear_flow.Flow")
+    def test_migrate_flavor(self, mock_flow,
+                            mock_retrieve_flavor, mock_ensure_flavor):
         store = {}
 
         (flow, store) = flavor.migrate_flavor(
@@ -87,8 +86,18 @@ class TestMigrateFlavor(TestFlavor):
             self.dummy_id,
         )
 
-        self.assertTrue(mock_flow.called)
-        self.assertNotEqual({}, store)
+        mock_flow.assert_called_once_with("migrate-flavor-%s" % self.dummy_id)
+        self.assertEqual(
+            mock_flow().add.call_args,
+            call(
+                mock_retrieve_flavor(),
+                mock_ensure_flavor()
+            )
+        )
+        self.assertEqual(
+            {"flavor-%s-retrieve" % self.dummy_id: self.dummy_id},
+            store
+        )
 
 
 if __name__ == '__main__':
