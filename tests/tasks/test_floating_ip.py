@@ -43,6 +43,10 @@ class TestFloatingIP(unittest.TestCase):
         self.src = Mock()
         self.dst = Mock()
 
+        self.context = Mock()
+        self.context.dst_cloud = self.dst
+        self.context.src_cloud = self.src
+
     def side_effect(self, *args, **kwargs):
         result = self.returns.pop(0)
         if isinstance(result, Exception):
@@ -178,8 +182,7 @@ class TestMigrateFloatingIP(TestFloatingIP):
         store = {}
 
         (flow, store) = floating_ip.migrate_floating_ip(
-            self.src,
-            self.dst,
+            self.context,
             store,
             self.test_address)
 
@@ -197,8 +200,7 @@ class TestAssociateFloatingIPServer(TestFloatingIP):
         store = {}
 
         (flow, store) = floating_ip.associate_floating_ip_server(
-            self.src,
-            self.dst,
+            self.context,
             store,
             self.test_address,
             self.fixed_ip_info,

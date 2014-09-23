@@ -70,6 +70,10 @@ class SecGroupTestCase(unittest.TestCase):
 
         self.dst = Mock()
 
+        self.context = Mock()
+        self.context.src_cloud = self.src
+        self.context.dst_cloud = self.dst
+
 
 class TestRetrieveSecGroup(SecGroupTestCase):
     def test_retrieve_is_task(self):
@@ -191,8 +195,7 @@ class TestMigrateSecGroup(SecGroupTestCase):
         store = {}
 
         (flow, store) = secgroup.migrate_secgroup(
-            self.src,
-            self.dst,
+            self.context,
             store,
             self.test_secgroup_id,
             self.test_tenant_id,
