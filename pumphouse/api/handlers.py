@@ -179,7 +179,7 @@ def resources():
 def migrate_tenant(tenant_id):
     @flask.copy_current_request_context
     def migrate():
-        config = flask.current_app.config.get("PARAMETERS")
+        config = flask.current_app.config.get("PLUGINS") or {}
         src = hooks.source.connect()
         dst = hooks.destination.connect()
         ctx = context.Context(config, src, dst)

@@ -60,7 +60,8 @@ def migrate_server(context, store, server_id):
         flavor_flow, store = flavor_tasks.migrate_flavor(context, store,
                                                          flavor_id)
         resources.append(flavor_flow)
-    migrate_disk_func = migrate_disk.select("image")
+    migrate_disk_func = migrate_disk.select_from_config(context.config,
+                                                        "image")
     image_ensure, resources, store = migrate_disk_func(context, store,
                                                        resources, server)
     server_flow, store = server_tasks.reprovision_server(context, store,
