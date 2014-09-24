@@ -1,8 +1,9 @@
 import unittest
-from mock import patch, Mock
+
+from mock import patch, Mock, call
+
 from pumphouse.tasks import snapshot
 from pumphouse import task
-from taskflow.patterns import linear_flow
 
 
 class AttrDict(dict):
@@ -56,8 +57,13 @@ class TestEnsureSnapshot(TestSnapshot):
 
 
 class TestMigrateEphemeralStorage(TestSnapshot):
-    @patch.object(linear_flow.Flow, "add")
-    def test_migrate_snapshot(self, mock_flow_add):
+
+    @patch("pumphouse.tasks.image.EnsureSingleImage")
+    @patch.object(snapshot, "EnsureSnapshot")
+    @patch("taskflow.patterns.linear_flow.Flow")
+    def test_migrate_snapshot(self, flow_mock,
+                              ensure_snapshot_mock,
+                              ensure_image_mock):
         store = {}
 
         (flow, store) = snapshot.migrate_snapshot(
@@ -67,7 +73,12 @@ class TestMigrateEphemeralStorage(TestSnapshot):
             self.test_user_id
         )
 
-        self.assertEqual(mock_flow_add.call_count, 2)
+        flow_mock.assert_called_once_with("migrate-ephemeral-"
+                                          "storage-server-{}"
+                                          .format(self.test_server_id))
+        self.assertEqual(flow.add.call_args_list,
+                         [call(ensure_snapshot_mock()),
+                          call(ensure_image_mock())])
 
 
 if __name__ == '__main__':
