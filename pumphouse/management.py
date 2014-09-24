@@ -27,7 +27,7 @@ from pumphouse import utils
 LOG = logging.getLogger(__name__)
 
 RO_SECURITY_GROUPS = ['default']
-TEST_IMAGE_URL = ("http://download.cirros-cloud.net/0.3.2/"
+TEST_IMAGE_URL = ("http://127.0.0.1/share/"
                   "cirros-0.3.2-x86_64-disk.img")
 TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
 TEST_RESOURCE_PREFIX = "pumphouse-"
@@ -363,18 +363,16 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
         }, namespace="/events")
 
     if FLATDHCP:
-        try:
-            net = cloud.nova.networks.find(project_id=None)
-        except nova_excs.NotFound:
-            net = None
-        if net is None or net.label != "novanetwork":
+        for net in cloud.nova.networks.findall(project_id=None):
+            if net.label == "novanetwork":
+                LOG.info("Already exists: %s", net._info)
+                break
+        else:
             net = cloud.nova.networks.create(
                 label="novanetwork",
                 cidr="10.10.0.0/24",
                 project_id=None)
             LOG.info("Created: %s", net._info)
-        else:
-            LOG.info("Already exists: %s", net._info)
     else:
         raise NotImplementedError()
 
