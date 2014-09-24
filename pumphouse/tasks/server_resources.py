@@ -48,14 +48,26 @@ def migrate_server(src, dst, store, server_id):
             secgroup_flow, store = secgroup_tasks.migrate_secgroup(
                 src, dst, store, secgroup.id, tenant.id, server.user_id)
             resources.append(secgroup_flow)
-    for floating_ip in [addr["addr"]
-                        for addr in server.addresses.values().pop()
-                        if addr['OS-EXT-IPS:type'] == 'floating']:
-        floating_ip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
-        if floating_ip_retrieve not in store:
-            floating_ip_flow, store = fip_tasks.migrate_floating_ip(
-                src, dst, store, floating_ip)
-        resources.append(floating_ip_flow)
+    server_nics = "server-{}-nics".format(server_id)
+    nics = []
+    dst_networks = {net.label: net for net in dst.nova.networks.list()}
+    for network_name, addresses in server.addresses.iteritems():
+        network = dst_networks[network_name]
+        for address in addresses:
+            if address["OS-EXT-IPS:type"] == 'fixed':
+                nics.append({
+                    "net-id": network.id,
+                    "v4-fixed-ip": address['addr'],  # TODO(yorik-sar): IPv6
+                })
+            elif address["OS-EXT-IPS:type"] == 'floating':
+                floating_ip = address["addr"]
+                floating_ip_retrieve = "floating-ip-{}-retrieve".format(
+                    floating_ip)
+                if floating_ip_retrieve not in store:
+                    floating_ip_flow, store = fip_tasks.migrate_floating_ip(
+                        src, dst, store, floating_ip)
+                resources.append(floating_ip_flow)
+    store[server_nics] = nics
     if flavor_retrieve not in store:
         flavor_flow, store = flavor_tasks.migrate_flavor(src, dst, store,
                                                          flavor_id)
