@@ -1,11 +1,9 @@
 import unittest
 
-from mock import Mock, patch
+from mock import Mock, patch, call
 from pumphouse import exceptions
 from pumphouse import task
 from pumphouse.tasks import floating_ip
-
-from taskflow.patterns import linear_flow
 
 
 class TestFloatingIP(unittest.TestCase):
@@ -174,10 +172,13 @@ class TestEnsureFloatingIP(TestFloatingIP):
 
 class TestMigrateFloatingIP(TestFloatingIP):
 
-    @patch.object(linear_flow.Flow, "add")
-    def test_migrate_floating_ip(self, mock_flow):
+    @patch.object(floating_ip, "EnsureFloatingIPBulk")
+    @patch.object(floating_ip, "RetrieveFloatingIP")
+    @patch("taskflow.patterns.linear_flow.Flow")
+    def test_migrate_floating_ip(self, flow_mock,
+                                 retrieve_floating_ip_mock,
+                                 ensure_floating_ip_bulk_mock):
         floating_ip_binding = "floating-ip-{}".format(self.test_address)
-        mock_flow.return_value = self.floating_ip_info
 
         store = {}
 
@@ -186,16 +187,23 @@ class TestMigrateFloatingIP(TestFloatingIP):
             store,
             self.test_address)
 
-        self.assertTrue(mock_flow.called)
         self.assertEqual({floating_ip_binding: self.test_address}, store)
+        flow_mock.assert_run_once_with("migrate-floating-ip-{}"
+                                       .format(self.test_address))
+        self.assertEqual(flow.add.call_args_list,
+                         [call(retrieve_floating_ip_mock()),
+                          call(ensure_floating_ip_bulk_mock())])
 
 
 class TestAssociateFloatingIPServer(TestFloatingIP):
 
-    @patch.object(linear_flow.Flow, "add")
-    def test_associate_floating_ip_server(self, mock_flow):
+    @patch.object(floating_ip, "EnsureFloatingIP")
+    @patch("pumphouse.tasks.utils.SyncPoint")
+    @patch("taskflow.patterns.linear_flow.Flow")
+    def test_associate_floating_ip_server(self, flow_mock,
+                                          sync_point_mock,
+                                          ensure_floating_ip_mock):
         fixed_ip_binding = "fixed-ip-{}".format(self.test_instance_uuid)
-        mock_flow.return_value = self.floating_ip_info
 
         store = {}
 
@@ -206,8 +214,13 @@ class TestAssociateFloatingIPServer(TestFloatingIP):
             self.fixed_ip_info,
             self.test_instance_uuid)
 
-        self.assertTrue(mock_flow.called)
         self.assertEqual({fixed_ip_binding: self.fixed_ip_info}, store)
+        flow_mock.assert_called_once_with("associate-floating-ip-{}-server-{}"
+                                          .format(self.test_address,
+                                                  self.test_instance_uuid))
+        self.assertEqual(flow.add.call_args_list,
+                         [call(sync_point_mock()),
+                          call(ensure_floating_ip_mock())])
 
 
 if __name__ == '__main__':
