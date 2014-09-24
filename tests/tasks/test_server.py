@@ -13,10 +13,9 @@
 # limitations under the License.
 
 import unittest
-from mock import MagicMock, Mock, patch
+from mock import MagicMock, Mock, patch, call
 
 from pumphouse import task
-from pumphouse import exceptions
 from pumphouse.tasks import server
 
 
@@ -43,6 +42,7 @@ class TestServer(unittest.TestCase):
         }
 
         self.server = Mock()
+        self.server.id = self.test_server_id
         self.server.status = "ACTIVE"
         self.server.image = self.image_info
         self.server.flavor = self.flavor_info
@@ -54,6 +54,13 @@ class TestServer(unittest.TestCase):
         self.cloud.nova.servers.get.return_value = self.server
         self.cloud.nova.servers.find.return_value = self.server
         self.cloud.nova.servers.create.return_value = self.server
+
+        self.src_cloud = Mock()
+        self.dst_cloud = Mock()
+
+        self.context = Mock()
+        self.context.src_cloud = self.src_cloud
+        self.context.dst_cloud = self.dst_cloud
 
 
 class TestRetrieveServer(TestServer):
@@ -121,3 +128,65 @@ class TestBootServer(TestServer):
             self.image_info["id"],
             self.flavor_info["id"])
         self.assertEqual(self.server_info, server_info)
+
+
+class TestTerminateServer(TestServer):
+    def test_execute(self):
+        terminate_server = server.TerminateServer(self.cloud)
+        terminate_server.terminate_event = Mock()
+        terminate_server.execute(self.server_info)
+
+        self.cloud.nova.servers.delete.assert_called_once_with(
+            self.test_server_id)
+        terminate_server.terminate_event.assert_called_once_with(
+            self.server_info)
+
+
+class TestReprovisionServer(TestServer):
+
+    @patch("pumphouse.tasks.server.restore_floating_ips")
+    @patch("pumphouse.tasks.utils.SyncPoint")
+    @patch.object(server, "ServerSuccessMigrationEvent")
+    @patch.object(server, "ServerStartMigrationEvent")
+    @patch.object(server, "TerminateServer")
+    @patch.object(server, "BootServerFromImage")
+    @patch.object(server, "SuspendServer")
+    @patch.object(server, "RetrieveServer")
+    @patch("taskflow.patterns.linear_flow.Flow")
+    def test_reprovision_server(self,
+                                mock_flow,
+                                retrieve_server_mock,
+                                suspend_server_mock,
+                                boot_server_mock,
+                                terminate_server_mock,
+                                start_event_mock,
+                                stop_event_mock,
+                                mock_sync_point,
+                                mock_restore_floating_ips):
+        reprovision_server = server.reprovision_server
+        self.store = {}
+        self.flow = Mock()
+        floating_ips_flow = Mock()
+        mock_restore_floating_ips.return_value = (floating_ips_flow(),
+                                                  self.store)
+        image_ensure = "image-{}-ensure".format(self.image_info["id"])
+        server_binding = "server-{}".format(self.test_server_id)
+        expected_store_dict = {server_binding: self.test_server_id}
+        mock_flow.return_value = self.flow
+        (flow, store) = reprovision_server(self.context,
+                                           self.store,
+                                           self.server,
+                                           image_ensure)
+
+        self.assertEqual(self.store, expected_store_dict)
+        mock_flow.assert_called_once_with("migrate-server-{}"
+                                          .format(self.test_server_id))
+        self.assertEqual(self.flow.add.call_args_list,
+                         [call(mock_sync_point()),
+                          call(start_event_mock()),
+                          call(retrieve_server_mock()),
+                          call(suspend_server_mock()),
+                          call(boot_server_mock()),
+                          call(floating_ips_flow()),
+                          call(terminate_server_mock()),
+                          call(stop_event_mock())])
