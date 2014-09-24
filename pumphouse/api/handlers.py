@@ -184,10 +184,10 @@ def migrate_tenant(tenant_id):
         dst = hooks.destination.connect()
         ctx = context.Context(config, src, dst)
         store = {}
-        flow, store = resource_tasks.migrate_resources(ctx, store, tenant_id)
         events.emit("tenant migrate", {
             "id": tenant_id
         }, namespace="/events")
+        flow, store = resource_tasks.migrate_resources(ctx, store, tenant_id)
 
         try:
             LOG.debug("Migration flow: %s", flow)
