@@ -163,25 +163,22 @@ class TestReprovisionServer(TestServer):
                                 stop_event_mock,
                                 mock_sync_point,
                                 mock_restore_floating_ips):
-        reprovision_server = server.reprovision_server
         self.store = {}
-        self.flow = Mock()
         floating_ips_flow = Mock()
         mock_restore_floating_ips.return_value = (floating_ips_flow(),
                                                   self.store)
         image_ensure = "image-{}-ensure".format(self.image_info["id"])
         server_binding = "server-{}".format(self.test_server_id)
         expected_store_dict = {server_binding: self.test_server_id}
-        mock_flow.return_value = self.flow
-        (flow, store) = reprovision_server(self.context,
-                                           self.store,
-                                           self.server,
-                                           image_ensure)
+        (flow, store) = server.reprovision_server(self.context,
+                                                  self.store,
+                                                  self.server,
+                                                  image_ensure)
 
         self.assertEqual(self.store, expected_store_dict)
         mock_flow.assert_called_once_with("migrate-server-{}"
                                           .format(self.test_server_id))
-        self.assertEqual(self.flow.add.call_args_list,
+        self.assertEqual(flow.add.call_args_list,
                          [call(mock_sync_point()),
                           call(start_event_mock()),
                           call(retrieve_server_mock()),
@@ -190,3 +187,32 @@ class TestReprovisionServer(TestServer):
                           call(floating_ips_flow()),
                           call(terminate_server_mock()),
                           call(stop_event_mock())])
+
+
+class TestRestoreFloatingIPs(TestServer):
+
+    @patch("pumphouse.tasks.floating_ip.associate_floating_ip_server")
+    @patch("taskflow.patterns.unordered_flow.Flow")
+    def test_restore_floating_ips(self, flow_mock,
+                                  associate_fip_mock):
+        expected_store_dict = {}
+        self.store = {}
+        self.floating_ip = "1.1.1.1"
+        self.server_info["addresses"] = {
+            "novanetwork": [{
+                "addr": self.floating_ip,
+                "OS-EXT-IPS:type": "floating"
+            }]
+        }
+        fip_flow_mock = Mock()
+        fip_retrieve = "floating-ip-{}-retrieve".format(self.floating_ip)
+        associate_fip_mock.return_value = (fip_flow_mock(), self.store)
+        (flow, store) = server.restore_floating_ips(self.context,
+                                                    self.store,
+                                                    self.server_info)
+
+        self.assertEqual(self.store, expected_store_dict)
+        flow_mock.assert_called_once_with("post-migration-{}"
+                                          .format(self.test_server_id))
+        self.assertEqual(flow.add.call_args_list,
+                         [call(fip_flow_mock())])
