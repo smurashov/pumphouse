@@ -1,8 +1,6 @@
 import collections
 import unittest
 
-from mock import Mock
-
 from pumphouse import exceptions as excs
 from pumphouse import plugin
 
@@ -10,6 +8,7 @@ from pumphouse import plugin
 class PluginTestCase(unittest.TestCase):
     def setUp(self):
         self.plugin = plugin.Plugin("test")
+        self.config = {}
 
     def test_add(self):
         impl = lambda x: x
@@ -38,9 +37,22 @@ class PluginTestCase(unittest.TestCase):
         self.assertEqual("test", err.target)
         self.assertEqual("unknown", err.name)
 
+    def test_select_from_config(self):
+        impl = lambda x: x
+        self.plugin.add("impl")(impl)
+        self.config["test"] = "impl"
+        slc_impl = self.plugin.select_from_config(self.config)
+        self.assertIs(slc_impl, impl)
+
+    def test_select_from_config_default(self):
+        impl = lambda x: x
+        self.plugin.add("impl")(impl)
+        slc_impl = self.plugin.select_from_config(self.config, "impl")
+        self.assertIs(slc_impl, impl)
+
     def test_plugin_iter(self):
-        test_impl1 = Mock()
-        test_impl2 = Mock()
+        test_impl1 = lambda x: x
+        test_impl2 = lambda x: x
         decorator1 = self.plugin.add("test_impl1")
         decorator2 = self.plugin.add("test_impl2")
         decorator1(test_impl1)

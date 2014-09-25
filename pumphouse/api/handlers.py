@@ -22,6 +22,7 @@ import flask
 from . import evacuation
 from . import hooks
 
+from pumphouse import context
 from pumphouse import events
 from pumphouse import flows
 from pumphouse.tasks import resources as resource_tasks
@@ -149,6 +150,7 @@ def reset():
     @flask.copy_current_request_context
     def reset_destination():
         hooks.destination.reset(events)
+
     gevent.spawn(reset_destination)
     gevent.spawn(reset_source)
 
@@ -177,16 +179,15 @@ def resources():
 def migrate_tenant(tenant_id):
     @flask.copy_current_request_context
     def migrate():
-        # FIXME(akscram): The params don't support yet.
-        # parameters = flask.current_app.config.get("PARAMETERS")
+        config = flask.current_app.config.get("PLUGINS") or {}
         src = hooks.source.connect()
         dst = hooks.destination.connect()
+        ctx = context.Context(config, src, dst)
         store = {}
-        flow, store = resource_tasks.migrate_resources(src, dst, store,
-                                                       tenant_id)
         events.emit("tenant migrate", {
             "id": tenant_id
         }, namespace="/events")
+        flow, store = resource_tasks.migrate_resources(ctx, store, tenant_id)
 
         try:
             LOG.debug("Migration flow: %s", flow)

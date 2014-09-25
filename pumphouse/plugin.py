@@ -93,5 +93,9 @@ class Plugin(object):
                                                name=name)
         return self.implementations[name]
 
+    def select_from_config(self, config, default=None):
+        switch = config.get(self.target, default)
+        return self.select(switch)
+
     def __iter__(self):
         return iter(self.implementations)

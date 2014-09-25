@@ -50,16 +50,16 @@ class EnsureRole(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def migrate_role(src, dst, store, role_id):
+def migrate_role(context, store, role_id):
     role_binding = "role-{}".format(role_id)
     role_retrieve = "{}-retrieve".format(role_binding)
     role_ensure = "{}-ensure".format(role_binding)
     flow = linear_flow.Flow("migrate-role-{}".format(role_id)).add(
-        RetrieveRole(src,
+        RetrieveRole(context.src_cloud,
                      name=role_retrieve,
                      provides=role_binding,
                      rebind=[role_retrieve]),
-        EnsureRole(dst,
+        EnsureRole(context.dst_cloud,
                    name=role_ensure,
                    provides=role_ensure,
                    rebind=[role_binding]),

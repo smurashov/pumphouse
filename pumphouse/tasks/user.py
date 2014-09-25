@@ -89,13 +89,13 @@ class EnsureUserRole(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def migrate_membership(src, dst, store, user_id, role_id, tenant_id):
+def migrate_membership(context, store, user_id, role_id, tenant_id):
     user_ensure = "user-{}-ensure".format(user_id)
     role_ensure = "role-{}-ensure".format(role_id)
     tenant_ensure = "tenant-{}-ensure".format(tenant_id)
     user_role_ensure = "user-role-{}-{}-{}-ensure".format(user_id, role_id,
                                                           tenant_id)
-    task = EnsureUserRole(dst,
+    task = EnsureUserRole(context.dst_cloud,
                           name=user_role_ensure,
                           provides=user_role_ensure,
                           rebind=[user_ensure, role_ensure,
@@ -104,23 +104,23 @@ def migrate_membership(src, dst, store, user_id, role_id, tenant_id):
     return (task, store)
 
 
-def migrate_user(src, dst, store, user_id, tenant_id=None):
+def migrate_user(context, store, user_id, tenant_id=None):
     user_binding = "user-{}".format(user_id)
     user_retrieve = "{}-retrieve".format(user_binding)
     user_ensure = "{}-ensure".format(user_binding)
     flow = linear_flow.Flow("migrate-user-{}".format(user_id))
-    flow.add(RetrieveUser(src,
+    flow.add(RetrieveUser(context.src_cloud,
                           name=user_retrieve,
                           provides=user_binding,
                           rebind=[user_retrieve]))
     if tenant_id is not None:
         tenant_ensure = "tenant-{}-ensure".format(tenant_id)
-        flow.add(EnsureUser(dst,
+        flow.add(EnsureUser(context.dst_cloud,
                             name=user_ensure,
                             provides=user_ensure,
                             rebind=[user_binding, tenant_ensure]))
     else:
-        flow.add(EnsureOrphanUser(dst,
+        flow.add(EnsureOrphanUser(context.dst_cloud,
                                   name=user_ensure,
                                   provides=user_ensure,
                                   rebind=[user_binding]))

@@ -1,10 +1,9 @@
 import unittest
-from mock import Mock, patch
+from mock import Mock, patch, call
 
 from pumphouse import task
 from pumphouse.tasks import role
 from pumphouse.exceptions import keystone_excs
-from taskflow.patterns import linear_flow
 
 
 class TestRoleCase(unittest.TestCase):
@@ -18,7 +17,7 @@ class TestRoleCase(unittest.TestCase):
         self.role.to_dict.return_value = dict(self.role_info,
                                               id=self.dummy_id)
 
-        self.dst = Mock()
+        self.context = Mock()
 
         self.cloud = Mock()
         self.cloud.keystone.roles.get.return_value = self.role
@@ -42,45 +41,52 @@ class TestRetrieveRole(TestRoleCase):
 class TestEnsureRole(TestRoleCase):
     def test_execute(self):
         ensure_role = role.EnsureRole(self.cloud)
-
-        # Assures this is the instance of task.BaseCloudTask
-        self.assertIsInstance(ensure_role, task.BaseCloudTask)
-
-        # Assures that no cloud.keystone.roles.create method is not called
-        # if cloud.keystone.roles.find does not raise Not Found exception
-        # i.e. role is found by its name
         ensure_role.execute(self.role_info)
+
+        self.assertIsInstance(ensure_role, task.BaseCloudTask)
+        self.cloud.keystone.roles.find.assert_called_once_with(
+            name=self.role_info["name"]
+        )
         self.assertFalse(self.cloud.keystone.roles.create.called)
 
     def test_execute_not_found(self):
-        ensure_role = role.EnsureRole(self.cloud)
-
-        # In case if Not Found exception is raised by ...find call
-        # assures that cloud.keystone.roles.create is called
         self.cloud.keystone.roles.find.side_effect = keystone_excs.NotFound
+
+        ensure_role = role.EnsureRole(self.cloud)
         ensure_role.execute(self.role_info)
+
         self.cloud.keystone.roles.create.assert_called_once_with(
             name=self.role_info["name"]
         )
 
 
 class TestMigrateRole(TestRoleCase):
-    @patch.object(linear_flow.Flow, "add")
-    def test_migrate_role(self, mock_flow):
-        mock_flow.return_value = self.dummy_id
+
+    @patch.object(role, "EnsureRole")
+    @patch.object(role, "RetrieveRole")
+    @patch("taskflow.patterns.linear_flow.Flow")
+    def test_migrate_role(self, mock_flow,
+                          mock_retrieve_role, mock_ensure_role):
         store = {}
 
         (flow, store) = role.migrate_role(
-            self.role,
-            self.dst,
+            self.context,
             store,
-            self.dummy_id
+            self.dummy_id,
         )
-        # Assures linear_flow.Flow().add is called
-        self.assertTrue(mock_flow.called)
 
-        # Assures that new flow is added to store after execution
-        self.assertNotEqual({}, store)
+        mock_flow.assert_called_once_with("migrate-role-%s" % self.dummy_id)
+        self.assertEqual(
+            mock_flow().add.call_args,
+            call(
+                mock_retrieve_role(),
+                mock_ensure_role()
+            )
+        )
+        self.assertEqual(
+            {"role-%s-retrieve" % self.dummy_id: self.dummy_id},
+            store
+        )
 
 
 if __name__ == "__main__":

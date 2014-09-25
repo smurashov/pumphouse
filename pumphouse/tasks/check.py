@@ -49,7 +49,7 @@ class RunCheck(task.BaseCloudTask):
         return ip_list
 
 
-def run_checks(src, dst, store, server_id, commands=None):
+def run_checks(context, store, server_id, commands=None):
     if not commands:
         commands = []
     flow = linear_flow.Flow("check-server-{}".format(server_id))
@@ -57,7 +57,7 @@ def run_checks(src, dst, store, server_id, commands=None):
     for num, command in enumerate(commands):
         check_binding = "check-server-{}-{}".format(server_id, num)
         command_binding = "check-command-{}-{}".format(server_id, num)
-        flow.add(RunCheck(src,
+        flow.add(RunCheck(context.src_cloud,
                           name=check_binding,
                           provides=check_binding,
                           rebind=[server_ensure,
