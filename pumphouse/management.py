@@ -27,7 +27,7 @@ from pumphouse import utils
 LOG = logging.getLogger(__name__)
 
 RO_SECURITY_GROUPS = ['default']
-TEST_IMAGE_URL = ("http://127.0.0.1/share/"
+TEST_IMAGE_URL = ("http://download.cirros-cloud.net/0.3.2/"
                   "cirros-0.3.2-x86_64-disk.img")
 TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
 TEST_RESOURCE_PREFIX = "pumphouse-"
