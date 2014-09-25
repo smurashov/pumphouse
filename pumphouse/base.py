@@ -66,5 +66,3 @@ class Service(object):
         events.emit("reset completed", {
             "cloud": cloud.name
         }, namespace="/events")
-
-        return cloud

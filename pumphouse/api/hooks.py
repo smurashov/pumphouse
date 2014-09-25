@@ -25,13 +25,27 @@ LOG = logging.getLogger(__name__)
 
 class Clouds(object):
     def __init__(self):
-        self.clouds = {}
+        self._services = {}
+        self._clients = {}
 
-    def set(self, name, service, client):
-        self.clouds[name] = (service, client)
+    def register(self, name, service):
+        self._services[name] = service
 
-    def get(self, name):
-        return self.clouds.get(name)
+    def connect(self, name):
+        service = self._services[name]
+        client = self._clients.get(name)
+        if client is None:
+            client = service.make()
+            self._clients[name] = client
+        else:
+            LOG.debug("Trying to check client %s", client)
+            if not service.check(client):
+                LOG.warning("The client %s is broken, try to get yet one",
+                            client)
+                # TODO(akscram): One try is not enough.
+                client = service.make(identity=client.identity)
+                self._clients[name] = client
+        return service, client
 
 
 class Cloud(object):
@@ -46,8 +60,7 @@ class Cloud(object):
         app.config.setdefault("CLOUD_SERVICE", "pumphouse.base.Service")
         clouds = self.register_extension(app)
         service = self.init_cloud_service(app)
-        client = service.make()
-        clouds.set(self.target, service, client)
+        clouds.register(self.target, service)
 
     def register_extension(self, app):
         if not hasattr(app, "extensions"):
@@ -83,25 +96,14 @@ class Cloud(object):
         if ctx is not None:
             with self._reset_lock:
                 clouds = self.get_extension(ctx.app)
-                service, client = clouds.get(self.target)
-                client = service.reset(events, client)
-                clouds.set(self.target, service, client)
+                service, client = clouds.connect(self.target)
+                service.reset(events, client)
 
     def connect(self):
         ctx = flask._app_ctx_stack.top
         if ctx is not None:
             clouds = self.get_extension(ctx.app)
-            service, client = clouds.get(self.target)
-            # TODO(akscram): One check is not enough.
-            LOG.info("Trying to check client %s", client)
-            if not service.check(client):
-                LOG.warning("The client %s is unusable, try to reinitialize "
-                            "it",
-                            client)
-                client = service.make(identity=client.identity)
-                clouds.set(self.target, service, client)
-            else:
-                LOG.info("Client looks like alive %s", client)
+            _, client = clouds.connect(self.target)
             return client
 
     @property
@@ -109,7 +111,7 @@ class Cloud(object):
         ctx = flask._app_ctx_stack.top
         if ctx is not None:
             clouds = self.get_extension(ctx.app)
-            service, client = clouds.get(self.target)
+            service, _ = clouds.connect(self.target)
             return service.cloud_urls
 
 
