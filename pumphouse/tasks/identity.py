@@ -72,6 +72,7 @@ def migrate_server_identity(context, store, server_info):
         if role_retrieve not in store:
             role_flow, store = role_tasks.migrate_role(context, store, role_id)
             flow.add(role_flow)
+
         if role.name.startswith("_"):
             continue
         user_role_ensure = "user-role-{}-{}-{}-ensure".format(user_id,
