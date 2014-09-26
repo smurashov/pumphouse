@@ -187,9 +187,10 @@ def migrate_tenant(tenant_id):
         events.emit("tenant migrate", {
             "id": tenant_id
         }, namespace="/events")
-        flow, store = resource_tasks.migrate_resources(ctx, store, tenant_id)
 
         try:
+            flow, store = resource_tasks.migrate_resources(
+                ctx, store, tenant_id)
             LOG.debug("Migration flow: %s", flow)
             result = flows.run_flow(flow, store)
             LOG.debug("Result of migration: %s", result)
