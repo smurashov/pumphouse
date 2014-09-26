@@ -142,7 +142,7 @@ class TerminateServer(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def reprovision_server(context, store, server, image_ensure):
+def reprovision_server(context, store, server, image_ensure, server_nics):
     server_id = server.id
     user_id, tenant_id = server.user_id, server.tenant_id
     image_id, flavor_id = server.image["id"], server.flavor["id"]
@@ -154,7 +154,6 @@ def reprovision_server(context, store, server, image_ensure):
     server_suspend = "server-{}-suspend".format(server_id)
     server_boot = "server-{}-boot".format(server_id)
     server_terminate = "server-{}-terminate".format(server_id)
-    server_nics = "server-{}-nics".format(server_id)
     flavor_ensure = "flavor-{}-ensure".format(flavor_id)
     user_ensure = "user-{}-ensure".format(user_id)
     tenant_ensure = "tenant-{}-ensure".format(tenant_id)

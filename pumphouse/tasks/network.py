@@ -14,48 +14,136 @@
 
 import logging
 
+import netaddr
+
 from pumphouse import exceptions
-from pumphouse import flows
 from pumphouse import task
-from taskflow.patterns import linear_flow
+from pumphouse.tasks import floating_ip as fip_tasks
+from taskflow.patterns import graph_flow
 
 LOG = logging.getLogger(__name__)
 
-migrate_network = flows.register("network")
+
+class RetrieveAllNetworks(task.BaseCloudTask):
+    def execute(self):
+        # FIXME(yorik-sar): Who the hell needs nova-network with such API?!
+        networks = self.cloud.nova.networks.list()
+        return {
+            "by-name": dict((net.label, net) for net in networks),
+            "by-id": dict((net.id, net) for net in networks),
+        }
 
 
-class RetrieveNetwork(task.BaseCloudTask):
-    def execute(self, network_id):
-        network = self.cloud.nova.networks.get(network_id)
+class RetrieveNetworkById(task.BaseCloudTask):
+    def execute(self, all_networks, network_id):
+        network = all_networks["by-id"][network_id]
+        return network.to_dict()
+
+
+class RetrieveNetworkByName(task.BaseCloudTask):
+    def execute(self, all_networks, network_name):
+        network = all_networks["by-name"][network_name]
         return network.to_dict()
 
 
 class EnsureNetwork(task.BaseCloudTask):
     def execute(self, network_info):
         try:
+            cidr = network_info['cidr']
+            if cidr:
+                s = netaddr.IPSet(cidr)
+                network_info['cidr'] = str(list(s.iter_cidrs())[0])
             network = self.cloud.nova.networks.create(**network_info)
         except exceptions.nova_excs.Conflict:
             LOG.exception("Conflicts: %s", network_info)
             raise
         else:
-            LOG("Created: %s", network.to_dict())
+            LOG.info("Created: %s", network.to_dict())
             return network.to_dict()
 
 
-@migrate_network.add("flatdhcp")
-def migrate_network(context, network_id):
-    store = context.store
-    network_binding = "network-{}".format(network_id)
-    network_retrieve = "{}-retrieve".format(network_id)
-    network_ensure = "{}-ensure".format(network_id)
-    flow = linear_flow.Flow("migrate-{}".format(network_binding))
-    flow.add(RetrieveNetwork(context.src,
-                             name=network_retrieve,
-                             provides=network_retrieve,
-                             rebind=[network_binding]))
-    flow.add(EnsureNetwork(context.dst,
+class EnsureNic(task.BaseCloudTask):
+    def execute(self, network_info, address):
+        return {
+            "net-id": network_info['id'],
+            "v4-fixed-ip": address,  # TODO(yorik-sar): IPv6
+        }
+
+
+def migrate_nic(context, store, network_name, address):
+    if address["OS-EXT-IPS:type"] == 'floating':
+        floating_ip = address["addr"]
+        floating_ip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
+        if floating_ip_retrieve in store:
+            return None, None
+        floating_ip_flow, store = fip_tasks.migrate_floating_ip(
+            context, store, floating_ip)
+        return floating_ip_flow, None
+    elif address["OS-EXT-IPS:type"] == 'fixed':
+        fixed_ip = address["addr"]
+        fixed_ip_retrieve = "fixed-ip-{}-retrieve".format(fixed_ip)
+        fixed_ip_nic = "fixed-ip-{}-nic".format(fixed_ip)
+        if fixed_ip_retrieve in store:
+            return None, fixed_ip_nic
+        flow = graph_flow.Flow("migrate-{}-fixed-ip".format(fixed_ip))
+        network_flow, network_ensure = migrate_network(
+            context, store, network_name=network_name)
+        if network_flow is not None:
+            flow.add(network_flow)
+        flow.add(EnsureNic(context.dst_cloud,
+                           name=fixed_ip_nic,
+                           provides=fixed_ip_nic,
+                           rebind=[network_ensure, fixed_ip_retrieve]))
+        store[fixed_ip_retrieve] = fixed_ip
+        return flow, fixed_ip_nic
+
+
+def migrate_network(context, store, network_id=None, network_name=None):
+    assert (network_id, network_name).count(None) == 1
+    by_id = network_id is not None
+    all_src_networks = "networks-src"
+    all_dst_networks = "networks-dst"
+    all_src_networks_retrieve = "networks-src-retrieve"
+    all_dst_networks_retrieve = "networks-dst-retrieve"
+    if by_id:
+        network_binding = "network-{}".format(network_id)
+        network_retrieve = "{}-retrieve".format(network_id)
+        network_ensure = "{}-ensure".format(network_id)
+    else:
+        network_binding = "network-{}".format(network_name)
+        network_retrieve = "{}-retrieve".format(network_name)
+        network_ensure = "{}-ensure".format(network_name)
+    if network_binding in store:
+        return None, network_ensure
+    flow = graph_flow.Flow("migrate-{}".format(network_binding))
+    if all_src_networks_retrieve not in store:
+        flow.add(RetrieveAllNetworks(context.src_cloud,
+                                     name=all_src_networks,
+                                     provides=all_src_networks))
+        store[all_src_networks_retrieve] = None
+    if all_dst_networks_retrieve not in store:
+        flow.add(RetrieveAllNetworks(context.dst_cloud,
+                                     name=all_dst_networks,
+                                     provides=all_dst_networks))
+        store[all_dst_networks_retrieve] = None
+    if by_id:
+        flow.add(RetrieveNetworkById(
+            context.src_cloud,
+            name=network_retrieve,
+            provides=network_retrieve,
+            rebind=[all_src_networks, network_binding]))
+    else:
+        flow.add(RetrieveNetworkByName(
+            context.src_cloud,
+            name=network_retrieve,
+            provides=network_retrieve,
+            rebind=[all_src_networks, network_binding]))
+    flow.add(EnsureNetwork(context.dst_cloud,
                            name=network_ensure,
                            provides=network_ensure,
                            rebind=[network_retrieve]))
-    store[network_binding] = network_id
-    return flow, store
+    if by_id:
+        store[network_binding] = network_id
+    else:
+        store[network_binding] = network_name
+    return flow, network_ensure

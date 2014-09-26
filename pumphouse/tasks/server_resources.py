@@ -20,8 +20,9 @@ from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import snapshot as snapshot_tasks
 from pumphouse.tasks import flavor as flavor_tasks
 from pumphouse.tasks import secgroup as secgroup_tasks
-from pumphouse.tasks import floating_ip as fip_tasks
+from pumphouse.tasks import network as network_tasks
 from pumphouse.tasks import identity as identity_tasks
+from pumphouse.tasks import utils as task_utils
 
 
 LOG = logging.getLogger(__name__)
@@ -50,25 +51,17 @@ def migrate_server(context, store, server_id):
             resources.append(secgroup_flow)
     server_nics = "server-{}-nics".format(server_id)
     nics = []
-    dst_networks = dict((net.label, net)
-                        for net in context.dst_cloud.nova.networks.list())
     for network_name, addresses in server.addresses.iteritems():
-        network = dst_networks[network_name]
         for address in addresses:
-            if address["OS-EXT-IPS:type"] == 'fixed':
-                nics.append({
-                    "net-id": network.id,
-                    "v4-fixed-ip": address['addr'],  # TODO(yorik-sar): IPv6
-                })
-            elif address["OS-EXT-IPS:type"] == 'floating':
-                floating_ip = address["addr"]
-                floating_ip_retrieve = "floating-ip-{}-retrieve".format(
-                    floating_ip)
-                if floating_ip_retrieve not in store:
-                    floating_ip_flow, store = fip_tasks.migrate_floating_ip(
-                        context, store, floating_ip)
-                resources.append(floating_ip_flow)
-    store[server_nics] = nics
+            flow, nic = network_tasks.migrate_nic(
+                context, store, network_name, address)
+            if flow is not None:
+                resources.append(flow)
+            if nic is not None:
+                nics.append(nic)
+    resources.append(task_utils.Gather(name=server_nics,
+                                       provides=server_nics,
+                                       rebind=nics))
     if flavor_retrieve not in store:
         flavor_flow, store = flavor_tasks.migrate_flavor(context, store,
                                                          flavor_id)
@@ -77,8 +70,8 @@ def migrate_server(context, store, server_id):
                                                         "image")
     image_ensure, resources, store = migrate_disk_func(context, store,
                                                        resources, server)
-    server_flow, store = server_tasks.reprovision_server(context, store,
-                                                         server, image_ensure)
+    server_flow, store = server_tasks.reprovision_server(
+        context, store, server, image_ensure, server_nics)
     return resources, server_flow, store
 
 
