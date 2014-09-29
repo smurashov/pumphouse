@@ -22,7 +22,7 @@ from pumphouse.tasks import server_resources
 LOG = logging.getLogger(__name__)
 
 
-def migrate_resources(context, store, tenant_id):
+def migrate_resources(context, tenant_id):
     servers = context.src_cloud.nova.servers.list(
         search_opts={'all_tenants': 1, 'tenant_id': tenant_id})
     flow = graph_flow.Flow("migrate-resources-{}".format(tenant_id))
@@ -30,11 +30,9 @@ def migrate_resources(context, store, tenant_id):
     migrate_server = server_resources.migrate_server
     for server in servers:
         server_binding = "server-{}".format(server.id)
-        if server_binding not in store:
-            resources, server_flow, store = migrate_server(context,
-                                                           store,
-                                                           server.id)
+        if server_binding not in context.store:
+            resources, server_flow = migrate_server(context, server.id)
             flow.add(*resources)
             servers_flow.add(server_flow)
     flow.add(servers_flow)
-    return flow, store
+    return flow

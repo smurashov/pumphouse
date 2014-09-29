@@ -53,7 +53,7 @@ class EnsureTenant(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def migrate_tenant(context, store, tenant_id):
+def migrate_tenant(context, tenant_id):
     tenant_binding = "tenant-{}".format(tenant_id)
     tenant_retrieve = "{}-retrieve".format(tenant_binding)
     tenant_ensure = "{}-ensure".format(tenant_binding)
@@ -67,5 +67,5 @@ def migrate_tenant(context, store, tenant_id):
                      provides=tenant_ensure,
                      rebind=[tenant_binding]),
     )
-    store[tenant_retrieve] = tenant_id
-    return (flow, store)
+    context.store[tenant_retrieve] = tenant_id
+    return flow

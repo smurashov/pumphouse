@@ -89,7 +89,7 @@ class EnsureUserRole(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def migrate_membership(context, store, user_id, role_id, tenant_id):
+def migrate_membership(context, user_id, role_id, tenant_id):
     user_ensure = "user-{}-ensure".format(user_id)
     role_ensure = "role-{}-ensure".format(role_id)
     tenant_ensure = "tenant-{}-ensure".format(tenant_id)
@@ -100,11 +100,11 @@ def migrate_membership(context, store, user_id, role_id, tenant_id):
                           provides=user_role_ensure,
                           rebind=[user_ensure, role_ensure,
                                   tenant_ensure])
-    store[user_role_ensure] = user_role_ensure
-    return (task, store)
+    context.store[user_role_ensure] = user_role_ensure
+    return task
 
 
-def migrate_user(context, store, user_id, tenant_id=None):
+def migrate_user(context, user_id, tenant_id=None):
     user_binding = "user-{}".format(user_id)
     user_retrieve = "{}-retrieve".format(user_binding)
     user_ensure = "{}-ensure".format(user_binding)
@@ -124,5 +124,5 @@ def migrate_user(context, store, user_id, tenant_id=None):
                                   name=user_ensure,
                                   provides=user_ensure,
                                   rebind=[user_binding]))
-    store[user_retrieve] = user_id
-    return (flow, store)
+    context.store[user_retrieve] = user_id
+    return flow

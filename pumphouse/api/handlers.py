@@ -183,16 +183,14 @@ def migrate_tenant(tenant_id):
         src = hooks.source.connect()
         dst = hooks.destination.connect()
         ctx = context.Context(config, src, dst)
-        store = {}
         events.emit("tenant migrate", {
             "id": tenant_id
         }, namespace="/events")
 
         try:
-            flow, store = resource_tasks.migrate_resources(
-                ctx, store, tenant_id)
+            flow = resource_tasks.migrate_resources(ctx, tenant_id)
             LOG.debug("Migration flow: %s", flow)
-            result = flows.run_flow(flow, store)
+            result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of migration: %s", result)
             # TODO(akcram): All users' passwords should be restored when all
             #               migration operations ended.

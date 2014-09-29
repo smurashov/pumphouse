@@ -50,7 +50,7 @@ class EnsureRole(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def migrate_role(context, store, role_id):
+def migrate_role(context, role_id):
     role_binding = "role-{}".format(role_id)
     role_retrieve = "{}-retrieve".format(role_binding)
     role_ensure = "{}-ensure".format(role_binding)
@@ -64,5 +64,5 @@ def migrate_role(context, store, role_id):
                    provides=role_ensure,
                    rebind=[role_binding]),
     )
-    store[role_retrieve] = role_id
-    return (flow, store)
+    context.store[role_retrieve] = role_id
+    return flow

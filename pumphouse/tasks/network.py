@@ -70,35 +70,34 @@ class EnsureNic(task.BaseCloudTask):
         }
 
 
-def migrate_nic(context, store, network_name, address):
+def migrate_nic(context, network_name, address):
     if address["OS-EXT-IPS:type"] == 'floating':
         floating_ip = address["addr"]
         floating_ip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
-        if floating_ip_retrieve in store:
+        if floating_ip_retrieve in context.store:
             return None, None
-        floating_ip_flow, store = fip_tasks.migrate_floating_ip(
-            context, store, floating_ip)
+        floating_ip_flow = fip_tasks.migrate_floating_ip(context, floating_ip)
         return floating_ip_flow, None
     elif address["OS-EXT-IPS:type"] == 'fixed':
         fixed_ip = address["addr"]
         fixed_ip_retrieve = "fixed-ip-{}-retrieve".format(fixed_ip)
         fixed_ip_nic = "fixed-ip-{}-nic".format(fixed_ip)
-        if fixed_ip_retrieve in store:
+        if fixed_ip_retrieve in context.store:
             return None, fixed_ip_nic
         flow = graph_flow.Flow("migrate-{}-fixed-ip".format(fixed_ip))
         network_flow, network_ensure = migrate_network(
-            context, store, network_name=network_name)
+            context, network_name=network_name)
         if network_flow is not None:
             flow.add(network_flow)
         flow.add(EnsureNic(context.dst_cloud,
                            name=fixed_ip_nic,
                            provides=fixed_ip_nic,
                            rebind=[network_ensure, fixed_ip_retrieve]))
-        store[fixed_ip_retrieve] = fixed_ip
+        context.store[fixed_ip_retrieve] = fixed_ip
         return flow, fixed_ip_nic
 
 
-def migrate_network(context, store, network_id=None, network_name=None):
+def migrate_network(context, network_id=None, network_name=None):
     assert (network_id, network_name).count(None) == 1
     by_id = network_id is not None
     all_src_networks = "networks-src"
@@ -113,19 +112,19 @@ def migrate_network(context, store, network_id=None, network_name=None):
         network_binding = "network-{}".format(network_name)
         network_retrieve = "{}-retrieve".format(network_name)
         network_ensure = "{}-ensure".format(network_name)
-    if network_binding in store:
+    if network_binding in context.store:
         return None, network_ensure
     flow = graph_flow.Flow("migrate-{}".format(network_binding))
-    if all_src_networks_retrieve not in store:
+    if all_src_networks_retrieve not in context.store:
         flow.add(RetrieveAllNetworks(context.src_cloud,
                                      name=all_src_networks,
                                      provides=all_src_networks))
-        store[all_src_networks_retrieve] = None
-    if all_dst_networks_retrieve not in store:
+        context.store[all_src_networks_retrieve] = None
+    if all_dst_networks_retrieve not in context.store:
         flow.add(RetrieveAllNetworks(context.dst_cloud,
                                      name=all_dst_networks,
                                      provides=all_dst_networks))
-        store[all_dst_networks_retrieve] = None
+        context.store[all_dst_networks_retrieve] = None
     if by_id:
         flow.add(RetrieveNetworkById(
             context.src_cloud,
@@ -143,7 +142,7 @@ def migrate_network(context, store, network_id=None, network_name=None):
                            provides=network_ensure,
                            rebind=[network_retrieve]))
     if by_id:
-        store[network_binding] = network_id
+        context.store[network_binding] = network_id
     else:
-        store[network_binding] = network_name
+        context.store[network_binding] = network_name
     return flow, network_ensure

@@ -18,6 +18,7 @@ class TestRoleCase(unittest.TestCase):
                                               id=self.dummy_id)
 
         self.context = Mock()
+        self.context.store = {}
 
         self.cloud = Mock()
         self.cloud.keystone.roles.get.return_value = self.role
@@ -67,11 +68,8 @@ class TestMigrateRole(TestRoleCase):
     @patch("taskflow.patterns.linear_flow.Flow")
     def test_migrate_role(self, mock_flow,
                           mock_retrieve_role, mock_ensure_role):
-        store = {}
-
-        (flow, store) = role.migrate_role(
+        flow = role.migrate_role(
             self.context,
-            store,
             self.dummy_id,
         )
 
@@ -85,7 +83,7 @@ class TestMigrateRole(TestRoleCase):
         )
         self.assertEqual(
             {"role-%s-retrieve" % self.dummy_id: self.dummy_id},
-            store
+            self.context.store,
         )
 
 

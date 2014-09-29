@@ -75,9 +75,8 @@ class TestService(TestBase):
     @patch("pumphouse.management.cleanup")
     @patch("pumphouse.management.setup")
     def test_reset_with_workloads(self, mock_setup, mock_cleanup):
-        cloud = self.service.reset(self.events, self.cloud)
+        self.service.reset(self.events, self.cloud)
 
-        self.assertEqual(cloud, self.cloud)
         mock_cleanup.assert_called_once_with(self.events,
                                              self.cloud,
                                              self.service.target)
@@ -90,9 +89,8 @@ class TestService(TestBase):
     @patch("pumphouse.management.setup")
     def test_reset_with_populate(self, mock_setup, mock_cleanup):
         self.service.workloads_config = None
-        cloud = self.service.reset(self.events, self.cloud)
+        self.service.reset(self.events, self.cloud)
 
-        self.assertEqual(cloud, self.cloud)
         mock_cleanup.assert_called_once_with(self.events,
                                              self.cloud,
                                              self.service.target)

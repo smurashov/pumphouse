@@ -142,7 +142,7 @@ class TerminateServer(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def reprovision_server(context, store, server, image_ensure, server_nics):
+def reprovision_server(context, server, image_ensure, server_nics):
     server_id = server.id
     user_id, tenant_id = server.user_id, server.tenant_id
     image_id, flavor_id = server.image["id"], server.flavor["id"]
@@ -178,8 +178,7 @@ def reprovision_server(context, store, server, image_ensure, server_nics):
                                          flavor_ensure, user_ensure,
                                          tenant_ensure, server_nics]
                                  ))
-    floating_ips_flow, store = restore_floating_ips(context, store,
-                                                    server.to_dict())
+    floating_ips_flow = restore_floating_ips(context, server.to_dict())
     flow.add(floating_ips_flow)
     flow.add(TerminateServer(context.src_cloud,
                              name=server_terminate,
@@ -188,11 +187,11 @@ def reprovision_server(context, store, server, image_ensure, server_nics):
                                          name=server_finish_event,
                                          rebind=[server_retrieve,
                                                  server_boot]))
-    store[server_binding] = server_id
-    return (flow, store)
+    context.store[server_binding] = server_id
+    return flow
 
 
-def restore_floating_ips(context, store, server_info):
+def restore_floating_ips(context, server_info):
     flow = unordered_flow.Flow("post-migration-{}".format(server_info["id"]))
     addresses = server_info["addresses"]
     for label in addresses:
@@ -200,10 +199,10 @@ def restore_floating_ips(context, store, server_info):
         for floating_ip in [addr["addr"] for addr in addresses[label]
                             if addr['OS-EXT-IPS:type'] == 'floating']:
             fip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
-            if fip_retrieve not in store:
-                fip_flow, store = fip_tasks.associate_floating_ip_server(
-                    context, store,
+            if fip_retrieve not in context.store:
+                fip_flow = fip_tasks.associate_floating_ip_server(
+                    context,
                     floating_ip, fixed_ip,
                     server_info["id"])
                 flow.add(fip_flow)
-    return flow, store
+    return flow

@@ -126,7 +126,7 @@ class EnsureFloatingIP(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def migrate_floating_ip(context, store, address):
+def migrate_floating_ip(context, address):
     """Replicate Floating IP from source cloud to destination cloud"""
     floating_ip_binding = "floating-ip-{}".format(address)
     floating_ip_retrieve = "floating-ip-{}-retrieve".format(address)
@@ -140,11 +140,11 @@ def migrate_floating_ip(context, store, address):
                                   name=floating_ip_bulk_ensure,
                                   provides=floating_ip_bulk_ensure,
                                   rebind=[floating_ip_retrieve]))
-    store[floating_ip_binding] = address
-    return flow, store
+    context.store[floating_ip_binding] = address
+    return flow
 
 
-def associate_floating_ip_server(context, store, floating_ip_address,
+def associate_floating_ip_server(context, floating_ip_address,
                                  fixed_ip_info, server_id):
     """Associates Floating IP to Nova instance"""
     floating_ip_binding = "floating-ip-{}".format(floating_ip_address)
@@ -164,5 +164,5 @@ def associate_floating_ip_server(context, store, floating_ip_address,
                               rebind=[server_boot,
                                       floating_ip_binding,
                                       fixed_ip_binding]))
-    store[fixed_ip_binding] = fixed_ip_info
-    return flow, store
+    context.store[fixed_ip_binding] = fixed_ip_info
+    return flow

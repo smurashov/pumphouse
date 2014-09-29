@@ -71,6 +71,7 @@ class SecGroupTestCase(unittest.TestCase):
         self.context = Mock()
         self.context.src_cloud = self.src
         self.context.dst_cloud = self.dst
+        self.context.store = {}
 
 
 class TestRetrieveSecGroup(SecGroupTestCase):
@@ -194,17 +195,14 @@ class TestMigrateSecGroup(SecGroupTestCase):
         secgroup_binding = "secgroup-{}".format(self.test_secgroup_id)
         secgroup_retrieve = "{}-retrieve".format(secgroup_binding)
 
-        store = {}
-
-        (flow, store) = secgroup.migrate_secgroup(
+        flow = secgroup.migrate_secgroup(
             self.context,
-            store,
             self.test_secgroup_id,
             self.test_tenant_id,
             self.test_user_id)
 
         self.assertEqual({secgroup_retrieve: self.test_secgroup_id},
-                         store)
+                         self.context.store)
         flow_mock.assert_called_once_with("migrate-secgroup-{}"
                                           .format(self.test_secgroup_id))
         self.assertEqual(flow.add.call_args_list,

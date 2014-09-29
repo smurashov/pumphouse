@@ -60,7 +60,7 @@ class EnsureFlavor(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def migrate_flavor(context, store, flavor_id):
+def migrate_flavor(context, flavor_id):
     flavor_binding = "flavor-{}".format(flavor_id)
     flavor_retrieve = "{}-retrieve".format(flavor_binding)
     flavor_ensure = "{}-ensure".format(flavor_binding)
@@ -74,5 +74,5 @@ def migrate_flavor(context, store, flavor_id):
                      provides=flavor_ensure,
                      rebind=[flavor_binding])
     )
-    store[flavor_retrieve] = flavor_id
-    return (flow, store)
+    context.store[flavor_retrieve] = flavor_id
+    return flow
