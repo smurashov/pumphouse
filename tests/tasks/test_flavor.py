@@ -25,6 +25,7 @@ class TestFlavor(unittest.TestCase):
         self.flavor.to_dict.return_value = {}
 
         self.context = Mock()
+        self.context.store = {}
 
         self.cloud = Mock()
         self.cloud.nova.flavors.get.return_value = self.flavor
@@ -78,11 +79,8 @@ class TestMigrateFlavor(TestFlavor):
     @patch("taskflow.patterns.linear_flow.Flow")
     def test_migrate_flavor(self, mock_flow,
                             mock_retrieve_flavor, mock_ensure_flavor):
-        store = {}
-
-        (flow, store) = flavor.migrate_flavor(
+        flow = flavor.migrate_flavor(
             self.context,
-            store,
             self.dummy_id,
         )
 
@@ -96,7 +94,7 @@ class TestMigrateFlavor(TestFlavor):
         )
         self.assertEqual(
             {"flavor-%s-retrieve" % self.dummy_id: self.dummy_id},
-            store
+            self.context.store,
         )
 
 

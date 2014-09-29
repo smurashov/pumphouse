@@ -44,6 +44,7 @@ class TestFloatingIP(unittest.TestCase):
         self.context = Mock()
         self.context.dst_cloud = self.dst
         self.context.src_cloud = self.src
+        self.context.store = {}
 
     def side_effect(self, *args, **kwargs):
         result = self.returns.pop(0)
@@ -180,14 +181,12 @@ class TestMigrateFloatingIP(TestFloatingIP):
                                  ensure_floating_ip_bulk_mock):
         floating_ip_binding = "floating-ip-{}".format(self.test_address)
 
-        store = {}
-
-        (flow, store) = floating_ip.migrate_floating_ip(
+        flow = floating_ip.migrate_floating_ip(
             self.context,
-            store,
             self.test_address)
 
-        self.assertEqual({floating_ip_binding: self.test_address}, store)
+        self.assertEqual({floating_ip_binding: self.test_address},
+                         self.context.store)
         flow_mock.assert_run_once_with("migrate-floating-ip-{}"
                                        .format(self.test_address))
         self.assertEqual(flow.add.call_args_list,
@@ -205,16 +204,14 @@ class TestAssociateFloatingIPServer(TestFloatingIP):
                                           ensure_floating_ip_mock):
         fixed_ip_binding = "fixed-ip-{}".format(self.test_instance_uuid)
 
-        store = {}
-
-        (flow, store) = floating_ip.associate_floating_ip_server(
+        flow = floating_ip.associate_floating_ip_server(
             self.context,
-            store,
             self.test_address,
             self.fixed_ip_info,
             self.test_instance_uuid)
 
-        self.assertEqual({fixed_ip_binding: self.fixed_ip_info}, store)
+        self.assertEqual({fixed_ip_binding: self.fixed_ip_info},
+                         self.context.store)
         flow_mock.assert_called_once_with("associate-floating-ip-{}-server-{}"
                                           .format(self.test_address,
                                                   self.test_instance_uuid))

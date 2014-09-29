@@ -51,7 +51,7 @@ class EnsureSnapshot(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def migrate_snapshot(context, store, server_id, user_id):
+def migrate_snapshot(context, server_id, user_id):
     server_binding = "server-{}".format(server_id)
     snapshot_binding = "snapshot-{}".format(server_id)
     snapshot_ensure = "snapshot-{}-ensure".format(server_id)
@@ -68,4 +68,4 @@ def migrate_snapshot(context, store, server_id, user_id):
                                            provides=snapshot_ensure,
                                            rebind=[snapshot_binding,
                                                    user_ensure]))
-    return flow, store
+    return flow

@@ -30,64 +30,60 @@ migrate_disk = flows.register("migrate_disk")
 post_hooks = flows.register("post_server")
 
 
-def migrate_server(context, store, server_id):
+def migrate_server(context, server_id):
     server = context.src_cloud.nova.servers.get(server_id)
     server_id = server.id
     flavor_id = server.flavor["id"]
     flavor_retrieve = "flavor-{}-retrieve".format(flavor_id)
     resources = []
-    identity_flow, store = identity_tasks.migrate_server_identity(
-        context, store, server.to_dict())
+    identity_flow = identity_tasks.migrate_server_identity(
+        context, server.to_dict())
     resources.append(identity_flow)
     tenant = context.src_cloud.keystone.tenants.get(server.tenant_id)
     restrict_src = context.src_cloud.restrict(tenant_name=tenant.name)
     for name in [sg["name"] for sg in server.security_groups]:
         secgroup = restrict_src.nova.security_groups.find(name=name)
         secgroup_retrieve = "secgroup-{}-retrieve".format(secgroup.id)
-        if secgroup_retrieve not in store:
-            secgroup_flow, store = secgroup_tasks.migrate_secgroup(
-                context, store, secgroup.id, tenant.id, server.user_id)
+        if secgroup_retrieve not in context.store:
+            secgroup_flow = secgroup_tasks.migrate_secgroup(
+                context, secgroup.id, tenant.id, server.user_id)
             resources.append(secgroup_flow)
     for floating_ip in [addr["addr"]
                         for addr in server.addresses.values().pop()
                         if addr['OS-EXT-IPS:type'] == 'floating']:
         floating_ip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
-        if floating_ip_retrieve not in store:
-            floating_ip_flow, store = fip_tasks.migrate_floating_ip(
-                context, store, floating_ip)
+        if floating_ip_retrieve not in context.store:
+            floating_ip_flow = fip_tasks.migrate_floating_ip(
+                context, floating_ip)
         resources.append(floating_ip_flow)
-    if flavor_retrieve not in store:
-        flavor_flow, store = flavor_tasks.migrate_flavor(context, store,
-                                                         flavor_id)
+    if flavor_retrieve not in context.store:
+        flavor_flow = flavor_tasks.migrate_flavor(context, flavor_id)
         resources.append(flavor_flow)
     migrate_disk_func = migrate_disk.select_from_config(context.config,
                                                         "image")
-    image_ensure, resources, store = migrate_disk_func(context, store,
-                                                       resources, server)
-    server_flow, store = server_tasks.reprovision_server(context, store,
-                                                         server, image_ensure)
-    return resources, server_flow, store
+    image_ensure, resources = migrate_disk_func(context, resources, server)
+    server_flow = server_tasks.reprovision_server(context,
+                                                  server, image_ensure)
+    return resources, server_flow
 
 
 @migrate_disk.add("image")
-def migrate_disk_with_image(context, store, resources, server):
+def migrate_disk_with_image(context, resources, server):
     image_id = server.image["id"]
     image_retrieve = "image-{}-retrieve".format(image_id)
     image_ensure = "image-{}-ensure".format(image_id)
-    if image_retrieve not in store:
-        image_flow, store = image_tasks.migrate_image(context, store,
-                                                      image_id)
+    if image_retrieve not in context.store:
+        image_flow = image_tasks.migrate_image(context, image_id)
         resources.append(image_flow)
-    return image_ensure, resources, store
+    return image_ensure, resources
 
 
 @migrate_disk.add("snapshot")
-def migrate_disk_with_snapshot(context, store, resources, server):
+def migrate_disk_with_snapshot(context, resources, server):
     snapshot_retrieve = "snapshot-{}".format(server.id)
     snapshot_ensure = "snapshot-{}-ensure".format(server.id)
-    if snapshot_ensure not in store:
-        snapshot_flow, store = snapshot_tasks.migrate_snapshot(context, store,
-                                                               server.id,
-                                                               server.user_id)
+    if snapshot_ensure not in context.store:
+        snapshot_flow = snapshot_tasks.migrate_snapshot(context, server.id,
+                                                        server.user_id)
         resources.append(snapshot_flow)
-    return snapshot_ensure, resources, store
+    return snapshot_ensure, resources

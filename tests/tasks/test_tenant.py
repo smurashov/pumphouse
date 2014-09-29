@@ -20,6 +20,7 @@ class TenantTestCase(unittest.TestCase):
                                                 id=self.dummy_id)
 
         self.context = Mock()
+        self.context.store = {}
 
         self.cloud = Mock()
         self.cloud.keystone.tenants.get.return_value = self.tenant
@@ -73,11 +74,8 @@ class TestMigrateTenant(TenantTestCase):
     @patch("taskflow.patterns.linear_flow.Flow")
     def test_migrate_tenant(self, mock_flow,
                             mock_ensure_tenant, mock_retrieve_tenant):
-        store = {}
-
-        (flow, store) = tenant.migrate_tenant(
+        flow = tenant.migrate_tenant(
             self.context,
-            store,
             self.dummy_id,
         )
         mock_flow.assert_called_once_with("migrate-tenant-%s" % self.dummy_id)
@@ -92,7 +90,7 @@ class TestMigrateTenant(TenantTestCase):
             )
         )
         self.assertEqual(
-            store,
+            self.context.store,
             {"tenant-%s-retrieve" % self.dummy_id: self.dummy_id}
         )
 

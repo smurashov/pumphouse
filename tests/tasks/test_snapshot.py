@@ -27,6 +27,7 @@ class TestSnapshot(unittest.TestCase):
         self.test_user_id = '777'
 
         self.context = Mock()
+        self.context.store = {}
 
         self.cloud = Mock()
         self.cloud.nova.servers.create_image.return_value = \
@@ -64,11 +65,8 @@ class TestMigrateEphemeralStorage(TestSnapshot):
     def test_migrate_snapshot(self, flow_mock,
                               ensure_snapshot_mock,
                               ensure_image_mock):
-        store = {}
-
-        (flow, store) = snapshot.migrate_snapshot(
+        flow = snapshot.migrate_snapshot(
             self.context,
-            store,
             self.test_server_id,
             self.test_user_id
         )

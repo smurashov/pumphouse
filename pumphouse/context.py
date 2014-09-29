@@ -19,7 +19,11 @@ LOG = logging.getLogger(__name__)
 
 
 class Context(object):
-    def __init__(self, config, src_cloud, dst_cloud):
+    def __init__(self, config, src_cloud, dst_cloud, store=None):
         self.config = config
         self.src_cloud = src_cloud
         self.dst_cloud = dst_cloud
+        if store is None:
+            self.store = {}
+        else:
+            self.store = store

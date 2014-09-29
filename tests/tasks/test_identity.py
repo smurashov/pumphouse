@@ -38,16 +38,15 @@ class TestIdentity(unittest.TestCase):
         self.src_cloud.identity = self.users_infos
         self.context = Mock(src_cloud=self.src_cloud,
                             dst_cloud=self.dst_cloud,
+                            store={},
                             name="Context")
 
 
 class TestMigratePasswords(TestIdentity):
     @patch.object(identity, "RepairUsersPasswords")
     def test_migrate_passwords(self, mock_repair_user_passwords):
-        store = {}
-        (task, store) = identity.migrate_passwords(
+        task = identity.migrate_passwords(
             self.context,
-            store,
             self.users_ids,
             self.tenant_id
         )
@@ -59,8 +58,8 @@ class TestMigratePasswords(TestIdentity):
             name="repair-%s" % self.tenant_id
         )
 
-        self.assertEqual(task, mock_repair_user_passwords())
-        self.assertEqual(store, {})
+        self.assertEqual(task, mock_repair_user_passwords.return_value)
+        self.assertEqual(self.context.store, {})
 
 
 class TestRepairUsersPasswords(TestIdentity):
@@ -84,32 +83,27 @@ class TestRepairUsersPasswords(TestIdentity):
 
 
 class TestMigrateIdentityBase(TestIdentity):
-    def patchFlows(self, store):
-        def patchFlow(cl, method, store):
-            mock_flow = patch.object(cl, method).start()
+    def patchFlows(self):
+        def patchFlow(cl, method):
+            p = patch.object(cl, method)
+            self.addCleanup(p.stop)
+            mock_flow = p.start()
             mock_flow.configure_mock(name=method)
-            return_value = Mock(name=method)
-            mock_flow.return_value = (return_value, store)
+            mock_flow.return_value = return_value = Mock(name=method)
             return mock_flow, return_value
 
         (self.mock_role, self.mock_role_result) = patchFlow(
             role_tasks,
-            "migrate_role",
-            store)
+            "migrate_role")
         (self.mock_user, self.mock_user_result) = patchFlow(
             user_tasks,
-            "migrate_user",
-            store)
+            "migrate_user")
         (self.mock_member, self.mock_member_result) = patchFlow(
             user_tasks,
-            "migrate_membership",
-            store)
+            "migrate_membership")
         (self.mock_tenant, self.mock_tenant_result) = patchFlow(
             tenant_tasks,
-            "migrate_tenant",
-            store)
-        self.addCleanup(patch.stopall)
-        return store
+            "migrate_tenant")
 
     def mockRole(self, id, name):
         r = Mock(id=id, name=name)
@@ -136,15 +130,15 @@ class TestMigrateIdentityBase(TestIdentity):
 
 class TestMigrateServerIdentity(TestMigrateIdentityBase):
     def test_migrate_server_identity(self):
-        self.store = self.patchFlows(
-            {"user-role-%s-%s-%s-ensure" % (self.user_id,
-                                            self.roles[3].id,
-                                            self.tenant_id): True}
-        )
+        self.patchFlows()
+        self.context.store = {
+            "user-role-%s-%s-%s-ensure" % (self.user_id,
+                                           self.roles[3].id,
+                                           self.tenant_id): True,
+        }
 
-        (flow, store) = identity.migrate_server_identity(
+        flow = identity.migrate_server_identity(
             self.context,
-            self.store,
             self.server_info
         )
 
@@ -160,7 +154,7 @@ class TestMigrateServerIdentity(TestMigrateIdentityBase):
         # Tenant migration task created
         self.assertEqual(
             self.mock_tenant.call_args_list,
-            [call(self.context, self.store, self.tenant_id), ]
+            [call(self.context, self.tenant_id), ]
         )
 
         # User migration task created
@@ -168,7 +162,6 @@ class TestMigrateServerIdentity(TestMigrateIdentityBase):
             self.mock_user.call_args_list,
             [
                 call(self.context,
-                     self.store,
                      self.user_id,
                      tenant_id=self.tenant_id)
             ]
@@ -177,7 +170,7 @@ class TestMigrateServerIdentity(TestMigrateIdentityBase):
         # Tasks for each of roles
         self.assertEqual(
             self.mock_role.call_args_list,
-            [call(self.context, self.store, r.id) for r in self.roles]
+            [call(self.context, r.id) for r in self.roles]
         )
 
         # Tasks for memberships of 0 and 2
@@ -187,7 +180,6 @@ class TestMigrateServerIdentity(TestMigrateIdentityBase):
             self.mock_member.call_args_list,
             [
                 call(self.context,
-                     self.store,
                      self.user_id,
                      r.id,
                      self.tenant_id)
@@ -196,14 +188,14 @@ class TestMigrateServerIdentity(TestMigrateIdentityBase):
         )
 
     def test_migrate_server_identity_tenant_and_user_exist(self):
-        self.store = self.patchFlows({
+        self.patchFlows()
+        self.context.store = {
             "tenant-%s-retrieve" % self.tenant_id: True,
             "user-%s-retrieve" % self.user_id: True,
-        })
+        }
 
-        (flow, store) = identity.migrate_server_identity(
+        flow = identity.migrate_server_identity(
             self.context,
-            self.store,
             self.server_info
         )
 
@@ -215,13 +207,12 @@ class TestMigrateServerIdentity(TestMigrateIdentityBase):
     def test_migrate_server_return(self):
         self.src_cloud.keystone.users.list_roles.return_value = [self.roles[0]]
 
-        (flow, store) = identity.migrate_server_identity(
+        flow = identity.migrate_server_identity(
             self.context,
-            {},
             self.server_info
         )
 
-        self.assertEqual(store, {
+        self.assertEqual(self.context.store, {
             "role-role1_id-retrieve": "role1_id",
             "tenant-dummy_tenant_id-retrieve": "dummy_tenant_id",
             "user-dummy_user_id-retrieve": "dummy_user_id",
@@ -250,36 +241,34 @@ class TestMigrateIdentity(TestMigrateIdentityBase):
         self.src_cloud.keystone.users.list.return_value = self.users
 
     def test_migrate_identity(self):
-        self.store = self.patchFlows({
+        self.patchFlows()
+        self.context.store = {
             "user-role-%s-%s-%s-ensure" % (self.user1_info["id"],
                                            self.roles[3].id,
                                            self.tenant_id): True,
             "user-role-%s-%s-%s-ensure" % (self.user2_info["id"],
                                            self.roles[3].id,
                                            self.tenant_id): True,
-        })
+        }
 
-        (users_ids,
-         flow,
-         store) = identity.migrate_identity(self.context,
-                                            self.store,
-                                            self.tenant_id)
+        (users_ids, flow) = identity.migrate_identity(self.context,
+                                                      self.tenant_id)
 
         self.mock_flow.assert_called_once_with("identity-%s" % self.tenant_id)
 
         # Tenant migration task created
         self.assertEqual(
             self.mock_tenant.call_args_list,
-            [call(self.context, self.store, self.tenant_id), ]
+            [call(self.context, self.tenant_id), ]
         )
 
         # Tasks for all unique users created
         self.assertEqual(
             self.mock_user.call_args_list,
             [
-                call(self.context, self.store, self.user1_info["id"],
+                call(self.context, self.user1_info["id"],
                      tenant_id=self.tenant_id),
-                call(self.context, self.store, self.user2_info["id"],
+                call(self.context, self.user2_info["id"],
                      tenant_id=self.tenant_id),
             ]
         )
@@ -290,7 +279,7 @@ class TestMigrateIdentity(TestMigrateIdentityBase):
         self.assertEqual(
             self.mock_member.call_args_list,
             [
-                call(self.context, self.store, u["id"], r.id, self.tenant_id)
+                call(self.context, u["id"], r.id, self.tenant_id)
                 for u in [self.user1_info, self.user2_info]
                 for r in [self.roles[0], self.roles[2]]
             ]
@@ -299,19 +288,17 @@ class TestMigrateIdentity(TestMigrateIdentityBase):
         self.assertItemsEqual(
             self.mock_role.call_args_list,
             [
-                call(self.context, self.store, r.id)
+                call(self.context, r.id)
                 for r in [self.roles[0], self.roles[2], self.roles[3]]
             ]
         )
 
     def test_migrate_identity_return(self):
         self.src_cloud.keystone.users.list_roles.return_value = [self.roles[0]]
-        self.store = {}
-        (users_ids, flow, store) = identity.migrate_identity(self.context,
-                                                             self.store,
-                                                             self.tenant_id)
+        (users_ids, flow) = identity.migrate_identity(self.context,
+                                                      self.tenant_id)
 
-        self.assertEqual(store, {
+        self.assertEqual(self.context.store, {
             "role-role1_id-retrieve": "role1_id",
             "tenant-dummy_tenant_id-retrieve": "dummy_tenant_id",
             "user-role-user1_id-role1_id-dummy_tenant_id-ensure":

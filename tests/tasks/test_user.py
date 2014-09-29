@@ -29,6 +29,7 @@ class TestUser(unittest.TestCase):
         self.user.to_dict.return_value = self.user_info
 
         self.context = Mock()
+        self.context.store = {}
 
         self.cloud = Mock()
         self.users = self.cloud.keystone.users
@@ -116,17 +117,15 @@ class TestEnsureUserRole(TestUser):
 class TestMigrateMembership(TestUser):
     @patch.object(user, "EnsureUserRole")
     def test_migrate_membership(self, ensure_user_role_mock):
-        store = {}
-        (task, store) = user.migrate_membership(
+        task = user.migrate_membership(
             self.context,
-            store,
             self.user_id,
             self.role_id,
             self.tenant_id
         )
 
         self.assertTrue(ensure_user_role_mock.called)
-        self.assertNotEqual(store, {})
+        self.assertNotEqual(self.context.store, {})
 
 
 class TestMigrateUser(unittest.TestCase):
@@ -134,6 +133,7 @@ class TestMigrateUser(unittest.TestCase):
         self.user_id = "uid123"
         self.tenant_id = "tid456"
         self.context = Mock()
+        self.context.store = {}
         self.flow = Mock(return_value=Mock())
 
     @patch.object(user, "EnsureUser")
@@ -142,10 +142,8 @@ class TestMigrateUser(unittest.TestCase):
     def test_migrate_user(self, flow_mock,
                           retrieve_user_mock, ensure_user_mock):
         flow_mock.return_value = self.flow
-        store = {}
-        (flow, store) = user.migrate_user(
+        flow = user.migrate_user(
             self.context,
-            store,
             self.user_id,
             tenant_id=self.tenant_id,
         )
@@ -158,7 +156,7 @@ class TestMigrateUser(unittest.TestCase):
             self.flow.add.call_args_list,
             [call(retrieve_user_mock()), call(ensure_user_mock())]
         )
-        self.assertEqual(store,
+        self.assertEqual(self.context.store,
                          {"user-%s-retrieve" % self.user_id: self.user_id})
 
     @patch.object(user, "EnsureOrphanUser")
@@ -167,10 +165,8 @@ class TestMigrateUser(unittest.TestCase):
     def test_migrate_orphan_user(self, flow_mock,
                                  retrieve_user_mock, ensure_orphan_user_mock):
         flow_mock.return_value = self.flow
-        store = {}
-        (flow, store) = user.migrate_user(
+        flow = user.migrate_user(
             self.context,
-            store,
             self.user_id,
         )
 
@@ -181,7 +177,7 @@ class TestMigrateUser(unittest.TestCase):
             self.flow.add.call_args_list,
             [call(retrieve_user_mock()), call(ensure_orphan_user_mock())]
         )
-        self.assertEqual(store,
+        self.assertEqual(self.context.store,
                          {"user-%s-retrieve" % self.user_id: self.user_id})
 
 

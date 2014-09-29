@@ -83,7 +83,7 @@ class EnsureSecGroup(task.BaseCloudTask):
         return secgroup
 
 
-def migrate_secgroup(context, store, secgroup_id, tenant_id, user_id):
+def migrate_secgroup(context, secgroup_id, tenant_id, user_id):
     secgroup_binding = "secgroup-{}".format(secgroup_id)
     secgroup_retrieve = "{}-retrieve".format(secgroup_binding)
     secgroup_ensure = "{}-ensure".format(secgroup_binding)
@@ -104,5 +104,5 @@ def migrate_secgroup(context, store, secgroup_id, tenant_id, user_id):
                             rebind=[secgroup_binding,
                                     tenant_ensure,
                                     user_ensure]))
-    store[secgroup_retrieve] = secgroup_id
-    return flow, store
+    context.store[secgroup_retrieve] = secgroup_id
+    return flow
