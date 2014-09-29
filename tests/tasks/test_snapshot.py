@@ -20,11 +20,15 @@ class TestSnapshot(unittest.TestCase):
     def setUp(self):
         self.test_server_id = "123"
         self.test_snapshot_id = "456"
+        self.test_user_id = '777'
         self.test_snapshot_info = AttrDict({
             "id": self.test_snapshot_id,
-            "status": "active"
+            "status": "active",
         })
-        self.test_user_id = '777'
+        self.test_server_info = AttrDict({
+            "id": self.test_server_id,
+            "user_id": self.test_user_id,
+        })
 
         self.context = Mock()
         self.context.store = {}
@@ -38,12 +42,12 @@ class TestSnapshot(unittest.TestCase):
         self.utils.wait_for.return_value = self.test_snapshot_id
 
 
-class TestEnsureSnapshot(TestSnapshot):
+class TestSnapshotServer(TestSnapshot):
     def test_execute(self):
-        ensure_snapshot = snapshot.EnsureSnapshot(self.cloud)
+        ensure_snapshot = snapshot.SnapshotServer(self.cloud)
         self.assertIsInstance(ensure_snapshot, task.BaseCloudTask)
 
-        snapshot_id = ensure_snapshot.execute(self.test_server_id)
+        snapshot_id = ensure_snapshot.execute(self.test_server_info)
         self.cloud.nova.servers.create_image.assert_called_once_with(
             self.test_server_id,
             "pumphouse-snapshot-%s" % self.test_server_id)
@@ -54,21 +58,20 @@ class TestEnsureSnapshot(TestSnapshot):
         self.cloud.nova.servers.create_image.side_effect = Exception
 
         with self.assertRaises(Exception):
-            snapshot.EnsureSnapshot(self.cloud).execute(self.test_server_id)
+            snapshot.SnapshotServer(self.cloud).execute(self.test_server_info)
 
 
 class TestMigrateEphemeralStorage(TestSnapshot):
 
     @patch("pumphouse.tasks.image.EnsureSingleImage")
-    @patch.object(snapshot, "EnsureSnapshot")
+    @patch.object(snapshot, "SnapshotServer")
     @patch("taskflow.patterns.linear_flow.Flow")
     def test_migrate_snapshot(self, flow_mock,
                               ensure_snapshot_mock,
                               ensure_image_mock):
         flow = snapshot.migrate_snapshot(
             self.context,
-            self.test_server_id,
-            self.test_user_id
+            self.test_server_info,
         )
 
         flow_mock.assert_called_once_with("migrate-ephemeral-"

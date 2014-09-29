@@ -25,21 +25,23 @@ from pumphouse.tasks import image as image_tasks
 LOG = logging.getLogger(__name__)
 
 
-class EnsureSnapshot(task.BaseCloudTask):
-    def execute(self, server_id):
+class SnapshotServer(task.BaseCloudTask):
+
+    def execute(self, server_info):
+        server_id = server_info["id"]
         try:
             snapshot_id = self.cloud.nova.servers.create_image(
                 server_id,
                 "pumphouse-snapshot-{}"
                 .format(server_id))
         except Exception:
-            LOG.exception("Snapshot failed: %s", server_id)
+            LOG.exception("Snapshot failed for server: %s", server_id)
             raise
         else:
             snapshot = self.cloud.glance.images.get(snapshot_id)
             snapshot = utils.wait_for(snapshot.id,
                                       self.cloud.glance.images.get,
-                                      value='active')
+                                      value="active")
             LOG.info("Created: %s", snapshot)
             self.created_event(snapshot)
             return snapshot.id
@@ -51,17 +53,18 @@ class EnsureSnapshot(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def migrate_snapshot(context, server_id, user_id):
-    server_binding = "server-{}".format(server_id)
+def migrate_snapshot(context, server):
+    server_id = server.id
+    server_retrieve = "server-{}-retrieve".format(server_id)
     snapshot_binding = "snapshot-{}".format(server_id)
     snapshot_ensure = "snapshot-{}-ensure".format(server_id)
-    user_ensure = "user-{}-ensure".format(user_id)
+    user_ensure = "user-{}-ensure".format(server.user_id)
     flow = linear_flow.Flow("migrate-ephemeral-storage-server-{}"
                             .format(server_id))
-    flow.add(EnsureSnapshot(context.src_cloud,
+    flow.add(SnapshotServer(context.src_cloud,
                             name=snapshot_binding,
                             provides=snapshot_binding,
-                            rebind=[server_binding]))
+                            rebind=[server_retrieve]))
     flow.add(image_tasks.EnsureSingleImage(context.src_cloud,
                                            context.dst_cloud,
                                            name=snapshot_ensure,
