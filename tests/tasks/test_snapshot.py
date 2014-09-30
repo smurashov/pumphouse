@@ -21,6 +21,7 @@ class TestSnapshot(unittest.TestCase):
         self.test_server_id = "123"
         self.test_snapshot_id = "456"
         self.test_user_id = '777'
+        self.test_server_name = "test-server"
         self.test_snapshot_info = AttrDict({
             "id": self.test_snapshot_id,
             "status": "active",
@@ -28,6 +29,7 @@ class TestSnapshot(unittest.TestCase):
         self.test_server_info = AttrDict({
             "id": self.test_server_id,
             "user_id": self.test_user_id,
+            "name": self.test_server_name,
         })
 
         self.context = Mock()
@@ -48,9 +50,10 @@ class TestSnapshotServer(TestSnapshot):
         self.assertIsInstance(ensure_snapshot, task.BaseCloudTask)
 
         snapshot_id = ensure_snapshot.execute(self.test_server_info)
+        expected_name = "{}-snapshot-{}".format(self.test_server_name,
+                                                self.test_server_id)
         self.cloud.nova.servers.create_image.assert_called_once_with(
-            self.test_server_id,
-            "pumphouse-snapshot-%s" % self.test_server_id)
+            self.test_server_id, expected_name)
 
         self.assertEqual(snapshot_id, self.test_snapshot_id)
 

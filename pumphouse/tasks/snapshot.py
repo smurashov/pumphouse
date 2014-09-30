@@ -29,11 +29,10 @@ class SnapshotServer(task.BaseCloudTask):
 
     def execute(self, server_info):
         server_id = server_info["id"]
+        snapshot_name = "{}-snapshot-{}".format(server_info["name"], server_id)
         try:
             snapshot_id = self.cloud.nova.servers.create_image(
-                server_id,
-                "pumphouse-snapshot-{}"
-                .format(server_id))
+                server_id, snapshot_name)
         except Exception:
             LOG.exception("Snapshot failed for server: %s", server_id)
             raise
