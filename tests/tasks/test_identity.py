@@ -72,8 +72,8 @@ class TestRepairUsersPasswords(TestIdentity):
         })
 
         self.assertIsInstance(repair_users_passwords, task.BaseCloudsTask)
-        self.assertEqual(
-            [i for i in self.dst_cloud.identity.update.call_args[0][0]],
+        self.assertItemsEqual(
+            self.dst_cloud.identity.update.call_args[0][0],
             [
                 (self.users_ids[0], self.user1_info),
                 (self.users_ids[1], self.user2_info),
