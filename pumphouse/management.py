@@ -262,7 +262,7 @@ def setup_image(cloud, image_dict):
 
 def cache_image_file(url=TEST_IMAGE_URL):
     tmpfile = os.tmpfile()
-    LOG.info("Caching test image: %s", tmpfile.name)
+    LOG.info("Caching test image from %s: %s", url, tmpfile.name)
     urllib.urlretrieve(url, tmpfile.name)
     return tmpfile
 
