@@ -16,7 +16,7 @@
 from flask.ext import socketio
 
 
-__all__ = ["emit"]
+__all__ = ("emit", "init_app", "on", "run")
 
 
 sio = socketio.SocketIO()
