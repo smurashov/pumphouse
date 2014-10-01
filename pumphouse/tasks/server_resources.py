@@ -17,7 +17,6 @@ import logging
 from pumphouse import flows
 from pumphouse.tasks import server as server_tasks
 from pumphouse.tasks import image as image_tasks
-from pumphouse.tasks import snapshot as snapshot_tasks
 from pumphouse.tasks import flavor as flavor_tasks
 from pumphouse.tasks import secgroup as secgroup_tasks
 from pumphouse.tasks import network as network_tasks
@@ -65,31 +64,15 @@ def migrate_server(context, server_id):
     if flavor_retrieve not in context.store:
         flavor_flow = flavor_tasks.migrate_flavor(context, flavor_id)
         resources.append(flavor_flow)
-    migrate_disk_func = migrate_disk.select_from_config(context.config,
-                                                        "image")
-    image_ensure, resources = migrate_disk_func(context, resources, server)
-    server_flow = server_tasks.reprovision_server(
-        context, server, image_ensure, server_nics)
+    if context.config.get("provision_server") == "image":
+        migrate_bootable_image(context, resources, server)
+    server_flow = server_tasks.reprovision_server(context, server, server_nics)
     return resources, server_flow
 
 
-@migrate_disk.add("image")
-def migrate_disk_with_image(context, resources, server):
+def migrate_bootable_image(context, resources, server):
     image_id = server.image["id"]
     image_retrieve = "image-{}-retrieve".format(image_id)
-    image_ensure = "image-{}-ensure".format(image_id)
     if image_retrieve not in context.store:
         image_flow = image_tasks.migrate_image(context, image_id)
         resources.append(image_flow)
-    return image_ensure, resources
-
-
-@migrate_disk.add("snapshot")
-def migrate_disk_with_snapshot(context, resources, server):
-    snapshot_retrieve = "snapshot-{}".format(server.id)
-    snapshot_ensure = "snapshot-{}-ensure".format(server.id)
-    if snapshot_ensure not in context.store:
-        snapshot_flow = snapshot_tasks.migrate_snapshot(context, server.id,
-                                                        server.user_id)
-        resources.append(snapshot_flow)
-    return snapshot_ensure, resources

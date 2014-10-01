@@ -40,6 +40,10 @@ class TestServer(unittest.TestCase):
         self.tenant_info = {
             "name": "test-tenant-name"
         }
+        self.server_nics = [{
+            "net-id": "456",
+            "v4-fixed-ip": "1.2.3.4",
+        }]
 
         self.server = Mock()
         self.server.id = self.test_server_id
@@ -119,7 +123,8 @@ class TestBootServer(TestServer):
                                           self.image_info,
                                           self.flavor_info,
                                           self.user_info,
-                                          self.tenant_info)
+                                          self.tenant_info,
+                                          self.server_nics)
         self.cloud.restrict.assert_called_once_with(
             username=self.user_info["name"],
             tenant_name=self.tenant_info["name"],
@@ -127,7 +132,8 @@ class TestBootServer(TestServer):
         self.cloud.nova.servers.create.assert_called_once_with(
             self.server_info["name"],
             self.image_info["id"],
-            self.flavor_info["id"])
+            self.flavor_info["id"],
+            nics=self.server_nics)
         self.assertEqual(self.server_info, server_info)
 
 
@@ -146,41 +152,44 @@ class TestTerminateServer(TestServer):
 class TestReprovisionServer(TestServer):
 
     @patch("pumphouse.tasks.server.restore_floating_ips")
-    @patch("pumphouse.tasks.utils.SyncPoint")
     @patch.object(server, "ServerSuccessMigrationEvent")
     @patch.object(server, "ServerStartMigrationEvent")
     @patch.object(server, "TerminateServer")
-    @patch.object(server, "BootServerFromImage")
     @patch.object(server, "SuspendServer")
     @patch.object(server, "RetrieveServer")
+    @patch.object(server, "provision_server")
     @patch("taskflow.patterns.linear_flow.Flow")
     def test_reprovision_server(self,
                                 mock_flow,
+                                provision_server_mock,
                                 retrieve_server_mock,
                                 suspend_server_mock,
-                                boot_server_mock,
                                 terminate_server_mock,
                                 start_event_mock,
                                 stop_event_mock,
-                                mock_sync_point,
                                 mock_restore_floating_ips):
         floating_ips_flow = Mock()
+        mock_provision = Mock(name="provision")
+        boot_server_mock = Mock(name="boot")
+        mock_sync_point = Mock(name="sync_point")
+        mock_server_boot = Mock(name="server_boot")
+        provision_server_mock.return_value = (
+            boot_server_mock, mock_sync_point, mock_server_boot)
         mock_restore_floating_ips.return_value = floating_ips_flow()
         image_ensure = "image-{}-ensure".format(self.image_info["id"])
         server_binding = "server-{}".format(self.test_server_id)
         expected_store_dict = {server_binding: self.test_server_id}
-        flow = server.reprovision_server(self.context, self.server,
-                                         image_ensure)
+        flow = server.reprovision_server(self.context, self.server, "nics")
 
         self.assertEqual(self.context.store, expected_store_dict)
         mock_flow.assert_called_once_with("migrate-server-{}"
                                           .format(self.test_server_id))
         self.assertEqual(flow.add.call_args_list,
-                         [call(mock_sync_point()),
+                         [call(mock_sync_point),
                           call(start_event_mock()),
                           call(retrieve_server_mock()),
                           call(suspend_server_mock()),
-                          call(boot_server_mock()),
+                          call(boot_server_mock),
                           call(floating_ips_flow()),
                           call(terminate_server_mock()),
                           call(stop_event_mock())])

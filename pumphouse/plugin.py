@@ -21,7 +21,7 @@ class Registry(object):
     def __init__(self):
         self.plugins = {}
 
-    def register(self, target):
+    def register(self, target, *args, **kwargs):
         """Register a plugin by the target.
 
         :param target: a string with name of the plugin
@@ -32,7 +32,7 @@ class Registry(object):
         """
         if target in self.plugins:
             raise exceptions.PluginAlreadyRegisterError(target=target)
-        self.plugins[target] = plugin = Plugin(target)
+        self.plugins[target] = plugin = Plugin(target, *args, **kwargs)
         return plugin
 
     def get(self, target):
@@ -62,9 +62,10 @@ class Plugin(object):
     """
     # TODO(akscram): A list of requirements is necessary to inspect
     #                implementations.
-    def __init__(self, target):
+    def __init__(self, target, default=None):
         self.target = target
         self.implementations = {}
+        self.default = default
 
     def add(self, name):
         """Register a function.
@@ -99,3 +100,7 @@ class Plugin(object):
 
     def __iter__(self):
         return iter(self.implementations)
+
+    def __call__(self, context, *args, **kwargs):
+        impl = self.select_from_config(context.config, self.default)
+        return impl(context, *args, **kwargs)

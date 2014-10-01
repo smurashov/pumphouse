@@ -80,10 +80,13 @@ class TestService(TestBase):
         mock_cleanup.assert_called_once_with(self.events,
                                              self.cloud,
                                              self.service.target)
-        mock_setup.assert_called_once_with(self.events,
-                                           self.cloud,
-                                           self.service.target,
-                                           workloads=self.config["workloads"])
+        mock_setup.assert_called_once_with(
+            self.events,
+            self.cloud,
+            self.service.target,
+            num_tenants=self.config["populate"]["num_tenants"],
+            num_servers=self.config["populate"]["num_servers"],
+            workloads=self.config["workloads"])
 
     @patch("pumphouse.management.cleanup")
     @patch("pumphouse.management.setup")
@@ -96,8 +99,8 @@ class TestService(TestBase):
                                              self.service.target)
         mock_setup.assert_called_once_with(
             self.events, self.cloud, self.service.target,
-            self.config["populate"]["num_tenants"],
-            self.config["populate"]["num_servers"])
+            num_tenants=self.config["populate"]["num_tenants"],
+            num_servers=self.config["populate"]["num_servers"])
 
     @patch("pumphouse.management.cleanup")
     @patch("pumphouse.management.setup")
@@ -111,8 +114,8 @@ class TestService(TestBase):
         mock_setup.assert_called_once_with(self.events,
                                            self.cloud,
                                            self.service.target,
-                                           2,
-                                           2)
+                                           num_tenants=2,
+                                           num_servers=2)
 
     @patch("pumphouse.management.cleanup")
     @patch("pumphouse.management.setup")
