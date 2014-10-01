@@ -20,6 +20,7 @@ from pumphouse import events
 from pumphouse import flows
 from pumphouse import task
 from pumphouse.tasks import floating_ip as fip_tasks
+from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import snapshot as snapshot_tasks
 from pumphouse.tasks import utils as task_utils
 from pumphouse import utils
@@ -143,6 +144,10 @@ class TerminateServer(task.BaseCloudTask):
 
 
 def reprovision_server(context, server, server_nics):
+    flavor_ensure = "flavor-{}-ensure".format(server.flavor["id"])
+    user_ensure = "user-{}-ensure".format(server.user_id)
+    tenant_ensure = "tenant-{}-ensure".format(server.tenant_id)
+
     server_id = server.id
     server_start_event = "server-{}-start-event".format(server_id)
     server_finish_event = "server-{}-finish-event".format(server_id)
@@ -150,88 +155,73 @@ def reprovision_server(context, server, server_nics):
     server_retrieve = "server-{}-retrieve".format(server_id)
     server_suspend = "server-{}-suspend".format(server_id)
     server_terminate = "server-{}-terminate".format(server_id)
+    server_boot = "server-{}-boot".format(server_id)
+    server_sync = "server-{}-sync".format(server_id)
 
-    boot, sync_point, server_boot = provision_server(
-        context, server, server_nics)
+    pre_suspend_tasks, pre_suspend_sync, pre_boot_tasks, image_ensure = \
+        provision_server(context, server)
 
     flow = linear_flow.Flow("migrate-server-{}".format(server_id))
     # NOTE(akscram): The synchronization point avoids excessive downtime
     #                of the server.
-    flow.add(sync_point)
-    flow.add(ServerStartMigrationEvent(context.src_cloud,
-                                       name=server_start_event,
-                                       rebind=[server_binding]))
-    flow.add(RetrieveServer(context.src_cloud,
-                            name=server_binding,
-                            provides=server_retrieve,
-                            rebind=[server_binding]))
-    flow.add(SuspendServer(context.src_cloud,
-                           name=server_retrieve,
-                           provides=server_suspend,
-                           rebind=[server_retrieve]))
-    flow.add(boot)
-    floating_ips_flow = restore_floating_ips(context, server.to_dict())
-    flow.add(floating_ips_flow)
-    flow.add(TerminateServer(context.src_cloud,
-                             name=server_terminate,
-                             rebind=[server_suspend]))
-    flow.add(ServerSuccessMigrationEvent(context.src_cloud, context.dst_cloud,
-                                         name=server_finish_event,
-                                         rebind=[server_retrieve,
-                                                 server_boot]))
+    flow.add(
+        task_utils.SyncPoint(name=server_sync,
+                             requires=[flavor_ensure] + pre_suspend_sync),
+        ServerStartMigrationEvent(context.src_cloud,
+                                  name=server_start_event,
+                                  rebind=[server_binding]),
+        RetrieveServer(context.src_cloud,
+                       name=server_binding,
+                       provides=server_retrieve,
+                       rebind=[server_binding]),
+        SuspendServer(context.src_cloud,
+                      name=server_retrieve,
+                      provides=server_suspend,
+                      rebind=[server_retrieve]),
+    )
+    if pre_boot_tasks:
+        flow.add(*pre_boot_tasks)
+    flow.add(
+        BootServerFromImage(context.dst_cloud,
+                            name=server_boot,
+                            provides=server_boot,
+                            rebind=[server_suspend, image_ensure,
+                                    flavor_ensure, user_ensure,
+                                    tenant_ensure, server_nics]),
+        restore_floating_ips(context, server.to_dict()),
+        TerminateServer(context.src_cloud,
+                        name=server_terminate,
+                        rebind=[server_suspend]),
+        ServerSuccessMigrationEvent(context.src_cloud, context.dst_cloud,
+                                    name=server_finish_event,
+                                    rebind=[server_retrieve, server_boot]),
+    )
     context.store[server_binding] = server_id
-    return flow
+    return pre_suspend_tasks, flow
 
 
 @provision_server.add("image")
-def rebuild_by_image(context, server, server_nics):
-    flavor_ensure = "flavor-{}-ensure".format(server.flavor["id"])
-    user_ensure = "user-{}-ensure".format(server.user_id)
-    tenant_ensure = "tenant-{}-ensure".format(server.tenant_id)
+def rebuild_by_image(context, server):
+    image_id = server.image["id"]
+    image_retrieve = "image-{}-retrieve".format(image_id)
+    image_ensure = "image-{}-ensure".format(image_id)
 
-    server_id = server.id
-    server_suspend = "server-{}-suspend".format(server_id)
-    server_boot = "server-{}-boot".format(server_id)
-    server_sync = "server-{}-sync".format(server_id)
+    pre_suspend = []
+    if image_retrieve not in context.store:
+        image_flow = image_tasks.migrate_image(context, image_id)
+        pre_suspend.append(image_flow)
 
-    image_ensure = "image-{}-ensure".format(server.image["id"])
-
-    sync_point = task_utils.SyncPoint(name=server_sync,
-                                      requires=[image_ensure, flavor_ensure])
-    boot = BootServerFromImage(context.dst_cloud,
-                               name=server_boot,
-                               provides=server_boot,
-                               rebind=[server_suspend, image_ensure,
-                                       flavor_ensure, user_ensure,
-                                       tenant_ensure, server_nics])
-    return (boot, sync_point, server_boot)
+    return pre_suspend, [image_ensure], [], image_ensure
 
 
 @provision_server.add("snapshot")
-def rebuild_by_snapshot(context, server, server_nics):
-    flavor_ensure = "flavor-{}-ensure".format(server.flavor["id"])
-    user_ensure = "user-{}-ensure".format(server.user_id)
-    tenant_ensure = "tenant-{}-ensure".format(server.tenant_id)
-
+def rebuild_by_snapshot(context, server):
     server_id = server.id
-    server_suspend = "server-{}-suspend".format(server_id)
-    server_boot = "server-{}-boot".format(server_id)
-    server_sync = "server-{}-sync".format(server_id)
-
     snapshot_ensure = "snapshot-{}-ensure".format(server_id)
 
-    flow = snapshot_tasks.migrate_snapshot(context, server)
+    snapshot_flow = snapshot_tasks.migrate_snapshot(context, server)
 
-    sync_point = task_utils.SyncPoint(name=server_sync,
-                                      requires=[flavor_ensure])
-    boot = BootServerFromImage(context.dst_cloud,
-                               name=server_boot,
-                               provides=server_boot,
-                               rebind=[server_suspend, snapshot_ensure,
-                                       flavor_ensure, user_ensure,
-                                       tenant_ensure, server_nics])
-    flow.add(boot)
-    return (flow, sync_point, server_boot)
+    return [], [], [snapshot_flow], snapshot_ensure
 
 
 def restore_floating_ips(context, server_info):

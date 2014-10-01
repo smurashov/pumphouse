@@ -16,7 +16,6 @@ import logging
 
 from pumphouse import flows
 from pumphouse.tasks import server as server_tasks
-from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import flavor as flavor_tasks
 from pumphouse.tasks import secgroup as secgroup_tasks
 from pumphouse.tasks import network as network_tasks
@@ -64,15 +63,7 @@ def migrate_server(context, server_id):
     if flavor_retrieve not in context.store:
         flavor_flow = flavor_tasks.migrate_flavor(context, flavor_id)
         resources.append(flavor_flow)
-    if context.config.get("provision_server") == "image":
-        migrate_bootable_image(context, resources, server)
-    server_flow = server_tasks.reprovision_server(context, server, server_nics)
+    add_resources, server_flow = server_tasks.reprovision_server(
+        context, server, server_nics)
+    resources += add_resources
     return resources, server_flow
-
-
-def migrate_bootable_image(context, resources, server):
-    image_id = server.image["id"]
-    image_retrieve = "image-{}-retrieve".format(image_id)
-    if image_retrieve not in context.store:
-        image_flow = image_tasks.migrate_image(context, image_id)
-        resources.append(image_flow)
