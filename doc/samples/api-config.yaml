@@ -6,7 +6,7 @@ IDENTITY_DRIVER: pumphouse.fake.Identity
 CLOUD_SERVICE: pumphouse.fake.Service
 CLOUDS_RESET: true
 PLUGINS:
-    migrate_disk: image
+    provision_server: image
 cmds:
     ping: &ping
         cmd: "ping %"
