@@ -45,9 +45,8 @@ status_attr = operator.attrgetter("status")
 
 
 def wait_for(resource, update_resource,
-             attribute_getter=status_attr, value="ACTIVE", timeout=60,
-             check_interval=1, expect_excs=None,
-             stop_excs=None):
+             attribute_getter=status_attr, value="ACTIVE", error_value="ERROR",
+             timeout=60, check_interval=1, expect_excs=None, stop_excs=None):
     start = time.time()
     while True:
         LOG.debug("Trying to get resource: %s", resource)
@@ -63,6 +62,9 @@ def wait_for(resource, update_resource,
             result = attribute_getter(upd_resource)
             if result == value:
                 return upd_resource
+            if result == error_value:
+                raise exceptions.Error(
+                    "Resource %s fell into error state" % resource)
         time.sleep(check_interval)
         if time.time() - start > timeout:
             raise exceptions.TimeoutException()
