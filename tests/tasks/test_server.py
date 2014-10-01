@@ -167,9 +167,8 @@ class TestReprovisionServer(TestServer):
         boot_server_mock = Mock(name="boot")
         mock_sync_point = Mock(name="sync_point")
         mock_server_boot = Mock(name="server_boot")
-        mock_provision.return_value = (boot_server_mock, mock_sync_point,
-                                       mock_server_boot)
-        provision_server_mock.select_from_config.return_value = mock_provision
+        provision_server_mock.return_value = (
+            boot_server_mock, mock_sync_point, mock_server_boot)
         mock_restore_floating_ips.return_value = floating_ips_flow()
         image_ensure = "image-{}-ensure".format(self.image_info["id"])
         server_binding = "server-{}".format(self.test_server_id)

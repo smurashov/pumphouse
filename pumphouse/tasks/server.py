@@ -28,7 +28,7 @@ from pumphouse import utils
 LOG = logging.getLogger(__name__)
 
 
-provision_server = flows.register("provision_server")
+provision_server = flows.register("provision_server", default="image")
 
 
 class ServerStartMigrationEvent(task.BaseCloudTask):
@@ -150,8 +150,7 @@ def reprovision_server(context, server):
     server_suspend = "server-{}-suspend".format(server_id)
     server_terminate = "server-{}-terminate".format(server_id)
 
-    provision = provision_server.select_from_config(context.config, "image")
-    boot, sync_point, server_boot = provision(context, server)
+    boot, sync_point, server_boot = provision_server(context, server)
 
     flow = linear_flow.Flow("migrate-server-{}".format(server_id))
     # NOTE(akscram): The synchronization point avoids excessive downtime
