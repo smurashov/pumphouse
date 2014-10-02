@@ -29,7 +29,7 @@ class RetrieveAllNetworks(task.BaseCloudTask):
         # FIXME(yorik-sar): Who the hell needs nova-network with such API?!
         networks = self.cloud.nova.networks.list()
         return {
-            "by-name": dict((net.label, net) for net in networks),
+            "by-label": dict((net.label, net) for net in networks),
             "by-id": dict((net.id, net) for net in networks),
         }
 
@@ -40,27 +40,27 @@ class RetrieveNetworkById(task.BaseCloudTask):
         return network.to_dict()
 
 
-class RetrieveNetworkByName(task.BaseCloudTask):
-    def execute(self, all_networks, network_name):
-        network = all_networks["by-name"][network_name]
+class RetrieveNetworkByLabel(task.BaseCloudTask):
+    def execute(self, all_networks, network_label):
+        network = all_networks["by-label"][network_label]
         return network.to_dict()
 
 
 class EnsureNetwork(task.BaseCloudTask):
     def verify(self, network, network_info):
-        network_name = network["label"]
+        network_label = network["label"]
         for k, v in network.items():
             if k.endswith('_at') or k in ('id', 'host'):
                 continue  # Skip timestamps and cloud-specific fields
             if v != network_info[k]:
                 raise exceptions.Conflict("Network %s has different field %s" %
-                                          (network_name, k))
+                                          (network_label, k))
         return network
 
     def execute(self, all_networks, network_info):
-        network_name = network_info["label"]
+        network_label = network_info["label"]
         try:
-            network = all_networks["by-name"][network_name]
+            network = all_networks["by-label"][network_label]
         except KeyError:
             pass  # We'll create a new one
         else:  # Verify that existing one is a good one and return or fail
@@ -87,7 +87,7 @@ class EnsureNic(task.BaseCloudTask):
         }
 
 
-def migrate_nic(context, network_name, address):
+def migrate_nic(context, network_label, address):
     if address["OS-EXT-IPS:type"] == 'floating':
         floating_ip = address["addr"]
         floating_ip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
@@ -103,7 +103,7 @@ def migrate_nic(context, network_name, address):
             return None, fixed_ip_nic
         flow = graph_flow.Flow("migrate-{}-fixed-ip".format(fixed_ip))
         network_flow, network_ensure = migrate_network(
-            context, network_name=network_name)
+            context, network_label=network_label)
         if network_flow is not None:
             flow.add(network_flow)
         flow.add(EnsureNic(context.dst_cloud,
@@ -114,8 +114,8 @@ def migrate_nic(context, network_name, address):
         return flow, fixed_ip_nic
 
 
-def migrate_network(context, network_id=None, network_name=None):
-    assert (network_id, network_name).count(None) == 1
+def migrate_network(context, network_id=None, network_label=None):
+    assert (network_id, network_label).count(None) == 1
     by_id = network_id is not None
     all_src_networks = "networks-src"
     all_dst_networks = "networks-dst"
@@ -126,9 +126,9 @@ def migrate_network(context, network_id=None, network_name=None):
         network_retrieve = "{}-retrieve".format(network_id)
         network_ensure = "{}-ensure".format(network_id)
     else:
-        network_binding = "network-{}".format(network_name)
-        network_retrieve = "{}-retrieve".format(network_name)
-        network_ensure = "{}-ensure".format(network_name)
+        network_binding = "network-{}".format(network_label)
+        network_retrieve = "{}-retrieve".format(network_label)
+        network_ensure = "{}-ensure".format(network_label)
     if network_binding in context.store:
         return None, network_ensure
     flow = graph_flow.Flow("migrate-{}".format(network_binding))
@@ -149,7 +149,7 @@ def migrate_network(context, network_id=None, network_name=None):
             provides=network_retrieve,
             rebind=[all_src_networks, network_binding]))
     else:
-        flow.add(RetrieveNetworkByName(
+        flow.add(RetrieveNetworkByLabel(
             context.src_cloud,
             name=network_retrieve,
             provides=network_retrieve,
@@ -161,5 +161,5 @@ def migrate_network(context, network_id=None, network_name=None):
     if by_id:
         context.store[network_binding] = network_id
     else:
-        context.store[network_binding] = network_name
+        context.store[network_binding] = network_label
     return flow, network_ensure
