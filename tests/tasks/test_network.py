@@ -71,7 +71,7 @@ class TestEnsureNetwork(TestNetwork):
         self.assertEqual(rv, mock_verify.return_value)
         self.assertEqual(
             mock_verify.call_args_list,
-            [mock.call(existing_net.to_dict.return_value, self.network_info)],
+            [mock.call(existing_net, self.network_info)],
         )
 
     def test_verify(self):

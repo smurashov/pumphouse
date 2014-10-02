@@ -29,21 +29,21 @@ class RetrieveAllNetworks(task.BaseCloudTask):
         # FIXME(yorik-sar): Who the hell needs nova-network with such API?!
         networks = self.cloud.nova.networks.list()
         return {
-            "by-label": dict((net.label, net) for net in networks),
-            "by-id": dict((net.id, net) for net in networks),
+            "by-label": dict((net.label, net.to_dict()) for net in networks),
+            "by-id": dict((net.id, net.to_dict()) for net in networks),
         }
 
 
 class RetrieveNetworkById(task.BaseCloudTask):
     def execute(self, all_networks, network_id):
         network = all_networks["by-id"][network_id]
-        return network.to_dict()
+        return network
 
 
 class RetrieveNetworkByLabel(task.BaseCloudTask):
     def execute(self, all_networks, network_label):
         network = all_networks["by-label"][network_label]
-        return network.to_dict()
+        return network
 
 
 class EnsureNetwork(task.BaseCloudTask):
@@ -64,7 +64,7 @@ class EnsureNetwork(task.BaseCloudTask):
         except KeyError:
             pass  # We'll create a new one
         else:  # Verify that existing one is a good one and return or fail
-            return self.verify(network.to_dict(), network_info)
+            return self.verify(network, network_info)
         try:
             cidr = network_info['cidr']
             if cidr:
