@@ -123,12 +123,10 @@ def migrate_network(context, network_id=None, network_label=None):
     all_dst_networks_retrieve = "networks-dst-retrieve"
     if by_id:
         network_binding = "network-{}".format(network_id)
-        network_retrieve = "{}-retrieve".format(network_id)
-        network_ensure = "{}-ensure".format(network_id)
     else:
         network_binding = "network-{}".format(network_label)
-        network_retrieve = "{}-retrieve".format(network_label)
-        network_ensure = "{}-ensure".format(network_label)
+    network_retrieve = "{}-retrieve".format(network_binding)
+    network_ensure = "{}-ensure".format(network_binding)
     if network_binding in context.store:
         return None, network_ensure
     flow = graph_flow.Flow("migrate-{}".format(network_binding))

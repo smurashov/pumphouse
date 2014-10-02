@@ -16,7 +16,9 @@ import unittest
 
 import mock
 
+from pumphouse import context
 from pumphouse import exceptions
+from pumphouse.tasks import floating_ip
 from pumphouse.tasks import network
 
 
@@ -31,9 +33,16 @@ class TestNetwork(unittest.TestCase):
             "host": "that_one",
             "cidr": ["10.1.0.0", "10.1.0.1"],
         }
-        self.cloud = mock.Mock(spec=["nova"])
+        self.cloud = mock.Mock(spec=["nova"], name="dst_cloud")
         if self.task_class:
             self.task = self.task_class(self.cloud)
+        self.store = {}
+        self.context = context.Context(
+            mock.Mock(name="config"),
+            self.cloud,
+            mock.Mock(spec=["nova"], name="dst_cloud"),
+            self.store,
+        )
 
 
 class TestEnsureNetwork(TestNetwork):
@@ -97,3 +106,86 @@ class TestEnsureNic(TestNetwork):
             "net-id": self.network_info["id"],
             "v4-fixed-ip": "1.2.3.4",
         })
+
+
+class TestMigrateNic(TestNetwork):
+    @mock.patch.object(floating_ip, "migrate_floating_ip")
+    def test_migrate_floating_ip(self, mock_migrage_fip):
+        address = {
+            "addr": "1.2.3.4",
+            "OS-EXT-IPS:type": "floating",
+        }
+        rv = network.migrate_nic(self.context, "mynet", address)
+        self.assertEqual(rv, (mock_migrage_fip.return_value, None))
+        self.assertEqual(
+            mock_migrage_fip.call_args_list,
+            [mock.call(self.context, "1.2.3.4")],
+        )
+
+    @mock.patch.object(floating_ip, "migrate_floating_ip")
+    def test_migrate_floating_ip_dup(self, mock_migrage_fip):
+        address = {
+            "addr": "1.2.3.4",
+            "OS-EXT-IPS:type": "floating",
+        }
+        self.store["floating-ip-1.2.3.4-retrieve"] = None
+        rv = network.migrate_nic(self.context, "mynet", address)
+        self.assertEqual(rv, (None, None))
+        self.assertEqual(mock_migrage_fip.call_count, 0)
+
+    @mock.patch.object(network, "migrate_network")
+    @mock.patch.object(network, "EnsureNic")
+    @mock.patch("taskflow.patterns.graph_flow.Flow")
+    def test_migrate_fixed_ip(self, mock_flow, mock_ensure_nic,
+                              mock_migrate_network):
+        address = {
+            "addr": "1.2.3.4",
+            "OS-EXT-IPS:type": "fixed",
+        }
+        mock_migrate_network.return_value = mock.Mock(), mock.Mock()
+        rv = network.migrate_nic(self.context, "mynet", address)
+        self.assertEqual(rv, (mock_flow.return_value, "fixed-ip-1.2.3.4-nic"))
+        self.assertEqual(
+            mock_migrate_network.call_args_list,
+            [mock.call(self.context, network_label="mynet")],
+        )
+        self.assertItemsEqual(
+            mock_flow.return_value.add.call_args_list,
+            [mock.call(mock_migrate_network.return_value[0]),
+             mock.call(mock_ensure_nic.return_value)],
+        )
+        self.assertIn("fixed-ip-1.2.3.4-retrieve", self.store)
+
+    @mock.patch.object(network, "migrate_network")
+    def test_migrate_fixed_ip_dup(self, mock_migrate_network):
+        address = {
+            "addr": "1.2.3.4",
+            "OS-EXT-IPS:type": "fixed",
+        }
+        self.store["fixed-ip-1.2.3.4-retrieve"] = None
+        rv = network.migrate_nic(self.context, "mynet", address)
+        self.assertEqual(rv, (None, "fixed-ip-1.2.3.4-nic"))
+        self.assertEqual(mock_migrate_network.call_count, 0)
+
+    @mock.patch("taskflow.patterns.graph_flow.Flow")
+    def test_migrate_fixed_ip(self, mock_flow):
+        mocks = []
+        for name in ["RetrieveAllNetworks", "RetrieveNetworkByLabel",
+                     "EnsureNetwork"]:
+            patcher = mock.patch.object(network, name)
+            mocks.append(patcher.start())
+            self.addCleanup(patcher.stop)
+        rv = network.migrate_network(self.context, network_label="mynet")
+        self.assertEqual(rv, (mock_flow.return_value, "network-mynet-ensure"))
+        self.assertItemsEqual(
+            mock_flow.return_value.add.call_args_list,
+            [mock.call(m.return_value) for m in mocks + [mocks[0]]],
+        )
+        self.assertEqual(
+            self.store,
+            {
+                "networks-src-retrieve": None,
+                "networks-dst-retrieve": None,
+                "network-mynet": "mynet",
+            },
+        )
