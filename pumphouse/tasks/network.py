@@ -47,7 +47,24 @@ class RetrieveNetworkByName(task.BaseCloudTask):
 
 
 class EnsureNetwork(task.BaseCloudTask):
-    def execute(self, network_info):
+    def verify(self, network, network_info):
+        network_name = network["label"]
+        for k, v in network.items():
+            if k.endswith('_at') or k in ('id', 'host'):
+                continue  # Skip timestamps and cloud-specific fields
+            if v != network_info[k]:
+                raise exceptions.Conflict("Network %s has different field %s" %
+                                          (network_name, k))
+        return network
+
+    def execute(self, all_networks, network_info):
+        network_name = network_info["label"]
+        try:
+            network = all_networks["by-name"][network_name]
+        except KeyError:
+            pass  # We'll create a new one
+        else:  # Verify that existing one is a good one and return or fail
+            return self.verify(network.to_dict(), network_info)
         try:
             cidr = network_info['cidr']
             if cidr:
@@ -140,7 +157,7 @@ def migrate_network(context, network_id=None, network_name=None):
     flow.add(EnsureNetwork(context.dst_cloud,
                            name=network_ensure,
                            provides=network_ensure,
-                           rebind=[network_retrieve]))
+                           rebind=[all_dst_networks, network_retrieve]))
     if by_id:
         context.store[network_binding] = network_id
     else:
