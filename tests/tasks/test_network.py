@@ -168,7 +168,7 @@ class TestMigrateNic(TestNetwork):
         self.assertEqual(mock_migrate_network.call_count, 0)
 
     @mock.patch("taskflow.patterns.graph_flow.Flow")
-    def test_migrate_fixed_ip(self, mock_flow):
+    def test_migrate_network(self, mock_flow):
         mocks = []
         for name in ["RetrieveAllNetworks", "RetrieveNetworkByLabel",
                      "EnsureNetwork"]:
