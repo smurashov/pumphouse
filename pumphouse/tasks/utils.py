@@ -27,6 +27,11 @@ class SyncPoint(task.Task):
                   self.name, targets)
 
 
+class Gather(task.Task):
+    def execute(self, **kwargs):
+        return kwargs.values()
+
+
 class UploadReporter(object):
     def __init__(self, context, size=0, period=0.1):
         self.context = context

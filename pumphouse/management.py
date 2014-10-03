@@ -202,6 +202,14 @@ def generate_floating_ips_list(num):
     yield {pool: addr_list}
 
 
+def generate_networks_list(num):
+    for i in xrange(num):
+        yield {
+            "label": "{}-{}".format(TEST_RESOURCE_PREFIX, i),
+            "cidr": "10.42.{}.0/24".format(i),
+        }
+
+
 def generate_images_list(num):
     yield {"name": "{}-image".format(TEST_RESOURCE_PREFIX),
            "disk_format": "qcow2",
@@ -335,10 +343,8 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
     floating_ips = workloads.get(
         'floating_ips', list(generate_floating_ips_list(
             num_tenants * sum([len(t["servers"]) for t in tenants]))))
-    # TODO(ogelbukh): add networks list here to support Neutron and VLAN
-    # manager for nova network:
-    # networks = workloads.get('networks',
-    #                          generate_networks_list(num_tenants))
+    networks = workloads.get('networks',
+                             generate_networks_list(num_tenants))
     for image_dict in images:
         image = setup_image(cloud, image_dict.copy())
         LOG.info("Created: %s", dict(image))
@@ -363,20 +369,27 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
         }, namespace="/events")
 
     if FLATDHCP:
-        try:
-            net = cloud.nova.networks.find(project_id=None)
-        except nova_excs.NotFound:
-            net = None
-        if net is None or net.label != "novanetwork":
+        for net in cloud.nova.networks.findall(project_id=None):
+            if net.label == "novanetwork":
+                LOG.info("Already exists: %s", net._info)
+                break
+        else:
             net = cloud.nova.networks.create(
                 label="novanetwork",
                 cidr="10.10.0.0/24",
                 project_id=None)
             LOG.info("Created: %s", net._info)
-        else:
-            LOG.info("Already exists: %s", net._info)
     else:
         raise NotImplementedError()
+
+    for network_dict in networks:
+        network = cloud.nova.networks.create(**network_dict)
+        LOG.info("Created: %s", network.to_dict())
+        events.emit("network created", {
+            "id": network.id,
+            "name": network.label,
+            "cloud": target,
+        }, namespace="/events")
 
     for pool in floating_ips:
         for poolname in pool:

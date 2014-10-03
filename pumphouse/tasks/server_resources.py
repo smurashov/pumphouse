@@ -18,8 +18,9 @@ from pumphouse import flows
 from pumphouse.tasks import server as server_tasks
 from pumphouse.tasks import flavor as flavor_tasks
 from pumphouse.tasks import secgroup as secgroup_tasks
-from pumphouse.tasks import floating_ip as fip_tasks
+from pumphouse.tasks import network as network_tasks
 from pumphouse.tasks import identity as identity_tasks
+from pumphouse.tasks import utils as task_utils
 
 
 LOG = logging.getLogger(__name__)
@@ -46,18 +47,23 @@ def migrate_server(context, server_id):
             secgroup_flow = secgroup_tasks.migrate_secgroup(
                 context, secgroup.id, tenant.id, server.user_id)
             resources.append(secgroup_flow)
-    for floating_ip in [addr["addr"]
-                        for addr in server.addresses.values().pop()
-                        if addr['OS-EXT-IPS:type'] == 'floating']:
-        floating_ip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
-        if floating_ip_retrieve not in context.store:
-            floating_ip_flow = fip_tasks.migrate_floating_ip(
-                context, floating_ip)
-        resources.append(floating_ip_flow)
+    server_nics = "server-{}-nics".format(server_id)
+    nics = []
+    for network_name, addresses in server.addresses.iteritems():
+        for address in addresses:
+            flow, nic = network_tasks.migrate_nic(
+                context, network_name, address)
+            if flow is not None:
+                resources.append(flow)
+            if nic is not None:
+                nics.append(nic)
+    resources.append(task_utils.Gather(name=server_nics,
+                                       provides=server_nics,
+                                       rebind=nics))
     if flavor_retrieve not in context.store:
         flavor_flow = flavor_tasks.migrate_flavor(context, flavor_id)
         resources.append(flavor_flow)
-    add_resources, server_flow = server_tasks.reprovision_server(context,
-                                                                 server)
+    add_resources, server_flow = server_tasks.reprovision_server(
+        context, server, server_nics)
     resources += add_resources
     return resources, server_flow
