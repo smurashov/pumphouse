@@ -1,0 +1,11 @@
+{
+  "name": "pumphouse-ftests",
+  "version": "0.0.1",
+  "description": "Suite for functional tests for pumphouse project, that executes simple REST calls to pumphouse API and checks interstates",
+  "main": "index.js",
+  "dependencies": {
+    "superagent": "~0.19.1",
+    "socket.io-client": "~0.9.16"
+  },
+  "author": "Nick Bogdanov"
+}
