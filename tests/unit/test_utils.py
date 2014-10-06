@@ -25,8 +25,8 @@ class TestSafeLoadYaml(unittest.TestCase):
 
 class TestLoadClass(unittest.TestCase):
     def setUp(self):
-        self.correct_import_path = "tests.test_utils.DummyClass"
-        self.incorrect_import_path = "tests.dummy.DummyClass"
+        self.correct_import_path = "tests.unit.test_utils.DummyClass"
+        self.incorrect_import_path = "tests.unit.dummy.DummyClass"
 
     def test_load_class(self):
         self.assertEqual(
