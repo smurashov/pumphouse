@@ -37,7 +37,7 @@ class Fuel(object):
     '''
 
     def __init__(self, endpoint, env_id):
-        os.environ['LISTEN_ADDRESS'] = endpoint
+        os.environ["SERVER_ADDRESS"] = endpoint
         # NOTE(akscram): fuelclient.client initializes the singleton
         #                client during the module import.
         from pumphouse._vendor.fuelclient.objects import environment
