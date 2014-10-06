@@ -67,7 +67,7 @@ class Plugin(object):
         self.implementations = {}
         self.default = default
 
-    def add(self, name):
+    def add(self, name, func=None):
         """Register a function.
 
         This method returns the decorator which registers a function.
@@ -86,7 +86,10 @@ class Plugin(object):
         if name in self.implementations:
             raise exceptions.FuncAlreadyRegisterError(target=self.target,
                                                       name=name)
-        return decorate
+        if func is None:
+            return decorate
+        else:
+            return decorate(func)
 
     def select(self, name):
         if name not in self.implementations:
