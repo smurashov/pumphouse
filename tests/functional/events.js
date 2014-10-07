@@ -27,7 +27,7 @@ EventsListener.prototype.checkWaiters = function(name, m) {
                 return p;
             }, []);
     }
-    console.log(this._waiters);
+    //console.log(this._waiters);
 };
 
 EventsListener.prototype.handlerFactory = function(name) {
