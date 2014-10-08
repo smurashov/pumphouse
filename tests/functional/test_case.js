@@ -38,7 +38,7 @@ TestCase.prototype.next = function() {
     return true;
 };
 
-TestCase.prototype.failure = function(message) {
+TestCase.prototype.fail = function(message) {
     console.error('Test failed: ' + message);
     this.completed = true;
     process.exit(code=1);
@@ -55,7 +55,7 @@ TestStep.prototype.next = function() {
 };
 
 TestStep.prototype.fail = function(msg) {
-    return this.test_case.failure(msg);
+    return this.test_case.fail(msg);
 };
 
 

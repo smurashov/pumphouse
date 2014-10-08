@@ -6,7 +6,7 @@ var events = new Listener(Config.endpoint + '/events').bindHandlers();
 var pumphouse = new API(Config.endpoint);
 
 
-var cases = ['migrate'], limit = 120, i = 0, completed = true, c, timer;
+var cases = ['reset', 'migrate'], limit = 120, i = 0, completed = true, c, timer;
 
 // Async tests runner
 setInterval(function() {
