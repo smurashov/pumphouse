@@ -40,6 +40,10 @@ class TestServer(unittest.TestCase):
         self.tenant_info = {
             "name": "test-tenant-name"
         }
+        self.server_nics = [{
+            "net-id": "456",
+            "v4-fixed-ip": "1.2.3.4",
+        }]
 
         self.server = Mock()
         self.server.id = self.test_server_id
@@ -119,7 +123,8 @@ class TestBootServer(TestServer):
                                           self.image_info,
                                           self.flavor_info,
                                           self.user_info,
-                                          self.tenant_info)
+                                          self.tenant_info,
+                                          self.server_nics)
         self.cloud.restrict.assert_called_once_with(
             username=self.user_info["name"],
             tenant_name=self.tenant_info["name"],
@@ -127,7 +132,8 @@ class TestBootServer(TestServer):
         self.cloud.nova.servers.create.assert_called_once_with(
             self.server_info["name"],
             self.image_info["id"],
-            self.flavor_info["id"])
+            self.flavor_info["id"],
+            nics=self.server_nics)
         self.assertEqual(self.server_info, server_info)
 
 
@@ -174,7 +180,8 @@ class TestReprovisionServer(TestServer):
         mock_restore_floating_ips.return_value = floating_ips_flow()
         server_binding = "server-{}".format(self.test_server_id)
         expected_store_dict = {server_binding: self.test_server_id}
-        add_res, flow = server.reprovision_server(self.context, self.server)
+        add_res, flow = server.reprovision_server(
+            self.context, self.server, "nics")
 
         self.assertEqual(add_res, [mock_image_flow])
 

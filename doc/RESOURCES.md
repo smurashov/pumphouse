@@ -11,12 +11,15 @@ Nova | - instances | + |
      | - quotas | - |
      | - flavors | + |
      | - networks (fixed ips) | + |
-     | - networks (floating ips) | - |
+     | - networks (floating ips) | + |
 Glance | - image files | + |
 Keystone | - tenants | + |
          | - users | + |
          | - roles | + |
          | - user-roles assignments | + |
+Neutron | networks | - |
+        | subnets | - |
+        | ports | - |
 
 #### Dependencies
 

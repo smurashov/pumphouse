@@ -96,7 +96,7 @@ class SuspendServer(task.BaseCloudTask):
 
 class BootServerFromImage(task.BaseCloudTask):
     def execute(self, server_info, image_info, flavor_info, user_info,
-                tenant_info):
+                tenant_info, server_nics):
         # TODO(akscram): Network information doesn't saved.
         restrict_cloud = self.cloud.restrict(
             username=user_info["name"],
@@ -104,7 +104,8 @@ class BootServerFromImage(task.BaseCloudTask):
             password="default")
         server = restrict_cloud.nova.servers.create(server_info["name"],
                                                     image_info["id"],
-                                                    flavor_info["id"])
+                                                    flavor_info["id"],
+                                                    nics=server_nics)
         server = utils.wait_for(server, self.cloud.nova.servers.get,
                                 value="ACTIVE")
         self.spawn_event(server)
@@ -142,7 +143,7 @@ class TerminateServer(task.BaseCloudTask):
         }, namespace="/events")
 
 
-def reprovision_server(context, server):
+def reprovision_server(context, server, server_nics):
     flavor_ensure = "flavor-{}-ensure".format(server.flavor["id"])
     user_ensure = "user-{}-ensure".format(server.user_id)
     tenant_ensure = "tenant-{}-ensure".format(server.tenant_id)
@@ -186,7 +187,7 @@ def reprovision_server(context, server):
                             provides=server_boot,
                             rebind=[server_suspend, image_ensure,
                                     flavor_ensure, user_ensure,
-                                    tenant_ensure]),
+                                    tenant_ensure, server_nics]),
         restore_floating_ips(context, server.to_dict()),
         TerminateServer(context.src_cloud,
                         name=server_terminate,
