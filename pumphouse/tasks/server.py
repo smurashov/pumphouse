@@ -65,6 +65,7 @@ class EvacuateServer(task.BaseCloudTask):
                      server_id, hostname)
             events.emit("server evacuate", {
                 "id": server_id,
+                "cloud": self.cloud.name,
             }, namespace="/events")
 
     def evacuation_end_event(self, server):
@@ -79,6 +80,7 @@ class EvacuateServer(task.BaseCloudTask):
             events.emit("server evacuated", {
                 "id": server_id,
                 "host_name": hostname,
+                "cloud": self.cloud.name,
             }, namespace="/events")
 
 
@@ -291,8 +293,7 @@ def restore_floating_ips(context, server_info):
     return flow
 
 
-def evacuate_server(context, server):
-    server_id = server.id
+def evacuate_server(context, server_id):
     server_retrieve = "server-{}-retrieve".format(server_id)
     server_binding = "server-{}".format(server_id)
     server_evacuate = "server-{}-evacuate".format(server_id)
