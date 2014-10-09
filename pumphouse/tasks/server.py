@@ -28,8 +28,58 @@ from pumphouse import utils
 
 LOG = logging.getLogger(__name__)
 
+HYPERVISOR_HOSTNAME_ATTR = "OS-EXT-SRV-ATTR:hypervisor_hostname"
 
 provision_server = flows.register("provision_server", default="image")
+
+
+class EvacuateServer(task.BaseCloudTask):
+    """Migrates server within the cloud."""
+
+    def __init__(self, block_migration=True, disk_over_commit=False,
+                 *args, **kwargs):
+        super(EvacuateServer, self).__init__(*args, **kwargs)
+        self.block_migration = block_migration
+        self.disk_over_commit = disk_over_commit
+
+    def execute(self, server_info, hostname):
+        server_id = server_info["id"]
+        self.evacuation_start_event(server_info)
+        self.cloud.nova.servers.live_migrate(server_id, hostname,
+                                             self.block_migration,
+                                             self.disk_over_commit)
+        server = utils.wait_for(server_id, self.cloud.nova.servers.get)
+        server = server.to_dict()
+        self.evacuation_end_event(server)
+        return server
+
+    def evacuation_start_event(self, server):
+        server_id = server["id"]
+        try:
+            hostname = server[HYPERVISOR_HOSTNAME_ATTR]
+        except KeyError:
+            LOG.warning("Could not get %r attribute from server %r: %s",
+                        HYPERVISOR_HOSTNAME_ATTR, server_id)
+        else:
+            LOG.info("Perform evacuation of server %r from $r host",
+                     server_id, hostname)
+            events.emit("server evacuate", {
+                "id": server_id,
+            }, namespace="/events")
+
+    def evacuation_end_event(self, server):
+        server_id = server["id"]
+        try:
+            hostname = server[HYPERVISOR_HOSTNAME_ATTR]
+        except KeyError:
+            LOG.warning("Could not get %r attribute from server %r: %s",
+                        HYPERVISOR_HOSTNAME_ATTR, server_id)
+        else:
+            LOG.info("Server %r evacuated to host %r", server_id, hostname)
+            events.emit("server evacuated", {
+                "id": server_id,
+                "host_name": hostname,
+            }, namespace="/events")
 
 
 class ServerStartMigrationEvent(task.BaseCloudTask):
@@ -114,10 +164,10 @@ class BootServerFromImage(task.BaseCloudTask):
     def spawn_event(self, server):
         LOG.info("Server spawned: %s", server.id)
         try:
-            hostname = getattr(server, "OS-EXT-SRV-ATTR:hypervisor_hostname")
+            hostname = getattr(server, HYPERVISOR_HOSTNAME_ATTR)
         except AttributeError as err:
-            LOG.warning("Could not get 'hypervisor_hostname' attribute from "
-                        "server %r: %s", server.id, err)
+            LOG.warning("Could not get %r attribute from server %r: %s",
+                        HYPERVISOR_HOSTNAME_ATTR, server.id, err)
         else:
             events.emit("server boot", {
                 "cloud": self.cloud.name,
@@ -239,3 +289,26 @@ def restore_floating_ips(context, server_info):
                     server_info["id"])
                 flow.add(fip_flow)
     return flow
+
+
+def evacuate_server(context, server):
+    server_id = server.id
+    server_retrieve = "server-{}-retrieve".format(server_id)
+    server_binding = "server-{}".format(server_id)
+    server_evacuate = "server-{}-evacuate".format(server_id)
+    server_evacuated = "server-{}-evacuated".format(server_id)
+    if server_evacuated not in context.store:
+        evacuate = EvacuateServer(context.src_cloud,
+                                  name=server_evacuate,
+                                  requires=server_retrieve,
+                                  provides=server_evacuated)
+        flow = linear_flow.Flow("evacuate-server-{}".format(server_id))
+        if server_retrieve not in context.store:
+            flow.add(RetrieveServer(context.src_cloud,
+                                    name=server_binding,
+                                    provides=server_retrieve,
+                                    rebind=[server_binding]))
+            flow.add(evacuate)
+            return flow
+        return evacuate
+    return None
