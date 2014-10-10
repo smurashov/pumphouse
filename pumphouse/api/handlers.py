@@ -19,12 +19,12 @@ import logging
 
 import flask
 
-from . import evacuation
 from . import hooks
 
 from pumphouse import context
 from pumphouse import events
 from pumphouse import flows
+from pumphouse.tasks import evacuation
 from pumphouse.tasks import resources as resource_tasks
 
 
@@ -210,14 +210,38 @@ def migrate_tenant(tenant_id):
     return flask.make_response()
 
 
-@pump.route("/hosts/<host_name>", methods=["POST"])
+@pump.route("/hosts/<hostname>", methods=["POST"])
 @crossdomain()
-def evacuate_host(host_name):
+def reassign_host(hostname):
     @flask.copy_current_request_context
-    def evacuate():
-        source = hooks.source.connect()
-        evacuation.evacuate_servers(events, source, host_name)
-    gevent.spawn(evacuate)
+    def reassign():
+        config = flask.current_app.config.get("PLUGINS") or {}
+        src = hooks.source.connect()
+        dst = hooks.destination.connect()
+        ctx = context.Context(config, src, dst)
+        events.emit("host reassign", {
+            "id": hostname,
+            "cloud": src.name,
+        }, namespace="/events")
+
+        try:
+            flow = evacuation.evacuate_servers(ctx, hostname)
+            LOG.debug("Reassigning flow: %s", flow)
+            result = flows.run_flow(flow, ctx.store)
+            LOG.debug("Result of migration: %s", result)
+        except Exception:
+            LOG.exception("Error is occured during reassigning host %r",
+                          hostname)
+            status = "error"
+        else:
+            status = ""
+
+        events.emit("host reassigned", {
+            "id": hostname,
+            "cloud": dst.name,
+            "status": status,
+        }, namespace="/events")
+    gevent.spawn(reassign)
     return flask.make_response()
 
 
