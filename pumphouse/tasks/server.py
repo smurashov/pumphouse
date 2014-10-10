@@ -61,7 +61,7 @@ class EvacuateServer(task.BaseCloudTask):
             LOG.warning("Could not get %r attribute from server %r: %s",
                         HYPERVISOR_HOSTNAME_ATTR, server_id)
         else:
-            LOG.info("Perform evacuation of server %r from $r host",
+            LOG.info("Perform evacuation of server %r from %r host",
                      server_id, hostname)
             events.emit("server evacuate", {
                 "id": server_id,
