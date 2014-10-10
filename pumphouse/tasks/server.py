@@ -36,16 +36,18 @@ provision_server = flows.register("provision_server", default="image")
 class EvacuateServer(task.BaseCloudTask):
     """Migrates server within the cloud."""
 
-    def __init__(self, block_migration=True, disk_over_commit=False,
+    def __init__(self, cloud, block_migration=True, disk_over_commit=False,
                  *args, **kwargs):
-        super(EvacuateServer, self).__init__(*args, **kwargs)
+        super(EvacuateServer, self).__init__(cloud, *args, **kwargs)
         self.block_migration = block_migration
         self.disk_over_commit = disk_over_commit
 
-    def execute(self, server_info, hostname):
+    def execute(self, server_info):
         server_id = server_info["id"]
         self.evacuation_start_event(server_info)
-        self.cloud.nova.servers.live_migrate(server_id, hostname,
+        # NOTE(akscram): The destination host will be chosen by the
+        #                scheduler.
+        self.cloud.nova.servers.live_migrate(server_id, None,
                                              self.block_migration,
                                              self.disk_over_commit)
         server = utils.wait_for(server_id, self.cloud.nova.servers.get)
