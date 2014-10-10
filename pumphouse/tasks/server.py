@@ -14,7 +14,7 @@
 
 import logging
 
-from taskflow.patterns import linear_flow, unordered_flow
+from taskflow.patterns import graph_flow, linear_flow, unordered_flow
 
 from pumphouse import events
 from pumphouse import flows
@@ -300,18 +300,17 @@ def evacuate_server(context, server_id):
     server_binding = "server-{}".format(server_id)
     server_evacuate = "server-{}-evacuate".format(server_id)
     server_evacuated = "server-{}-evacuated".format(server_id)
-    if server_evacuated not in context.store:
-        evacuate = EvacuateServer(context.src_cloud,
-                                  name=server_evacuate,
-                                  requires=server_retrieve,
-                                  provides=server_evacuated)
-        flow = linear_flow.Flow("evacuate-server-{}".format(server_id))
-        if server_retrieve not in context.store:
-            flow.add(RetrieveServer(context.src_cloud,
-                                    name=server_binding,
-                                    provides=server_retrieve,
-                                    rebind=[server_binding]))
-            flow.add(evacuate)
-            return flow
-        return evacuate
-    return None
+    evacuate = EvacuateServer(context.src_cloud,
+                              name=server_evacuate,
+                              provides=server_evacuated,
+                              rebind=[server_retrieve])
+    if server_binding not in context.store:
+        context.store[server_binding] = server_id
+        flow = graph_flow.Flow("evacuate-server-{}".format(server_id))
+        flow.add(RetrieveServer(context.src_cloud,
+                                name=server_binding,
+                                provides=server_retrieve,
+                                rebind=[server_binding]))
+        flow.add(evacuate)
+        return flow
+    return evacuate
