@@ -1,5 +1,9 @@
 import functools
 
+import taskflow.engines
+from taskflow.patterns import graph_flow
+import taskflow.task
+
 
 class AttrDict(object):
     def __init__(self, **kwargs):
@@ -219,13 +223,15 @@ class Workload(Resource):
 class Server(Resource):
     @task
     def delete(self):
-        self.cloud.nova.servers.delete(self.server)
+        print "Deleting server", self.server
+        #self.cloud.nova.servers.delete(self.server)
 
 
 class Tenant(Resource):
     @task
     def delete(self):
-        self.cloud.keystone.tenants.delete(self.tenant)
+        print "Deleting tenant", self.tenant
+        #self.cloud.keystone.tenants.delete(self.tenant)
 
 
 class TenantWorkload(Workload):
@@ -289,9 +295,41 @@ class Runner(object):
         print("\n".join(map(repr, self.tasks)))
 
 
-class TaskflowRunner(Runner):
-    def run(self):
+class TaskFlowTask(taskflow.task.Task):
+    def __init__(self, task, **kwargs):
+        super(TaskFlowTask, self).__init__(**kwargs)
+        self.task = task
 
+    def execute(self, **dependencies):
+        if self.task.fn is not None:
+            self.task.fn(self.task.resource)
+
+
+class TaskflowRunner(Runner):
+    def get_task_prefix(self, task):
+        value = getattr(task.resource, task.resource._main_resource)
+        return "{}_{}_{}".format(
+            type(task.resource).__name__,
+            task.resource.get_id_for(value),
+            task.name,
+        )
+
+    def convert_task(self, task):
+        prefix = self.get_task_prefix(task)
+        flow_task = TaskFlowTask(
+            task,
+            name=prefix,
+            provides=prefix + "_finished",
+            rebind=[self.get_task_prefix(req_task) + "_finished"
+                    for req_task in task.requires],
+        )
+        return flow_task
+
+    def run(self):
+        flow = graph_flow.Flow("main flow")
+        for task in self.tasks:
+            flow.add(self.convert_task(task))
+        taskflow.engines.run(flow, engine_conf='parallel')
 
 if __name__ == '__main__':
     try:
