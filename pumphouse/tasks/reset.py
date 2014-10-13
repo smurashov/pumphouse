@@ -1,14 +1,47 @@
+import functools
+
+
+class AttrDict(object):
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+    def __repr__(self):
+        return "<{}>".format(" ".join("{}={}".format(k, v)
+                                      for k, v in self.__dict__.items()))
+
+
 class UnboundTask(object):
     def __init__(self, fn, requires=[]):
+        self._resource_task = {}
         self.fn = fn
         self.name = fn.__name__
         self.requires = requires
 
     def __get__(self, instance, owner):
-        if instance is not None:
+        if instance is None:
+            return self
+        if not instance.bound:
             return BoundTask(instance, self)
         else:
-            return self
+            return self.get_for_bound_resource(instance)
+
+    def get_for_bound_resource(self, resource):
+        try:
+            return self._resource_task[resource]
+        except KeyError:
+            task = self.realize_with(resource)
+            self._resource_task[resource] = task
+            return task
+
+    def realize_with(self, resource):
+        assert resource.bound
+        store = resource.get_store()
+        requires = []
+        for task in self.requires:
+            data = task.resource.get_data(resource)
+            bound_res = store.get_resource(task.resource, data)
+            requires.append(task.get_for_bound_resource(bound_res))
+        return Task(self.fn, self.name, resource, requires=requires)
 
 
 class BoundTask(object):
@@ -16,22 +49,8 @@ class BoundTask(object):
         self.resource = resource
         self.task = unbound_task
 
-    def realize(self):
-        assert self.resource.bound
-        requires = []
-        for task in self.task.requires:
-            data = task.resource.get_data(self.resource)
-            bound_res = task.resource.bind(data)
-            requires.append(task.rebind(bound_res).realize())
-        return Task(
-            self.task.fn,
-            self.task.name,
-            self.resource,
-            requires=requires,
-        )
-
-    def rebind(self, resource):
-        return type(self)(resource, self.task)
+    def get_for_bound_resource(self, resource):
+        return self.task.get_for_bound_resource(resource)
 
     def __repr__(self):
         return '<{} {} {}>'.format(
@@ -92,8 +111,9 @@ class Resource(object):
             cls_vars["_main_resource"] = main_res_name
             return type.__new__(mcs, name, bases, cls_vars)
 
-    def __init__(self, value=None):
+    def __init__(self, value=None, store=None):
         self._resource_data = {}
+        self.store = store
         if value is not None:
             setattr(self, self._main_resource, value)
             self.bound = True
@@ -106,8 +126,15 @@ class Resource(object):
     def set_data(self, resource, value):
         self._resource_data[resource] = value
 
-    def bind(self, value):
-        return type(self)(value)
+    def get_store(self):
+        assert self.bound
+        if self.store is not None:
+            self.store = Store()
+        return self.store
+
+    @classmethod
+    def get_id_for(cls, data):
+        return data.id
 
     def __get__(self, instance, owner):
         if instance is not None:
@@ -128,9 +155,8 @@ class Resource(object):
 
 
 class Collection(Resource):
-    def __init__(self, base_cls, value=None):
-        # This is the most magic class here
-        super(Collection, self).__init__(value)
+    def __init__(self, base_cls, value=None, store=None):
+        super(Collection, self).__init__(value, store)
         self.base_cls = base_cls
         self.list_fn = None
 
@@ -150,8 +176,8 @@ class Collection(Resource):
             self.set_data(resource, data)
             return data
 
-    def bind(self, value):
-        return type(self)(self.base_cls, value)
+    def get_id_for(self, data):
+        return frozenset(self.base_cls.get_id_for(el) for el in data)
 
 
 class CollectionProxy(object):
@@ -161,20 +187,27 @@ class CollectionProxy(object):
     def __getattr__(self, name):
         base_cls = self.collection.base_cls
         assert name in base_cls._tasks
-        return CollectionTask(self.collection, getattr(base_cls, name))
+        return BoundTask(
+            self.collection,
+            CollectionUnboundTask(getattr(base_cls, name)),
+        )
 
 
-class CollectionTask(BoundTask):
-    def realize(self):
-        assert self.resource.bound
+class CollectionUnboundTask(UnboundTask):
+    def __init__(self, task):
+        super(CollectionUnboundTask, self).__init__(task.fn, task.requires)
+        self.base_task = task
+
+    def realize_with(self, resource):
+        assert resource.bound
         requires = []
-        for data in self.resource.collection:
-            res = self.resource.base_cls(data)
-            requires.append(BoundTask(res, self.task).realize())
+        for data in resource.collection:
+            res = resource.base_cls(data)
+            requires.append(self.base_task.get_for_bound_resource(res))
         return Task(
             None,  # Wow! We'll call this None!
-            self.task.name,
-            self.resource,
+            self.name,
+            resource,
             requires=requires,
         )
 
@@ -201,7 +234,8 @@ class TenantWorkload(Workload):
 
     @servers.list
     def servers(self):
-        return ['server1', 'server2']
+        return [AttrDict(id='servid1', name='server1'),
+                AttrDict(id='servid2', name='server2')]
         return self.cloud.nova.servers.list(search_opts={
             "all_tenants": 1,
             "tenant_id": self.tenant.id,
@@ -214,25 +248,56 @@ class TenantWorkload(Workload):
 
 def delete_tenant(tenant):
     runner = TaskflowRunner()
-    runner.add(TenantWorkload(tenant).delete)
+    workload = runner.store.get_resource(TenantWorkload, tenant)
+    runner.add(workload.delete)
     runner.run()
+
+
+class Store(object):
+    def __init__(self):
+        self.resources = {}
+
+    def get_resource(self, resource, data):
+        if isinstance(resource, Collection):
+            base_cls = resource.base_cls
+            res_type = functools.partial(Collection, base_cls=base_cls)
+            key = (Collection, base_cls, resource.get_id_for(data))
+        else:
+            if isinstance(resource, type(Resource)):
+                res_type = resource
+            else:
+                res_type = type(resource)
+            key = (res_type, res_type.get_id_for(data))
+        try:
+            return self.resources[key]
+        except KeyError:
+            res = res_type(value=data, store=self)
+            self.resources[key] = res
+            return res
 
 
 class Runner(object):
     def __init__(self):
         self.tasks = []
+        self.store = Store()
 
     def add(self, task):
-        real_task = task.realize()
-        self.tasks.extend(real_task.get_tasks())
+        self.tasks.extend(task.get_tasks())
 
     def run(self):
-        print "Hey, I'm gonna run these tasks:", self.tasks
+        print("Hey, I'm gonna run these tasks:")
+        print("\n".join(map(repr, self.tasks)))
 
 
 class TaskflowRunner(Runner):
-    pass
+    def run(self):
 
 
 if __name__ == '__main__':
-    delete_tenant(123)
+    try:
+        delete_tenant(AttrDict(id='tenid1', name='tenant1'))
+    except:
+        import traceback
+        traceback.print_exc()
+        import pdb
+        pdb.post_mortem()
