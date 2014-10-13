@@ -171,11 +171,11 @@ def reprovision_server(context, server, server_nics):
                                   name=server_start_event,
                                   rebind=[server_binding]),
         RetrieveServer(context.src_cloud,
-                       name=server_binding,
+                       name=server_retrieve,
                        provides=server_retrieve,
                        rebind=[server_binding]),
         SuspendServer(context.src_cloud,
-                      name=server_retrieve,
+                      name=server_suspend,
                       provides=server_suspend,
                       rebind=[server_retrieve]),
     )
