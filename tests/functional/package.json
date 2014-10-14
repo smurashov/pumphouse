@@ -1,6 +1,6 @@
 {
   "name": "pumphouse-ftests",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Suite for functional tests for pumphouse project, that executes simple REST calls to pumphouse API and checks interstates",
   "main": "index.js",
   "dependencies": {
