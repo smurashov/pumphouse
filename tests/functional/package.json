@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Suite for functional tests for pumphouse project, that executes simple REST calls to pumphouse API and checks interstates",
   "main": "index.js",
+  "repository": "git@github.com:MirantisLabs/pumphouse.git",
   "dependencies": {
     "superagent": "~0.19.1",
     "socket.io-client": "~0.9.16"
