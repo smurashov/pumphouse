@@ -153,7 +153,7 @@ def associate_floating_ip_server(context, floating_ip_address,
                                                        floating_ip_address)
     fixed_ip_binding = "fixed-ip-{}".format(server_id)
     server_boot = "server-{}-boot".format(server_id)
-    floating_ip_ensure = "flotaing-ip-{}-ensure".format(floating_ip_address)
+    floating_ip_ensure = "floating-ip-{}-ensure".format(floating_ip_address)
     flow = linear_flow.Flow("associate-floating-ip-{}-server-{}"
                             .format(floating_ip_address, server_id))
     flow.add(task_utils.SyncPoint(name=floating_ip_sync,
