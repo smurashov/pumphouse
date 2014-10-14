@@ -117,15 +117,15 @@ class EnsureSingleImage(EnsureImage):
 
 
 def migrate_image_task(context, task_class, image_id, user_id, *rebind):
-    image_retrieve = "image-{}-retrieve".format(image_id)
+    image_binding = "image-{}".format(image_id)
     image_ensure = "image-{}-ensure".format(image_id)
     user_ensure = "user-{}-ensure".format(user_id)
-    rebind = itertools.chain((image_retrieve, user_ensure), *rebind)
+    rebind = itertools.chain((image_binding, user_ensure), *rebind)
     task = task_class(context.src_cloud, context.dst_cloud,
                       name=image_ensure,
                       provides=image_ensure,
                       rebind=list(rebind))
-    context.store[image_retrieve] = image_id
+    context.store[image_binding] = image_id
     return task
 
 
