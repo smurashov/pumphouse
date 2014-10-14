@@ -178,8 +178,8 @@ class TestReprovisionServer(TestServer):
         provision_server_mock.return_value = (
             [mock_image_flow], [image_ensure], [], image_ensure)
         mock_restore_floating_ips.return_value = floating_ips_flow()
-        server_binding = "server-{}".format(self.test_server_id)
-        expected_store_dict = {server_binding: self.test_server_id}
+        server_retrieve = "server-{}-retrieve".format(self.test_server_id)
+        expected_store_dict = {server_retrieve: self.test_server_id}
         add_res, flow = server.reprovision_server(
             self.context, self.server, "nics")
 

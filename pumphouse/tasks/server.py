@@ -170,15 +170,15 @@ def reprovision_server(context, server, server_nics):
                              requires=[flavor_ensure] + pre_suspend_sync),
         ServerStartMigrationEvent(context.src_cloud,
                                   name=server_start_event,
-                                  rebind=[server_binding]),
+                                  rebind=[server_retrieve]),
         RetrieveServer(context.src_cloud,
-                       name=server_retrieve,
-                       provides=server_retrieve,
-                       rebind=[server_binding]),
+                       name=server_binding,
+                       provides=server_binding,
+                       rebind=[server_retrieve]),
         SuspendServer(context.src_cloud,
                       name=server_suspend,
                       provides=server_suspend,
-                      rebind=[server_retrieve]),
+                      rebind=[server_binding]),
     )
     if pre_boot_tasks:
         flow.add(*pre_boot_tasks)
@@ -195,9 +195,9 @@ def reprovision_server(context, server, server_nics):
                         rebind=[server_suspend]),
         ServerSuccessMigrationEvent(context.src_cloud, context.dst_cloud,
                                     name=server_finish_event,
-                                    rebind=[server_retrieve, server_boot]),
+                                    rebind=[server_binding, server_boot]),
     )
-    context.store[server_binding] = server_id
+    context.store[server_retrieve] = server_id
     return pre_suspend_tasks, flow
 
 
