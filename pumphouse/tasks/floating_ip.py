@@ -147,7 +147,8 @@ def migrate_floating_ip(context, address):
 def associate_floating_ip_server(context, floating_ip_address,
                                  fixed_ip_info, server_id):
     """Associates Floating IP to Nova instance"""
-    floating_ip_retrieve = "floating-ip-{}-retrieve".format(floating_ip_address)
+    floating_ip_retrieve = "floating-ip-{}-retrieve".format(
+        floating_ip_address)
     floating_ip_sync = "floating-ip-{}-{}-sync".format(server_id,
                                                        floating_ip_address)
     fixed_ip_binding = "fixed-ip-{}".format(server_id)
@@ -159,7 +160,7 @@ def associate_floating_ip_server(context, floating_ip_address,
                                   requires=[floating_ip_retrieve,
                                             server_boot]))
     flow.add(EnsureFloatingIP(context.dst_cloud,
-                              name=floating_ip_binding,
+                              name=floating_ip_ensure,
                               provides=floating_ip_ensure,
                               rebind=[server_boot,
                                       floating_ip_retrieve,

@@ -19,6 +19,7 @@ from taskflow.patterns import linear_flow, unordered_flow
 from pumphouse import events
 from pumphouse import flows
 from pumphouse import task
+from pumphouse import exceptions
 from pumphouse.tasks import floating_ip as fip_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import snapshot as snapshot_tasks
@@ -231,7 +232,7 @@ def restore_floating_ips(context, server_info):
         fixed_ip = addresses[label][0]
         for floating_ip in [addr["addr"] for addr in addresses[label]
                             if addr['OS-EXT-IPS:type'] == 'floating']:
-            fip_retrieve = "floating-ip-bulk-{}-retrieve".format(floating_ip)
+            fip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
             if fip_retrieve in context.store:
                 fip_flow = fip_tasks.associate_floating_ip_server(
                     context,
