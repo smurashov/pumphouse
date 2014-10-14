@@ -23,6 +23,7 @@ from novaclient import exceptions as nova_excs
 
 from pumphouse import exceptions
 from pumphouse import utils
+from pumphouse import flows
 
 LOG = logging.getLogger(__name__)
 
@@ -34,7 +35,35 @@ TEST_RESOURCE_PREFIX = "pumphouse-"
 FLOATING_IP_STRING = "172.16.0.{}"
 # TODO(ogelbukh): make FLATDHCP actual configuration parameter and/or
 # command-line parameter, maybe autodetected in future
-FLATDHCP = True
+network_manager = flows.register("network_manager", default="FlatDHCP")
+
+
+@network_manager.add("FlatDHCP")
+def setup_network_flatdhcp(cloud, networks=None):
+    for net in cloud.nova.networks.findall(project_id=None):
+        if net.label == "novanetwork":
+            LOG.info("Already exists: %s", net._info)
+            return net
+    else:
+        net = cloud.nova.networks.create(
+            label="novanetwork",
+            cidr="10.10.0.0/24",
+            project_id=None)
+        LOG.info("Created: %s", net._info)
+        return net
+
+
+@network_manager.add("VLAN")
+def setup_network_vlans(cloud, networks):
+    for network_dict in networks:
+        net = cloud.nova.networks.create(**network_dict)
+        LOG.info("Created: %s", network.to_dict())
+        events.emit("network created", {
+            "id": net.id,
+            "name": net.label,
+            "cloud": target,
+        }, namespace="/events")
+        return net
 
 
 def become_admin_in_tenant(cloud, user, tenant):
@@ -368,28 +397,8 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
             "cloud": target
         }, namespace="/events")
 
-    if FLATDHCP:
-        for net in cloud.nova.networks.findall(project_id=None):
-            if net.label == "novanetwork":
-                LOG.info("Already exists: %s", net._info)
-                break
-        else:
-            net = cloud.nova.networks.create(
-                label="novanetwork",
-                cidr="10.10.0.0/24",
-                project_id=None)
-            LOG.info("Created: %s", net._info)
-    else:
-        raise NotImplementedError()
-
-    for network_dict in networks:
-        network = cloud.nova.networks.create(**network_dict)
-        LOG.info("Created: %s", network.to_dict())
-        events.emit("network created", {
-            "id": network.id,
-            "name": network.label,
-            "cloud": target,
-        }, namespace="/events")
+    setup_network = network_manager.select(config.get("network_manager"))
+    setup_network(cloud, networks)
 
     for pool in floating_ips:
         for poolname in pool:
