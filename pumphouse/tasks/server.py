@@ -231,11 +231,13 @@ def restore_floating_ips(context, server_info):
         fixed_ip = addresses[label][0]
         for floating_ip in [addr["addr"] for addr in addresses[label]
                             if addr['OS-EXT-IPS:type'] == 'floating']:
-            fip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
-            if fip_retrieve not in context.store:
+            fip_retrieve = "floating-ip-bulk-{}-retrieve".format(floating_ip)
+            if fip_retrieve in context.store:
                 fip_flow = fip_tasks.associate_floating_ip_server(
                     context,
                     floating_ip, fixed_ip,
                     server_info["id"])
                 flow.add(fip_flow)
+            else:
+                raise exceptions.NotFound()
     return flow
