@@ -179,13 +179,14 @@ class TestMigrateFloatingIP(TestFloatingIP):
     def test_migrate_floating_ip(self, flow_mock,
                                  retrieve_floating_ip_mock,
                                  ensure_floating_ip_bulk_mock):
-        floating_ip_binding = "floating-ip-{}".format(self.test_address)
+        floating_ip_retrieve = "floating-ip-{}-retrieve".format(
+            self.test_address)
 
         flow = floating_ip.migrate_floating_ip(
             self.context,
             self.test_address)
 
-        self.assertEqual({floating_ip_binding: self.test_address},
+        self.assertEqual({floating_ip_retrieve: self.test_address},
                          self.context.store)
         flow_mock.assert_run_once_with("migrate-floating-ip-{}"
                                        .format(self.test_address))

@@ -212,19 +212,26 @@ class TestRestoreFloatingIPs(TestServer):
                                   associate_fip_mock):
         expected_store_dict = {}
         self.floating_ip = "1.1.1.1"
+        self.floating_ip_info = {
+            "addr": self.floating_ip,
+            "OS-EXT-IPS:type": "floating"
+        }
         self.server_info["addresses"] = {
-            "novanetwork": [{
-                "addr": self.floating_ip,
-                "OS-EXT-IPS:type": "floating"
-            }]
+            "novanetwork": [
+                self.floating_ip_info
+            ]
         }
         fip_flow_mock = Mock()
         fip_retrieve = "floating-ip-{}-retrieve".format(self.floating_ip)
+        self.context.store = {fip_retrieve: self.floating_ip}
         associate_fip_mock.return_value = fip_flow_mock()
         flow = server.restore_floating_ips(self.context, self.server_info)
 
-        self.assertEqual(self.context.store, expected_store_dict)
         flow_mock.assert_called_once_with("post-migration-{}"
                                           .format(self.test_server_id))
+        associate_fip_mock.assert_called_once_with(self.context,
+                                                   self.floating_ip,
+                                                   self.floating_ip_info,
+                                                   self.test_server_id)
         self.assertEqual(flow.add.call_args_list,
                          [call(fip_flow_mock())])
