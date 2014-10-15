@@ -15,11 +15,20 @@ class AttrDict(object):
 
 
 class UnboundTask(object):
-    def __init__(self, fn, requires=[]):
+    def __init__(self, fn=None, name=None, requires=[]):
         self._resource_task = {}
         self.fn = fn
-        self.name = fn.__name__
+        if name is None and fn is not None:
+            self.name = fn.__name__
+        else:
+            self.name = name
         self.requires = requires
+
+    def __call__(self, fn):
+        assert self.fn is None and self.name is None
+        self.fn = fn
+        self.name = fn.__name__
+        return self
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -86,15 +95,7 @@ class Task(object):
             requires,
         )
 
-
-def task(fn=None, **kwargs):
-    def _get_task(fn):
-        return UnboundTask(fn, **kwargs)
-
-    if fn is None:
-        return _get_task
-    else:
-        return _get_task(fn)
+task = UnboundTask
 
 
 class Resource(object):
@@ -216,10 +217,6 @@ class CollectionUnboundTask(UnboundTask):
         )
 
 
-class Workload(Resource):
-    pass
-
-
 class Server(Resource):
     @task
     def delete(self):
@@ -234,7 +231,7 @@ class Tenant(Resource):
         #self.cloud.keystone.tenants.delete(self.tenant)
 
 
-class TenantWorkload(Workload):
+class TenantWorkload(Resource):
     tenant = Tenant()
     servers = Collection(Server)
 
@@ -247,9 +244,8 @@ class TenantWorkload(Workload):
             "tenant_id": self.tenant.id,
         })
 
-    @task(requires=[tenant.delete, servers.each().delete])
-    def delete(self):
-        pass
+    delete = task(name="delete",
+                  requires=[tenant.delete, servers.each().delete])
 
 
 def delete_tenant(tenant):
