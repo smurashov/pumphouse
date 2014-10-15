@@ -35,9 +35,9 @@ class Resource(object):
             cls_vars["_main_resource"] = main_res_name
             return type.__new__(mcs, name, bases, cls_vars)
 
-    def __init__(self, value=None, store=None):
+    def __init__(self, value=None, runner=None):
         self._resource_data = {}
-        self.store = store
+        self.runner = runner
         if value is not None:
             setattr(self, self._main_resource, value)
             self.bound = True
@@ -50,10 +50,10 @@ class Resource(object):
     def set_data(self, resource, value):
         self._resource_data[resource] = value
 
-    def get_store(self):
+    def get_runner(self):
         assert self.bound
-        assert self.store is not None
-        return self.store
+        assert self.runner is not None
+        return self.runner
 
     @classmethod
     def get_id_for(cls, data):
@@ -76,16 +76,22 @@ class Resource(object):
             value = 'unbound'
         return '<{} {}>'.format(type(self).__name__, value)
 
+    @property
+    def env(self):
+        return self.runner.env
+
 
 class Collection(Resource):
-    def __init__(self, base_cls, value=None, store=None):
-        super(Collection, self).__init__(value, store)
+    def __init__(self, base_cls, value=None, runner=None):
+        super(Collection, self).__init__(value, runner)
         self.base_cls = base_cls
         self.list_fn = None
 
     def list(self, fn):
         self.list_fn = fn
         return self
+
+    __call__ = list
 
     def each(self):
         return CollectionProxy(self)
@@ -123,10 +129,10 @@ class CollectionUnboundTask(tasks.UnboundTask):
 
     def realize_with(self, resource):
         assert resource.bound
-        store = resource.get_store()
+        runner = resource.get_runner()
         requires = []
         for data in resource.collection:
-            res = store.get_resource(resource.base_cls, data)
+            res = runner.get_resource(resource.base_cls, data)
             requires.append(self.base_task.get_for_bound_resource(res))
         return tasks.Task(
             None,  # Wow! We'll call this None!

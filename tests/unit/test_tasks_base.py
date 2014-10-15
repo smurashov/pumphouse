@@ -22,26 +22,21 @@ from pumphouse.tasks import base
 class Server(base.Resource):
     @base.task
     def delete(self):
-        print "Deleting server", self.server
-        #self.cloud.nova.servers.delete(self.server)
+        self.env.cloud.nova.servers.delete(self.server)
 
 
 class Tenant(base.Resource):
     @base.task
     def delete(self):
-        print "Deleting tenant", self.tenant
-        #self.cloud.keystone.tenants.delete(self.tenant)
+        self.env.cloud.keystone.tenants.delete(self.tenant)
 
 
 class TenantWorkload(base.Resource):
     tenant = Tenant()
-    servers = base.Collection(Server)
 
-    @servers.list
+    @base.Collection(Server)
     def servers(self):
-        return [mock.Mock(id='servid1', name='server1'),
-                mock.Mock(id='servid2', name='server2')]
-        return self.cloud.nova.servers.list(search_opts={
+        return self.env.cloud.nova.servers.list(search_opts={
             "all_tenants": 1,
             "tenant_id": self.tenant.id,
         })
@@ -53,7 +48,26 @@ class TenantWorkload(base.Resource):
 class TasksBaseTestCase(unittest.TestCase):
     def test_basic_tasks(self):
         tenant = mock.Mock(id='tenid1', name='tenant1')
-        runner = base.TaskflowRunner()
-        workload = runner.store.get_resource(TenantWorkload, tenant)
+        servers = [mock.Mock(id='servid1', name='server1'),
+                   mock.Mock(id='servid2', name='server2')]
+        env = mock.Mock()
+        env.cloud.nova.servers.list.return_value = servers
+        runner = base.TaskflowRunner(env)
+        workload = runner.get_resource(TenantWorkload, tenant)
         runner.add(workload.delete)
         runner.run()
+        self.assertEqual(
+            env.cloud.nova.servers.list.call_args_list,
+            [mock.call(search_opts={
+                "all_tenants": 1,
+                "tenant_id": tenant.id,
+            })],
+        )
+        self.assertEqual(
+            env.cloud.keystone.tenants.delete.call_args_list,
+            [mock.call(tenant)],
+        )
+        self.assertItemsEqual(
+            env.cloud.nova.servers.delete.call_args_list,
+            map(mock.call, servers),
+        )

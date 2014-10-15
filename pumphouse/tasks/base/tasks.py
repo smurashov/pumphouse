@@ -49,11 +49,11 @@ class UnboundTask(object):
 
     def realize_with(self, resource):
         assert resource.bound
-        store = resource.get_store()
+        runner = resource.get_runner()
         requires = []
         for task in self.requires:
             data = task.resource.get_data(resource)
-            bound_res = store.get_resource(task.resource, data)
+            bound_res = runner.get_resource(task.resource, data)
             requires.append(task.get_for_bound_resource(bound_res))
         return Task(self.fn, self.name, resource, requires=requires)
 

@@ -20,12 +20,14 @@ import taskflow.task
 
 from . import resources
 
-__all__ = ['Store', 'Runner', 'TaskflowRunner']
+__all__ = ['Runner', 'TaskflowRunner']
 
 
-class Store(object):
-    def __init__(self):
+class Runner(object):
+    def __init__(self, env=None):
         self.resources = {}
+        self.tasks = []
+        self.env = env
 
     def get_resource(self, resource, data):
         if isinstance(resource, resources.Collection):
@@ -42,15 +44,9 @@ class Store(object):
         try:
             return self.resources[key]
         except KeyError:
-            res = res_type(value=data, store=self)
+            res = res_type(value=data, runner=self)
             self.resources[key] = res
             return res
-
-
-class Runner(object):
-    def __init__(self):
-        self.tasks = []
-        self.store = Store()
 
     def add(self, task):
         self.tasks.extend(task.get_tasks())
