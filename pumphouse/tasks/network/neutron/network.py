@@ -1,39 +1,40 @@
 import logging
 
-from taskflow.patterns import linear_flow
+from taskflow.patterns import graph_flow
 
 from pumphouse import task
-from pumphouse import events
+#from pumphouse import events
 from pumphouse import exceptions
 from pumphouse.tasks import utils as task_utils
 
-# TODO (sryabin) create|del|list_security_group_rule implementation
+LOG = logging.getLogger(__name__)
+#TODO (sryabin) create|del|list_security_group_rule implementation
 
 
-def RetrieveAllNetworks(task.BaseCloudTask):
+class RetrieveAllNetworks(task.BaseCloudTask):
     def execute(self):
         return list_networks(self.cloud.neutron, None)
 
 
-def RetrieveAllNetworksById(task.BaseCloudTask):
+class RetrieveAllNetworksById(task.BaseCloudTask):
     def execute(self, network_id):
         return list_networks(self.cloud.neutron, {"name": network_id})
 
 
-def EnsureNetwork(task.baseCloudTask):
-    def exists(self, network_id)
-        return list_networks(self.cloud.neutron, {"id": network_id}) ? 1:
-            0
+class EnsureNetwork(task.baseCloudTask):
+    def exists(self, network_id):
+        return 1 if list_networks(self.cloud.neutron, {"id": network_id}) \
+            else 0
 
-    def exceute(self, network_id)
-        if (!self.exists(network_id)):
+    def exceute(self, network_id):
+        if not self.exists(network_id):
             create_network(self.cloud.neutron, network_id)
         return list_networks(self.cloud.neutron, {"id": network_id})
 
 
-def RetrievePorts(task.baseCloudTask):
-    def execute(self)
-        return list_ports(sefl.cloud.neutron)
+class RetrievePorts(task.baseCloudTask):
+    def execute(self):
+        return list_ports(self.cloud.neutron)
 
 
 def migrate_network(context, network_id=None):
@@ -52,15 +53,15 @@ def migrate_network(context, network_id=None):
 
     flow = graph_flow.Flow("migrate-{}".format(network_binding))
 
-    if (all_src_networks_retrieve not in context.store):
+    if ("all_src_networks_retrieve" not in context.store):
         flow.add(RetrieveAllNetworks(context.src_cloud,
-                                     name=all_src_networks
+                                     name=all_src_networks,
                                      provides=all_src_networks))
         context.store[all_src_networks] = None
 
-    if (all_dst_networks_retrieve not in context.store):
+    if ("all_dst_networks_retrieve" not in context.store):
         flow.add(RetrieveAllNetworks(context.dst_cloud,
-                                     name=all_dst_networks
+                                     name=all_dst_networks,
                                      provides=all_dst_networks))
         context.store[all_dst_networks] = None
 
@@ -71,8 +72,8 @@ def migrate_network(context, network_id=None):
     return flow, network_ensure
 
 
-def list_ports(client)
-        # list_ports(fields=['network_id', 'mac_address', 'id'])
+def list_ports(client):
+    # list_ports(fields=['network_id', 'mac_address', 'id'])
     try:
         return {
             'port_list': lambda: client.list_ports()["ports"]
@@ -97,7 +98,7 @@ def create_port(client, network_id, mac, security_groups, ip_address):
         'mac_address': mac,
         'security_groups': security_groups
     }
-    if (ip_address)
+    if (ip_address):
         port_params['fixed_ips'] = [{"ip_address": ip_address}]
 
     # TODO Keyerror
@@ -125,14 +126,14 @@ def del_security_groups(client, security_group):
         raise
 
 
-def create_security_group(client, name, description)
+def create_security_group(client, name, description):
     try:
         return client.create_sequrity_group({
-                                            "security_group": {
-                                                "name": name,
-                                                "description": description
-                                            }
-                                            })
+            "security_group": {
+                "name": name,
+                "description": description,
+            },
+        })
     except Exception as e:
         LOG.exception("Error in get security groups: %s" % e.message)
         raise
@@ -140,7 +141,7 @@ def create_security_group(client, name, description)
 
 def list_subnets(client):
     try:
-        return client.list_subnets()['subnets']:
+        return client.list_subnets()['subnets']
     except Exception as e:
         LOG.exception("Error in list subnets: %s" % e.message)
         raise
@@ -148,7 +149,7 @@ def list_subnets(client):
 
 def del_subnet(client, subnet_id):
     try:
-        return client.list_subnets()['subnets']:
+        return client.list_subnets()['subnets']
     except Exception as e:
         LOG.exception("Error in list subnets: %s" % e.message)
         raise
@@ -169,7 +170,7 @@ def list_network(client, network_info, tenant_id):
         if network_info:
             if 'id' in network_info:
                 return client.list_networks(id=network_info['id'])['networks'][0]
-            else if 'name' in network_info:
+            elif 'name' in network_info:
                 return client.list_networks(name=network_info['name'])['networks'][0]
         else:
             return client.list_networks()

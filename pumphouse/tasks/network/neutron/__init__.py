@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and#
 # limitations under the License.
 
-from .floating_ip import migrate_floating_ip
-from .network import migrate_network
-from .network import migrate_nic
+#from .floating_ip import migrate_floating_ip
+#from .network import migrate_network
+#from .network import migrate_nic
