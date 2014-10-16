@@ -117,23 +117,23 @@ def list_network(client, net_info, tenant_id):
 
 class RetrieveAllNetworks(task.BaseCloudTask):
     def execute(self):
-        return list_networks(self.cloud.neutron, None)
+        return list_network(self.cloud.neutron, None)
 
 
 class RetrieveAllNetworksById(task.BaseCloudTask):
     def execute(self, network_id):
-        return list_networks(self.cloud.neutron, {"name": network_id})
+        return list_network(self.cloud.neutron, {"name": network_id})
 
 
 class EnsureNetwork(task.baseCloudTask):
     def exists(self, network_id):
-        return 1 if list_networks(self.cloud.neutron, {"id": network_id}) \
+        return 1 if list_network(self.cloud.neutron, {"id": network_id}) \
             else 0
 
     def exceute(self, network_id):
         if not self.exists(network_id):
             create_network(self.cloud.neutron, network_id)
-        return list_networks(self.cloud.neutron, {"id": network_id})
+        return list_network(self.cloud.neutron, {"id": network_id})
 
 
 class RetrievePorts(task.baseCloudTask):
@@ -142,7 +142,7 @@ class RetrievePorts(task.baseCloudTask):
 
 
 def migrate_network(context, network_id=None):
-    all_networks = list_networks(context.dst_cloud)
+    all_networks = list_network(context.dst_cloud)
     # XXX (sryabin) nova migration driver uses "networks-src, networks-dst"
     # consts
     all_src_networks = "neutron-network-src"
