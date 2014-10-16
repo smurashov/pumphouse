@@ -20,6 +20,7 @@ from pumphouse import exceptions
 from pumphouse import management
 from pumphouse import utils
 from pumphouse import flows
+from pumphouse import context
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import identity as identity_tasks
 from pumphouse.tasks import resources as resources_tasks
@@ -127,29 +128,29 @@ def get_parser():
     return parser
 
 
-def migrate_images(src, dst, flow, store, ids):
-    for image in src.glance.images.list():
+def migrate_images(ctx, flow, ids):
+    for image in ctx.src_cloud.glance.images.list():
         if image.id in ids:
-            image_flow, store = image_tasks.migrate_image(
-                src, dst, store, image.id)
+            image_flow = image_tasks.migrate_image(
+                ctx, image.id)
             flow.add(image_flow)
-    return flow, store
+    return flow
 
 
-def migrate_identity(src, dst, flow, store, ids):
+def migrate_identity(ctx, flow, ids):
     for tenant_id in ids:
-        _, identity_flow, store = identity_tasks.migrate_identity(
-            src, dst, store, tenant_id)
+        _, identity_flow = identity_tasks.migrate_identity(
+            ctx, tenant_id)
         flow.add(identity_flow)
-    return flow, store
+    return flow
 
 
-def migrate_resources(src, dst, flow, store, ids):
+def migrate_resources(ctx, flow, ids):
     for tenant_id in ids:
-        resources_flow, store = resources_tasks.migrate_resources(
-            src, dst, store, tenant_id)
+        resources_flow = resources_tasks.migrate_resources(
+            ctx, tenant_id)
         flow.add(resources_flow)
-    return flow, store
+    return flow
 
 
 def evacuate(cloud, host):
@@ -309,8 +310,9 @@ def main():
             ids = get_ids_by_host(src, args.resource, args.host)
         else:
             raise exceptions.UsageError("Missing tenant ID")
-        resources_flow, store = migrate_function(src, dst, flow, store, ids)
-        flows.run_flow(resources_flow, store)
+        ctx = context.Context(args.config, src, dst)
+        resources_flow = migrate_function(ctx, flow, ids)
+        flows.run_flow(resources_flow, ctx.store)
     elif args.action == "cleanup":
         cloud_config = args.config[args.target]
         cloud = init_client(cloud_config,

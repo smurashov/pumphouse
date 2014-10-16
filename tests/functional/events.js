@@ -27,15 +27,14 @@ EventsListener.prototype.checkWaiters = function(name, m) {
                 return p;
             }, []);
     }
-    console.log(this._waiters);
+    //console.log(this._waiters);
 };
 
 EventsListener.prototype.handlerFactory = function(name) {
-    var that = this;
     return function(m) {
-        that.checkWaiters(name, m);
-        that.logEventData(name, JSON.stringify(m));
-    };
+        this.checkWaiters(name, m);
+        this.logEventData(name, JSON.stringify(m));
+    }.bind(this);
 };
 
 EventsListener.prototype.on = function(event, handler) {
@@ -61,7 +60,9 @@ EventsListener.prototype.bindHandlers = function() {
         'server activate',
         'server migrated',
         'reset started',
-        'reset completed'
+        'reset completed',
+        'host reassign',
+        'host reassigned'
     ].map(function(name) {
         this.socket.on(name, this.handlerFactory(name))
     }, this);

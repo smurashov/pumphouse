@@ -4,9 +4,13 @@ function API(endpoint) {
 
     this._no_callback = function(res) {};
 
-    this.resources = function() {
+    this.resources = function(callback) {
         // Returns world's picture
-        return this._request.get(this._endpoint + '/resources');
+        return this._request
+            .get(this._endpoint + '/resources')
+            .end(function(err, res) {
+                (callback || this._no_callback)(err, res);
+            });
     };
 
     this.reset = function(callback) {

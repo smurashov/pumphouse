@@ -59,7 +59,7 @@ def migrate_tenant(context, tenant_id):
     tenant_ensure = "{}-ensure".format(tenant_binding)
     flow = linear_flow.Flow("migrate-tenant-{}".format(tenant_id)).add(
         RetrieveTenant(context.src_cloud,
-                       name=tenant_retrieve,
+                       name=tenant_binding,
                        provides=tenant_binding,
                        rebind=[tenant_retrieve]),
         EnsureTenant(context.dst_cloud,

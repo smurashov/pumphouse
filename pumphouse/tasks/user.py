@@ -110,7 +110,7 @@ def migrate_user(context, user_id, tenant_id=None):
     user_ensure = "{}-ensure".format(user_binding)
     flow = linear_flow.Flow("migrate-user-{}".format(user_id))
     flow.add(RetrieveUser(context.src_cloud,
-                          name=user_retrieve,
+                          name=user_binding,
                           provides=user_binding,
                           rebind=[user_retrieve]))
     if tenant_id is not None:

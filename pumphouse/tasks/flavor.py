@@ -66,7 +66,7 @@ def migrate_flavor(context, flavor_id):
     flavor_ensure = "{}-ensure".format(flavor_binding)
     flow = linear_flow.Flow("migrate-flavor-{}".format(flavor_id)).add(
         RetrieveFlavor(context.src_cloud,
-                       name=flavor_retrieve,
+                       name=flavor_binding,
                        provides=flavor_binding,
                        rebind=[flavor_retrieve]),
         EnsureFlavor(context.dst_cloud,

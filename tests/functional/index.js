@@ -3,20 +3,27 @@ var Listener = require('./events');
 var API = require('./api');
 
 var events = new Listener(Config.endpoint + '/events').bindHandlers();
-pumphouse = new API(Config.endpoint);
+var pumphouse = new API(Config.endpoint);
 
-setTimeout(function() {process.exit(code=1)}, 120000);
 
-pumphouse.reset(function() {
-    console.log('Reset event emitted');
-    var completed_for = {};
-    events.on('reset completed', function(m) {
-        completed_for[m.cloud] = true;
-        if (completed_for['source'] && completed_for['destination']) {
-            console.log('Reset completed');
-            events.disconnect();
+var cases = ['reset', 'migrate', 'evaculate'], limit = 120, i = 0, completed = true, c, timer;
+
+// Async tests runner
+setInterval(function() {
+    if (completed) {
+        cycles = 0;
+        if (i >= cases.length) {
+            console.log('Tests execution completed');
             process.exit(code=0);
         }
-        return false;
-    })
-});
+        c = require('./case_' + cases[i++]);
+        c.o.run(pumphouse, events);
+    }
+    completed = c.o.completed;
+    if (cycles++ > limit) {
+        console.error('Timed out!');
+        process.exit(code=1);
+    }
+    cycles++;
+}, 1000);
+
