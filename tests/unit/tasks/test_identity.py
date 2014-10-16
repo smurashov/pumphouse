@@ -124,8 +124,9 @@ class TestMigrateIdentityBase(TestIdentity):
             tenantId=self.tenant_id
         )
 
-        self.mock_flow_patcher = patch("taskflow.patterns.graph_flow.Flow")
-        self.mock_flow = self.mock_flow_patcher.start()
+        mock_flow_patcher = patch("taskflow.patterns.graph_flow.Flow")
+        self.mock_flow = mock_flow_patcher.start()
+        self.addCleanup(mock_flow_patcher.stop)
 
 
 class TestMigrateServerIdentity(TestMigrateIdentityBase):
