@@ -45,8 +45,13 @@ status_attr = operator.attrgetter("status")
 
 
 def wait_for(resource, update_resource,
-             attribute_getter=status_attr, value="ACTIVE", error_value="ERROR",
+             attribute_getter=status_attr, value=None, error_value=None,
              timeout=60, check_interval=1, expect_excs=None, stop_excs=None):
+    if stop_excs is None:
+        if value is None:
+            value = "ACTIVE"
+        if error_value is None:
+            error_value = "ERROR"
     start = time.time()
     while True:
         LOG.debug("Trying to get resource: %s", resource)
