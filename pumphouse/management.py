@@ -23,7 +23,7 @@ from novaclient import exceptions as nova_excs
 
 from pumphouse import exceptions
 from pumphouse import utils
-from pumphouse import flows
+from pumphouse import plugin
 
 LOG = logging.getLogger(__name__)
 
@@ -35,7 +35,8 @@ TEST_RESOURCE_PREFIX = "pumphouse-"
 FLOATING_IP_STRING = "172.16.0.{}"
 # TODO(ogelbukh): make FLATDHCP actual configuration parameter and/or
 # command-line parameter, maybe autodetected in future
-network_manager = flows.register("network_manager", default="FlatDHCP")
+network_manager = plugin.Plugin("network_manager", default="FlatDHCP")
+network_generator = plugin.Plugin("network_generator", default="FlatDHCP")
 
 
 @network_manager.add("FlatDHCP")
@@ -342,7 +343,8 @@ def setup_server_floating_ip(cloud, server):
         return server, floating_ip
 
 
-def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
+def setup(config, events, cloud, target,
+          num_tenants=0, num_servers=0, workloads={}):
 
     """Prepares test resources in the source cloud
 
@@ -372,6 +374,8 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
     floating_ips = workloads.get(
         'floating_ips', list(generate_floating_ips_list(
             num_tenants * sum([len(t["servers"]) for t in tenants]))))
+    generate_networks_list = network_generator.select(
+        config.get("network_manager"))
     networks = workloads.get('networks',
                              generate_networks_list(num_tenants))
     for image_dict in images:
