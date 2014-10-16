@@ -91,7 +91,7 @@ def del_subnet(client, subnet_id):
         raise
 
 
-def create_subnet(client, network_name):
+def create_network(client, network_name):
     try:
         return client.create_network({
                                      'network': network_name
