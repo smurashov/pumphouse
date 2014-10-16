@@ -91,6 +91,22 @@ def del_subnet(client, subnet_id):
         raise
 
 
+def create_subnet(client, network_id, cidr, tenant_id):
+    # FIXME (verify args)
+    try:
+        return client.create_subnet({
+            "subnet": {
+                "networki_id": tenant_id,
+                "ip_version": 4,
+                "cidr": cidr,
+                "tenant_id": tenant_id
+            },
+        })
+    except Exception as e:
+        LOG.exception("Error in list subnets: %s" % e.message)
+        raise
+
+
 def create_network(client, network_name):
     try:
         return client.create_network({
@@ -107,7 +123,8 @@ def list_network(client, net_info, tenant_id):
             if 'id' in net_info:
                 return client.list_networks(id=net_info['id'])['networks'][0]
             elif 'name' in net_info:
-                return client.list_networks(name=net_info['name'])['networks'][0]
+                return \
+                    client.list_networks(name=net_info['name'])['networks'][0]
         else:
             return client.list_networks()
     except Exception as e:
