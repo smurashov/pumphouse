@@ -26,7 +26,7 @@ __all__ = ['Runner', 'TaskflowRunner']
 class Runner(object):
     def __init__(self, env=None):
         self.resources = {}
-        self.tasks = []
+        self.tasks = set()
         self.env = env
 
     def get_resource_by_id(self, resource, id_):
@@ -59,7 +59,7 @@ class Runner(object):
             return res
 
     def add(self, task):
-        self.tasks.extend(task.get_tasks())
+        self.tasks.update(task.get_tasks())
 
     def run(self):
         print("Hey, I'm gonna run these tasks:")
@@ -77,7 +77,7 @@ class TaskFlowTask(taskflow.task.Task):
 
 
 class TaskflowRunner(Runner):
-    def get_task_prefix(self, task):
+    def get_task_name(self, task):
         id_ = getattr(task.resource, task.resource._main_resource + "_id")
         return "{}_{}_{}".format(
             type(task.resource).__name__,
@@ -86,13 +86,13 @@ class TaskflowRunner(Runner):
         )
 
     def convert_task(self, task):
-        prefix = self.get_task_prefix(task)
+        name = self.get_task_name(task)
         flow_task = TaskFlowTask(
             task,
-            name=prefix,
-            provides=prefix + "_finished",
-            rebind=[self.get_task_prefix(req_task) + "_finished"
-                    for req_task in task.requires],
+            name=name,
+            provides=name,
+            rebind=[self.get_task_name(req_task)
+                    for req_task in (task.requires | task.after & self.tasks)],
         )
         return flow_task
 

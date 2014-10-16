@@ -33,7 +33,7 @@ class Server(base.Resource):
     def tenant(self):
         return self.server.tenant_id
 
-    @base.task
+    @base.task(before=[tenant.delete])
     def delete(self):
         self.env.cloud.nova.servers.delete(self.server)
 
@@ -55,8 +55,10 @@ class TenantWorkload(base.Resource):
 class TasksBaseTestCase(unittest.TestCase):
     def test_basic_tasks(self):
         tenant = mock.Mock(id='tenid1', name='tenant1')
-        servers = [mock.Mock(id='servid1', name='server1'),
-                   mock.Mock(id='servid2', name='server2')]
+        servers = [
+            mock.Mock(id='servid1', name='server1', tenant_id=tenant.id),
+            mock.Mock(id='servid2', name='server2', tenant_id=tenant.id),
+        ]
         env = mock.Mock()
         env.cloud.nova.servers.list.return_value = servers
         env.cloud.keystone.tenants.get.return_value = tenant

@@ -16,7 +16,8 @@ __all__ = ['UnboundTask', 'Task', 'task']
 
 
 class UnboundTask(object):
-    def __init__(self, fn=None, name=None, id_based=False, requires=[]):
+    def __init__(self, fn=None, name=None, id_based=False,
+                 requires=[], after=[], before=[]):
         self._resource_task = {}
         self.fn = fn
         if name is None and fn is not None:
@@ -24,7 +25,9 @@ class UnboundTask(object):
         else:
             self.name = name
         self.id_based = id_based
-        self.requires = requires
+        self.requires = frozenset(requires)
+        self.after = frozenset(after)
+        self.before = frozenset(before)
 
     def __call__(self, fn):
         assert self.fn is None and self.name is None
@@ -51,17 +54,22 @@ class UnboundTask(object):
 
     def realize_with(self, resource):
         assert resource.bound
-        runner = resource.get_runner()
         requires = []
         for task in self.requires:
-            if task.task.id_based:
-                id_ = task.resource.get_id(resource)
-                bound_res = runner.get_resource_by_id(task.resource, id_)
-            else:
-                data = task.resource.get_data(resource)
-                bound_res = runner.get_resource(task.resource, data)
-            requires.append(task.get_for_bound_resource(bound_res))
-        return Task(self.fn, self.name, resource, requires=requires)
+            requires.append(task.get_for_resource(resource))
+        after = []
+        for task in self.after:
+            after.append(task.get_for_resource(resource))
+        before = []
+        for task in self.before:
+            before.append(task.get_for_resource(resource))
+        res = Task(self.fn, self.name, resource,
+                   requires=requires, after=after, before=before)
+        for task in before:
+            task.add_after(res)
+        for task in after:
+            task.add_before(res)
+        return res
 
 
 class BoundTask(object):
@@ -72,17 +80,36 @@ class BoundTask(object):
     def get_for_bound_resource(self, resource):
         return self.task.get_for_bound_resource(resource)
 
+    def get_for_resource(self, resource):
+        runner = resource.runner
+        if self.task.id_based:
+            id_ = self.resource.get_id(resource)
+            bound_res = runner.get_resource_by_id(self.resource, id_)
+        else:
+            data = self.resource.get_data(resource)
+            bound_res = runner.get_resource(self.resource, data)
+        return self.get_for_bound_resource(bound_res)
+
     def __repr__(self):
         return '<{} {} {}>'.format(
             type(self).__name__, self.task.name, self.resource)
 
 
 class Task(object):
-    def __init__(self, fn, name, resource, requires):
+    def __init__(self, fn, name, resource, requires, after=[], before=[]):
         self.fn = fn
         self.name = name
         self.resource = resource
-        self.requires = requires
+        self.requires = frozenset(requires)
+        self.after = set(after)
+        self.before = set(before)
+
+    def add_before(self, task):
+        self.before.add(task)
+
+    def add_after(self, task):
+        if task not in self.requires:
+            self.after.add(task)
 
     def get_tasks(self):
         for task in self.requires:
@@ -91,10 +118,13 @@ class Task(object):
         yield self
 
     def __repr__(self):
+        requires = ''
         if self.requires:
-            requires = ' requires={}'.format(self.requires)
-        else:
-            requires = ''
+            requires += ' requires={}'.format(self.requires)
+        if self.after:
+            requires += ' after={}'.format(self.after)
+        if self.before:
+            requires += ' before={}'.format(self.before)
         return '<{} {} {}{}>'.format(
             type(self).__name__,
             self.name,
