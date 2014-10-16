@@ -19,16 +19,23 @@ import mock
 from pumphouse.tasks import base
 
 
+class Tenant(base.Resource):
+    def from_id(self, tenant_id):
+        return self.env.cloud.keystone.tenants.get(tenant_id)
+
+    @base.task(id_based=True)
+    def delete(self):
+        self.env.cloud.keystone.tenants.delete(self.tenant_id)
+
+
 class Server(base.Resource):
+    @Tenant()
+    def tenant(self):
+        return self.server.tenant_id
+
     @base.task
     def delete(self):
         self.env.cloud.nova.servers.delete(self.server)
-
-
-class Tenant(base.Resource):
-    @base.task
-    def delete(self):
-        self.env.cloud.keystone.tenants.delete(self.tenant)
 
 
 class TenantWorkload(base.Resource):
@@ -38,10 +45,10 @@ class TenantWorkload(base.Resource):
     def servers(self):
         return self.env.cloud.nova.servers.list(search_opts={
             "all_tenants": 1,
-            "tenant_id": self.tenant.id,
+            "tenant_id": self.tenant_id,
         })
 
-    delete = base.task(name="delete",
+    delete = base.task(name="delete", id_based=True,
                        requires=[tenant.delete, servers.each().delete])
 
 
@@ -52,10 +59,13 @@ class TasksBaseTestCase(unittest.TestCase):
                    mock.Mock(id='servid2', name='server2')]
         env = mock.Mock()
         env.cloud.nova.servers.list.return_value = servers
+        env.cloud.keystone.tenants.get.return_value = tenant
+
         runner = base.TaskflowRunner(env)
-        workload = runner.get_resource(TenantWorkload, tenant)
+        workload = runner.get_resource_by_id(TenantWorkload, tenant.id)
         runner.add(workload.delete)
         runner.run()
+
         self.assertEqual(
             env.cloud.nova.servers.list.call_args_list,
             [mock.call(search_opts={
@@ -65,7 +75,7 @@ class TasksBaseTestCase(unittest.TestCase):
         )
         self.assertEqual(
             env.cloud.keystone.tenants.delete.call_args_list,
-            [mock.call(tenant)],
+            [mock.call(tenant.id)],
         )
         self.assertItemsEqual(
             env.cloud.nova.servers.delete.call_args_list,

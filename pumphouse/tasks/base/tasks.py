@@ -16,13 +16,14 @@ __all__ = ['UnboundTask', 'Task', 'task']
 
 
 class UnboundTask(object):
-    def __init__(self, fn=None, name=None, requires=[]):
+    def __init__(self, fn=None, name=None, id_based=False, requires=[]):
         self._resource_task = {}
         self.fn = fn
         if name is None and fn is not None:
             self.name = fn.__name__
         else:
             self.name = name
+        self.id_based = id_based
         self.requires = requires
 
     def __call__(self, fn):
@@ -40,6 +41,7 @@ class UnboundTask(object):
             return self.get_for_bound_resource(instance)
 
     def get_for_bound_resource(self, resource):
+        assert resource.bound
         try:
             return self._resource_task[resource]
         except KeyError:
@@ -52,8 +54,12 @@ class UnboundTask(object):
         runner = resource.get_runner()
         requires = []
         for task in self.requires:
-            data = task.resource.get_data(resource)
-            bound_res = runner.get_resource(task.resource, data)
+            if task.task.id_based:
+                id_ = task.resource.get_id(resource)
+                bound_res = runner.get_resource_by_id(task.resource, id_)
+            else:
+                data = task.resource.get_data(resource)
+                bound_res = runner.get_resource(task.resource, data)
             requires.append(task.get_for_bound_resource(bound_res))
         return Task(self.fn, self.name, resource, requires=requires)
 

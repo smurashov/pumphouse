@@ -29,22 +29,32 @@ class Runner(object):
         self.tasks = []
         self.env = env
 
+    def get_resource_by_id(self, resource, id_):
+        return self._get_resource(resource, id_=id_)
+
     def get_resource(self, resource, data):
+        return self._get_resource(resource, data=data)
+
+    def _get_resource(self, resource, data=None, id_=None):
         if isinstance(resource, resources.Collection):
             base_cls = resource.base_cls
             res_type = functools.partial(resources.Collection,
                                          base_cls=base_cls)
-            key = (resources.Collection, base_cls, resource.get_id_for(data))
+            if id_ is None:
+                id_ = resource.get_id_for(data)
+            key = (resources.Collection, base_cls, id_)
         else:
             if isinstance(resource, type(resources.Resource)):
                 res_type = resource
             else:
                 res_type = type(resource)
-            key = (res_type, res_type.get_id_for(data))
+            if id_ is None:
+                id_ = resource.get_id_for(data)
+            key = (res_type, id_)
         try:
             return self.resources[key]
         except KeyError:
-            res = res_type(value=data, runner=self)
+            res = res_type(id_=id_, value=data, runner=self)
             self.resources[key] = res
             return res
 
@@ -68,10 +78,10 @@ class TaskFlowTask(taskflow.task.Task):
 
 class TaskflowRunner(Runner):
     def get_task_prefix(self, task):
-        value = getattr(task.resource, task.resource._main_resource)
+        id_ = getattr(task.resource, task.resource._main_resource + "_id")
         return "{}_{}_{}".format(
             type(task.resource).__name__,
-            task.resource.get_id_for(value),
+            id_,
             task.name,
         )
 
