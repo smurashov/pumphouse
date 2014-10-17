@@ -227,7 +227,7 @@ def generate_vlan_networks_list(num):
 
 def generate_images_list(num):
     image_ref = str(random.randint(1, 0x7fffffff))
-    yield {"name": "{}-image".format(TEST_RESOURCE_PREFIX, image_ref),
+    yield {"name": "{}-image-{}".format(TEST_RESOURCE_PREFIX, image_ref),
            "disk_format": "qcow2",
            "container_format": "bare",
            "visibility": "public",
