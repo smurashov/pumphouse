@@ -13,9 +13,9 @@
 # limitations under the License.
 
 import logging
-import os
 import random
 import urllib
+import tempfile
 
 from keystoneclient.openstack.common.apiclient import exceptions \
     as keystone_excs
@@ -31,7 +31,7 @@ RO_SECURITY_GROUPS = ['default']
 TEST_IMAGE_URL = ("http://download.cirros-cloud.net/0.3.2/"
                   "cirros-0.3.2-x86_64-disk.img")
 TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
-TEST_RESOURCE_PREFIX = "pumphouse-"
+TEST_RESOURCE_PREFIX = "pumphouse"
 FLOATING_IP_STRING = "172.16.0.{}"
 # TODO(ogelbukh): make FLATDHCP actual configuration parameter and/or
 # command-line parameter, maybe autodetected in future
@@ -303,15 +303,15 @@ def setup_image(cloud, image_dict):
     if not cloud.__module__ == "pumphouse.fake":
         image_file = cache_image_file(url)
         cloud.glance.images.upload(image.id,
-                                   open(image_file.name, "rb"))
+                                   open(image_file, "rb"))
     return image
 
 
 def cache_image_file(url=TEST_IMAGE_URL):
-    tmpfile = os.tmpfile()
-    LOG.info("Caching test image from %s: %s", url, tmpfile.name)
-    urllib.urlretrieve(url, tmpfile.name)
-    return tmpfile
+    _, path = tempfile.mkstemp()
+    LOG.info("Caching test image from %s: %s", url, path)
+    urllib.urlretrieve(url, path)
+    return path
 
 
 def setup_server(cloud, server_dict):
