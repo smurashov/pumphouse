@@ -212,16 +212,15 @@ def migrate_tenant(tenant_id):
 
 @pump.route("/hosts/<hostname>", methods=["POST"])
 @crossdomain()
-def reassign_host(hostname):
+def evacuate_host(hostname):
     @flask.copy_current_request_context
-    def reassign():
+    def evacuate():
         config = flask.current_app.config.get("PLUGINS") or {}
         src = hooks.source.connect()
         dst = hooks.destination.connect()
         ctx = context.Context(config, src, dst)
-        events.emit("host reassign", {
+        events.emit("host evacuate", {
             "id": hostname,
-            "cloud": src.name,
         }, namespace="/events")
 
         try:
@@ -230,18 +229,17 @@ def reassign_host(hostname):
             result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of migration: %s", result)
         except Exception:
-            LOG.exception("Error is occured during reassigning host %r",
+            LOG.exception("Error is occured during evacuating host %r",
                           hostname)
             status = "error"
         else:
             status = ""
 
-        events.emit("host reassigned", {
+        events.emit("host evacuated", {
             "id": hostname,
-            "cloud": dst.name,
             "status": status,
         }, namespace="/events")
-    gevent.spawn(reassign)
+    gevent.spawn(evacuate)
     return flask.make_response()
 
 
