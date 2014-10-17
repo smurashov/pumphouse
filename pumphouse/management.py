@@ -182,8 +182,9 @@ def cleanup(events, cloud, target):
 
 
 def generate_flavors_list(num):
-    yield {"name": "{}-flavor"
-           .format(TEST_RESOURCE_PREFIX),
+    flavor_ref = str(random.randint(1, 0x7fffffff))
+    yield {"name": "{}-flavor-{}"
+           .format(TEST_RESOURCE_PREFIX, flavor_ref),
            "ram": 1024,
            "vcpu": 1,
            "disk": 5}
@@ -199,7 +200,8 @@ def generate_tenants_list(num):
 
 
 def generate_floating_ips_list(num):
-    pool = "{}-pool".format(TEST_RESOURCE_PREFIX)
+    pool_ref = str(random.randint(1, 0x7fffffff))
+    pool = "{}-pool-{}".format(TEST_RESOURCE_PREFIX, pool_ref)
     addr_list = [FLOATING_IP_STRING.format(136 + i) for i in xrange(num)]
     yield {pool: addr_list}
 
@@ -224,7 +226,8 @@ def generate_vlan_networks_list(num):
 
 
 def generate_images_list(num):
-    yield {"name": "{}-image".format(TEST_RESOURCE_PREFIX),
+    image_ref = str(random.randint(1, 0x7fffffff))
+    yield {"name": "{}-image".format(TEST_RESOURCE_PREFIX, image_ref),
            "disk_format": "qcow2",
            "container_format": "bare",
            "visibility": "public",
