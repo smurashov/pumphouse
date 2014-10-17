@@ -33,7 +33,13 @@ class TestNetwork(unittest.TestCase):
             "host": "that_one",
             "cidr": ["10.1.0.0", "10.1.0.1"],
         }
-        self.cloud = mock.Mock(spec=["nova"], name="dst_cloud")
+        self.tenant_id = "123"
+        self.tenant_info = {
+            "id": self.tenant_id,
+            "name": "test-tenant-name"
+        }
+        self.cloud = mock.Mock(spec=["nova", "restrict"], name="dst_cloud")
+        self.cloud.restrict.return_value = self.cloud
         if self.task_class:
             self.task = self.task_class(self.cloud)
         self.store = {}
@@ -51,7 +57,9 @@ class TestEnsureNetwork(TestNetwork):
     @mock.patch.object(network.EnsureNetwork, "verify")
     def test_execute(self, mock_verify):
         all_networks = {"by-label": {}}
-        rv = self.task.execute(all_networks, self.network_info)
+        rv = self.task.execute(all_networks,
+                               self.network_info,
+                               self.tenant_info)
         network_create = self.cloud.nova.networks.create
         self.assertEqual(rv, network_create.return_value.to_dict.return_value)
         self.assertEqual(mock_verify.call_count, 0)
@@ -65,7 +73,9 @@ class TestEnsureNetwork(TestNetwork):
     def test_execute_exists(self, mock_verify):
         existing_net = mock.Mock()
         all_networks = {"by-label": {self.network_info["label"]: existing_net}}
-        rv = self.task.execute(all_networks, self.network_info)
+        rv = self.task.execute(all_networks,
+                               self.network_info,
+                               self.tenant_info)
         network_create = self.cloud.nova.networks.create
         self.assertEqual(network_create.call_count, 0)
         self.assertEqual(rv, mock_verify.return_value)
@@ -115,7 +125,8 @@ class TestMigrateNic(TestNetwork):
             "addr": "1.2.3.4",
             "OS-EXT-IPS:type": "floating",
         }
-        rv = network.migrate_nic(self.context, "mynet", address)
+        rv = network.migrate_nic(self.context, "mynet", address,
+                                 self.tenant_id)
         self.assertEqual(rv, (mock_migrage_fip.return_value, None))
         self.assertEqual(
             mock_migrage_fip.call_args_list,
@@ -129,7 +140,8 @@ class TestMigrateNic(TestNetwork):
             "OS-EXT-IPS:type": "floating",
         }
         self.store["floating-ip-1.2.3.4-retrieve"] = None
-        rv = network.migrate_nic(self.context, "mynet", address)
+        rv = network.migrate_nic(self.context, "mynet", address,
+                                 self.tenant_id)
         self.assertEqual(rv, (None, None))
         self.assertEqual(mock_migrage_fip.call_count, 0)
 
@@ -143,11 +155,13 @@ class TestMigrateNic(TestNetwork):
             "OS-EXT-IPS:type": "fixed",
         }
         mock_migrate_network.return_value = mock.Mock(), mock.Mock()
-        rv = network.migrate_nic(self.context, "mynet", address)
+        rv = network.migrate_nic(self.context, "mynet", address,
+                                 self.tenant_id)
         self.assertEqual(rv, (mock_flow.return_value, "fixed-ip-1.2.3.4-nic"))
         self.assertEqual(
             mock_migrate_network.call_args_list,
-            [mock.call(self.context, network_label="mynet")],
+            [mock.call(self.context, network_label="mynet",
+                       tenant_id=self.tenant_id)],
         )
         self.assertItemsEqual(
             mock_flow.return_value.add.call_args_list,
@@ -163,7 +177,8 @@ class TestMigrateNic(TestNetwork):
             "OS-EXT-IPS:type": "fixed",
         }
         self.store["fixed-ip-1.2.3.4-retrieve"] = None
-        rv = network.migrate_nic(self.context, "mynet", address)
+        rv = network.migrate_nic(self.context, "mynet", address,
+                                 self.tenant_id)
         self.assertEqual(rv, (None, "fixed-ip-1.2.3.4-nic"))
         self.assertEqual(mock_migrate_network.call_count, 0)
 
@@ -175,7 +190,8 @@ class TestMigrateNic(TestNetwork):
             patcher = mock.patch.object(network, name)
             mocks.append(patcher.start())
             self.addCleanup(patcher.stop)
-        rv = network.migrate_network(self.context, network_label="mynet")
+        rv = network.migrate_network(self.context, network_label="mynet",
+                                     tenant_id=self.tenant_id)
         self.assertEqual(rv, (mock_flow.return_value, "network-mynet-ensure"))
         self.assertItemsEqual(
             mock_flow.return_value.add.call_args_list,

@@ -50,14 +50,14 @@ class EnsureNetwork(task.BaseCloudTask):
     def verify(self, network, network_info):
         network_label = network["label"]
         for k, v in network.items():
-            if k.endswith('_at') or k in ('id', 'host'):
+            if k.endswith('_at') or k in ('id', 'host', 'vpn_public_address'):
                 continue  # Skip timestamps and cloud-specific fields
             if v != network_info[k]:
                 raise exceptions.Conflict("Network %s has different field %s" %
                                           (network_label, k))
         return network
 
-    def execute(self, all_networks, network_info):
+    def execute(self, all_networks, network_info, tenant_info):
         network_label = network_info["label"]
         try:
             network = all_networks["by-label"][network_label]
@@ -70,6 +70,7 @@ class EnsureNetwork(task.BaseCloudTask):
             if isinstance(cidr, list):
                 s = netaddr.IPSet(cidr)
                 network_info['cidr'] = str(list(s.iter_cidrs())[0])
+            network_info['project_id'] = tenant_info['id']
             network = self.cloud.nova.networks.create(**network_info)
         except exceptions.nova_excs.Conflict:
             LOG.exception("Conflicts: %s", network_info)
@@ -87,7 +88,7 @@ class EnsureNic(task.BaseCloudTask):
         }
 
 
-def migrate_nic(context, network_label, address):
+def migrate_nic(context, network_label, address, tenant_id):
     if address["OS-EXT-IPS:type"] == 'floating':
         floating_ip = address["addr"]
         floating_ip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
@@ -103,7 +104,7 @@ def migrate_nic(context, network_label, address):
             return None, fixed_ip_nic
         flow = graph_flow.Flow("migrate-{}-fixed-ip".format(fixed_ip))
         network_flow, network_ensure = migrate_network(
-            context, network_label=network_label)
+            context, network_label=network_label, tenant_id=tenant_id)
         if network_flow is not None:
             flow.add(network_flow)
         flow.add(EnsureNic(context.dst_cloud,
@@ -114,7 +115,8 @@ def migrate_nic(context, network_label, address):
         return flow, fixed_ip_nic
 
 
-def migrate_network(context, network_id=None, network_label=None):
+def migrate_network(context, network_id=None, network_label=None,
+                    tenant_id=None):
     assert (network_id, network_label).count(None) == 1
     by_id = network_id is not None
     all_src_networks = "networks-src"
@@ -127,6 +129,7 @@ def migrate_network(context, network_id=None, network_label=None):
         network_binding = "network-{}".format(network_label)
     network_retrieve = "{}-retrieve".format(network_binding)
     network_ensure = "{}-ensure".format(network_binding)
+    tenant_ensure = "tenant-{}-ensure".format(tenant_id)
     if network_binding in context.store:
         return None, network_ensure
     flow = graph_flow.Flow("migrate-{}".format(network_binding))
@@ -155,7 +158,8 @@ def migrate_network(context, network_id=None, network_label=None):
     flow.add(EnsureNetwork(context.dst_cloud,
                            name=network_ensure,
                            provides=network_ensure,
-                           rebind=[all_dst_networks, network_retrieve]))
+                           rebind=[all_dst_networks, network_retrieve,
+                                   tenant_ensure]))
     if by_id:
         context.store[network_binding] = network_id
     else:
