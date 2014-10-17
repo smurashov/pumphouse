@@ -39,34 +39,6 @@ network_manager = plugin.Plugin("network_manager", default="FlatDHCP")
 network_generator = plugin.Plugin("network_generator", default="FlatDHCP")
 
 
-@network_manager.add("FlatDHCP")
-def setup_network_flatdhcp(events, cloud, networks=None):
-    for net in cloud.nova.networks.findall(project_id=None):
-        if net.label == "novanetwork":
-            LOG.info("Already exists: %s", net._info)
-            return net
-    else:
-        net = cloud.nova.networks.create(
-            label="novanetwork",
-            cidr="10.10.0.0/24",
-            project_id=None)
-        LOG.info("Created: %s", net._info)
-        return net
-
-
-@network_manager.add("VLAN")
-def setup_network_vlans(events, cloud, networks):
-    for network_dict in networks:
-        net = cloud.nova.networks.create(**network_dict)
-        LOG.info("Created: %s", net.to_dict())
-        events.emit("network created", {
-            "id": net.id,
-            "name": net.label,
-            "cloud": "source",
-        }, namespace="/events")
-        return net
-
-
 def become_admin_in_tenant(cloud, user, tenant):
     """Adds the user into the tenant with an admin role.
 
@@ -232,11 +204,22 @@ def generate_floating_ips_list(num):
     yield {pool: addr_list}
 
 
-def generate_networks_list(num):
+@network_generator.add("FlatDHCP")
+def generate_flat_networks_list(num):
+    yield {
+        "label": "novanetwork",
+        "cidr": "10.10.0.0/24",
+        "project_id": None
+    }
+
+
+@network_generator.add("VLAN")
+def generate_vlan_networks_list(num):
     for i in xrange(num):
         yield {
             "label": "{}-{}".format(TEST_RESOURCE_PREFIX, i),
             "cidr": "10.42.{}.0/24".format(i),
+            "vlan": "20{}".format(i + 3)
         }
 
 
@@ -256,6 +239,32 @@ def generate_servers_list(num, images, flavors):
         yield {"name": "{}-{}".format(TEST_RESOURCE_PREFIX, server_ref),
                "image": image,
                "flavor": flavor}
+
+
+def _create_networks(events, cloud, networks):
+    for network_dict in networks:
+        net = cloud.nova.networks.create(**network_dict)
+        LOG.info("Created: %s", net._info)
+        events.emit("network created", {
+            "id": net.id,
+            "name": net.label,
+            "cloud": "source",
+        }, namespace="/events")
+
+
+@network_manager.add("FlatDHCP")
+def setup_network_flatdhcp(events, cloud, networks):
+    for net in cloud.nova.networks.findall(project_id=None):
+        if net.label == "novanetwork":
+            LOG.info("Already exists: %s", net._info)
+            return
+    else:
+        _create_networks(events, cloud, networks)
+
+
+@network_manager.add("VLAN")
+def setup_network_vlans(events, cloud, networks):
+    _create_networks(events, cloud, networks)
 
 
 def setup_floating_ip(cloud, floating_ip):
