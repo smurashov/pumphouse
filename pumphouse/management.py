@@ -40,7 +40,7 @@ network_generator = plugin.Plugin("network_generator", default="FlatDHCP")
 
 
 @network_manager.add("FlatDHCP")
-def setup_network_flatdhcp(cloud, networks=None):
+def setup_network_flatdhcp(events, cloud, networks=None):
     for net in cloud.nova.networks.findall(project_id=None):
         if net.label == "novanetwork":
             LOG.info("Already exists: %s", net._info)
@@ -55,14 +55,14 @@ def setup_network_flatdhcp(cloud, networks=None):
 
 
 @network_manager.add("VLAN")
-def setup_network_vlans(cloud, networks):
+def setup_network_vlans(events, cloud, networks):
     for network_dict in networks:
         net = cloud.nova.networks.create(**network_dict)
-        LOG.info("Created: %s", network.to_dict())
+        LOG.info("Created: %s", net.to_dict())
         events.emit("network created", {
             "id": net.id,
             "name": net.label,
-            "cloud": target,
+            "cloud": "source",
         }, namespace="/events")
         return net
 
@@ -402,7 +402,7 @@ def setup(config, events, cloud, target,
         }, namespace="/events")
 
     setup_network = network_manager.select(config.get("network_manager"))
-    setup_network(cloud, networks)
+    setup_network(events, cloud, networks)
 
     for pool in floating_ips:
         for poolname in pool:
