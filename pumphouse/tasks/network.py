@@ -67,7 +67,7 @@ class EnsureNetwork(task.BaseCloudTask):
             return self.verify(network, network_info)
         try:
             cidr = network_info['cidr']
-            if cidr:
+            if isinstance(cidr, list):
                 s = netaddr.IPSet(cidr)
                 network_info['cidr'] = str(list(s.iter_cidrs())[0])
             network = self.cloud.nova.networks.create(**network_info)
