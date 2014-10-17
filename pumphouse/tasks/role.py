@@ -56,7 +56,7 @@ def migrate_role(context, role_id):
     role_ensure = "{}-ensure".format(role_binding)
     flow = linear_flow.Flow("migrate-role-{}".format(role_id)).add(
         RetrieveRole(context.src_cloud,
-                     name=role_retrieve,
+                     name=role_binding,
                      provides=role_binding,
                      rebind=[role_retrieve]),
         EnsureRole(context.dst_cloud,

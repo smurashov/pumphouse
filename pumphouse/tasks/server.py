@@ -19,6 +19,7 @@ from taskflow.patterns import graph_flow, linear_flow, unordered_flow
 from pumphouse import events
 from pumphouse import flows
 from pumphouse import task
+from pumphouse import exceptions
 from pumphouse.tasks import floating_ip as fip_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import snapshot as snapshot_tasks
@@ -223,15 +224,15 @@ def reprovision_server(context, server, server_nics):
                              requires=[flavor_ensure] + pre_suspend_sync),
         ServerStartMigrationEvent(context.src_cloud,
                                   name=server_start_event,
-                                  rebind=[server_binding]),
+                                  rebind=[server_retrieve]),
         RetrieveServer(context.src_cloud,
                        name=server_binding,
-                       provides=server_retrieve,
-                       rebind=[server_binding]),
+                       provides=server_binding,
+                       rebind=[server_retrieve]),
         SuspendServer(context.src_cloud,
-                      name=server_retrieve,
+                      name=server_suspend,
                       provides=server_suspend,
-                      rebind=[server_retrieve]),
+                      rebind=[server_binding]),
     )
     if pre_boot_tasks:
         flow.add(*pre_boot_tasks)
@@ -248,9 +249,9 @@ def reprovision_server(context, server, server_nics):
                         rebind=[server_suspend]),
         ServerSuccessMigrationEvent(context.src_cloud, context.dst_cloud,
                                     name=server_finish_event,
-                                    rebind=[server_retrieve, server_boot]),
+                                    rebind=[server_binding, server_boot]),
     )
-    context.store[server_binding] = server_id
+    context.store[server_retrieve] = server_id
     return pre_suspend_tasks, flow
 
 
@@ -286,12 +287,14 @@ def restore_floating_ips(context, server_info):
         for floating_ip in [addr["addr"] for addr in addresses[label]
                             if addr['OS-EXT-IPS:type'] == 'floating']:
             fip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
-            if fip_retrieve not in context.store:
+            if fip_retrieve in context.store:
                 fip_flow = fip_tasks.associate_floating_ip_server(
                     context,
                     floating_ip, fixed_ip,
                     server_info["id"])
                 flow.add(fip_flow)
+            else:
+                raise exceptions.NotFound()
     return flow
 
 

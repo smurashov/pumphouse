@@ -93,7 +93,7 @@ def migrate_secgroup(context, secgroup_id, tenant_id, user_id):
     user_ensure = "{}-ensure".format(user_binding)
     flow = linear_flow.Flow("migrate-secgroup-{}".format(secgroup_id))
     flow.add(RetrieveSecGroup(context.src_cloud,
-                              name=secgroup_retrieve,
+                              name=secgroup_binding,
                               provides=secgroup_binding,
                               rebind=[secgroup_retrieve,
                                       tenant_binding,

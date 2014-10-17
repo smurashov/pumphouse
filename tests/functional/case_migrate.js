@@ -4,12 +4,11 @@ var Config = require('./config');
 var MigrateTestCase = new TestCase('Tenant migration');
 
 MigrateTestCase.addStep('Calling API to fetch resources', function() {
-    var that = this;
     this.test_case.api.resources(function(err, res) {
-        if (err) that.fail('Resources fetching error');
-        that.test_case.context.body = res.body;
-        that.next();
-    })
+        if (err) this.fail('Resources fetching error');
+        this.test_case.context.body = res.body;
+        this.next();
+    }.bind(this))
 });
 
 MigrateTestCase.findTenant = function(cloud) {
@@ -39,22 +38,22 @@ MigrateTestCase.addStep('Looking for preconfigured tenant in source cloud', func
 });
 
 MigrateTestCase.addStep('Initiate tenant migration', function() {
-    var that = this, tenant = this.test_case.context.tenant;
+    var tenant = this.test_case.context.tenant;
     this.test_case.api.migrateTenant(tenant.id, function(err, res) {
-        if (err) that.fail('Tenant (' + tenant.id + ') migration initialization failed');
-        that.next();
-    })
+        if (err) this.fail('Tenant (' + tenant.id + ') migration initialization failed');
+        this.next();
+    }.bind(this))
 });
 
 MigrateTestCase.addStep('Listening for tenant migrated event', function() {
-    var that = this, tenant = this.test_case.context.tenant;
+    var tenant = this.test_case.context.tenant;
     this.test_case.events.on('tenant migrated', function(m) {
         if (m.id == tenant.id) {
             console.log('Tenant (' + tenant.id + ') migration completed');
-            that.next();
+            this.next();
         }
         return false;
-    })
+    }.bind(this))
 });
 
 MigrateTestCase.repeatStep(0);

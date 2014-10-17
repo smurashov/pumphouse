@@ -133,36 +133,37 @@ def migrate_floating_ip(context, address):
     floating_ip_bulk_ensure = "floating-ip-bulk-{}-ensure".format(address)
     flow = linear_flow.Flow("migrate-floating-ip-{}".format(address))
     flow.add(RetrieveFloatingIP(context.src_cloud,
-                                name=floating_ip_retrieve,
-                                provides=floating_ip_retrieve,
-                                rebind=[floating_ip_binding]))
+                                name=floating_ip_binding,
+                                provides=floating_ip_binding,
+                                rebind=[floating_ip_retrieve]))
     flow.add(EnsureFloatingIPBulk(context.dst_cloud,
                                   name=floating_ip_bulk_ensure,
                                   provides=floating_ip_bulk_ensure,
-                                  rebind=[floating_ip_retrieve]))
-    context.store[floating_ip_binding] = address
+                                  rebind=[floating_ip_binding]))
+    context.store[floating_ip_retrieve] = address
     return flow
 
 
 def associate_floating_ip_server(context, floating_ip_address,
                                  fixed_ip_info, server_id):
     """Associates Floating IP to Nova instance"""
-    floating_ip_binding = "floating-ip-{}".format(floating_ip_address)
+    floating_ip_retrieve = "floating-ip-{}-retrieve".format(
+        floating_ip_address)
     floating_ip_sync = "floating-ip-{}-{}-sync".format(server_id,
                                                        floating_ip_address)
     fixed_ip_binding = "fixed-ip-{}".format(server_id)
     server_boot = "server-{}-boot".format(server_id)
-    floating_ip_ensure = "flotaing-ip-{}-ensure".format(floating_ip_address)
+    floating_ip_ensure = "floating-ip-{}-ensure".format(floating_ip_address)
     flow = linear_flow.Flow("associate-floating-ip-{}-server-{}"
                             .format(floating_ip_address, server_id))
     flow.add(task_utils.SyncPoint(name=floating_ip_sync,
-                                  requires=[floating_ip_binding,
+                                  requires=[floating_ip_retrieve,
                                             server_boot]))
     flow.add(EnsureFloatingIP(context.dst_cloud,
-                              name=floating_ip_binding,
+                              name=floating_ip_ensure,
                               provides=floating_ip_ensure,
                               rebind=[server_boot,
-                                      floating_ip_binding,
+                                      floating_ip_retrieve,
                                       fixed_ip_binding]))
     context.store[fixed_ip_binding] = fixed_ip_info
     return flow
