@@ -10,14 +10,17 @@ LOG = logging.getLogger(__name__)
 def get_port_by(client, **port_filter): 
     try:
         LOG.debug("port_filter: %s", str(port_filter)) 
-        return client.list_ports( port_filter ) 
+        return client.list_ports( **port_filter )['ports'] 
     except Exception as e:
         LOG.exception("Error in listing ports: %s" % e.message)
         raise
 
-def del_port(client, port_id):
+def del_port(client, **port_filter):
     try:
-        return client.delete_port(port_id)
+        i = 0 
+        for port in get_port_by(client, **port_filter):
+            client.delete_port( id = port['id']
+        return i
     except Exception as e:
         LOG.exception("Error in delete port: %s, pord_id: %s" %
                       (e.message, port_id))
