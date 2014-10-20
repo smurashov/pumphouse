@@ -168,7 +168,7 @@ def migrate_ports(context, port_id):
     if (port_binding in context.store):
         return None, port_ensure
 
-    flow = graph_flow.Flow("migrate-{}".format(network_binding))
+    flow = graph_flow.Flow("migrate-{}".format(port_binding))
     flow.add()
 
 
