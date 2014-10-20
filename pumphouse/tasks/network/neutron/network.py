@@ -5,17 +5,15 @@ from taskflow.patterns import graph_flow
 from pumphouse import task
 
 LOG = logging.getLogger(__name__)
-# TODO (sryabin) create|del|list_security_group_rule implementation
 
-
-def list_ports(client, net_id):
-    # list_ports(fields=['network_id', 'mac_address', 'id'])
+# Port http://docs.openstack.org/api/openstack-network/2.0/content/Overview-d1e71.html
+def get_port_by(client, **port_filter): 
     try:
-        return client.list_ports(network_id=net_id)["ports"]
+        LOG.debug("port_filter: %s", str(port_filter)) 
+        return client.list_ports( port_filter ) 
     except Exception as e:
         LOG.exception("Error in listing ports: %s" % e.message)
         raise
-
 
 def del_port(client, port_id):
     try:
@@ -155,9 +153,9 @@ class EnsureNetwork(task.baseCloudTask):
 
 
 class RetrievePorts(task.baseCloudTask):
-
     def execute(self, net_id):
-        return list_ports(self.cloud.neutron, net_id)
+        return get_port_by(self.cloud.neutron, network_id = net_id)
+
 
 
 def migrate_ports(context, port_id):
@@ -169,7 +167,7 @@ def migrate_ports(context, port_id):
         return None, port_ensure
 
     flow = graph_flow.Flow("migrate-{}".format(port_binding))
-    flow.add()
+#   flow.add()
 
 
 def migrate_network(context, network_id=None, tenant_id):
