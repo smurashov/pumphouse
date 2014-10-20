@@ -172,8 +172,8 @@ def migrate_ports(context, port_id):
     flow.add()
 
 
-def migrate_network(context, network_id=None):
-    all_networks = list_network(context.dst_cloud)
+def migrate_network(context, network_id=None, tenant_id):
+    all_networks = list_network(context.dst_cloud, network_id, tenant_id)
     # XXX (sryabin) nova migration driver uses "networks-src, networks-dst"
     # consts
     all_src_networks = "neutron-network-src"
