@@ -15,6 +15,7 @@ def get_port_by(client, **port_filter):
         LOG.exception("Error in listing ports: %s" % e.message)
         raise
 
+
 def get_security_groups_by(client, **sg_filter): 
     try:
         LOG.debug("security_groups_filter: %s", str(sg_filter)) 
@@ -23,6 +24,7 @@ def get_security_groups_by(client, **sg_filter):
         LOG.exception("Error in listing ports: %s" % e.message)
         raise
 
+# Network. An isolated virtual layer-2 domain. A network can also be a virtual, or logical, switch.
 def get_network_by(client, **net_filter):
     try:
         LOG.debug("get_network_by: %s", str(net_filter)) 
@@ -36,6 +38,7 @@ def del_port(client, **port_filter):
         i = 0 
         for port in get_port_by(client, **port_filter):
             client.delete_port( id = port['id']
+            i++
         return i
     except Exception as e:
         LOG.exception("Error in delete port: %s, pord_id: %s" %
@@ -45,16 +48,18 @@ def del_port(client, **port_filter):
 
 def create_port(client, **create_params):
     default_params = {
-        "admin_state_up": True,
+        "admin_state_up": True,  # Administrative state of port.
     } 
+    required_params = [ "network_id", "subnet_id", "tenant_id" ]
+
 
     port_params = default_params.update(dict(create_params)) 
 
-    if (network_id not in port_params or subnet_id not in port_params):
-        LOG.warning("Require network_id and subnet_id properties")
-        return -1
+    for required in required_params:
+        if required not in port_params or not port_params[required]:
+            LOG.warning("Require network_id and subnet_id properties")
+            return -1
 
-    # TODO Keyerror
     try:
         return client.create_port(body = port_params)['port']
     except Exception as e:
@@ -63,7 +68,7 @@ def create_port(client, **create_params):
         raise
 
 
-def get_security_groups(client, sg_id):
+def get_security_groups(client, **sg_filter):
     try:
         return client.list_security_groups(security_group_id=sg_id)['security_groups']
     except Exception as e:
@@ -190,7 +195,8 @@ def migrate_ports(context, port_id):
     flow = graph_flow.Flow("migrate-{}".format(port_binding))
 #   flow.add()
 
-
+# In the Networking API v2.0, the network is the main entity. 
+# Ports and subnets are always associated with a network.
 def migrate_network(context, network_id=None, tenant_id):
     all_networks = list_network(context.dst_cloud, network_id, tenant_id)
     # XXX (sryabin) nova migration driver uses "networks-src, networks-dst"
