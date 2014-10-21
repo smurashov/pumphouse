@@ -285,6 +285,7 @@ def main():
     events = Events()
     flow = graph_flow.Flow("migrate-resources")
     Cloud, Identity = load_cloud_driver(is_fake=args.fake)
+    config = args.config["PLUGINS"]
     if args.action == "migrate":
         store = {}
         src_config = args.config["source"]
@@ -310,7 +311,7 @@ def main():
             ids = get_ids_by_host(src, args.resource, args.host)
         else:
             raise exceptions.UsageError("Missing tenant ID")
-        ctx = context.Context(args.config, src, dst)
+        ctx = context.Context(config, src, dst)
         resources_flow = migrate_function(ctx, flow, ids)
         flows.run_flow(resources_flow, ctx.store)
     elif args.action == "cleanup":
@@ -327,8 +328,10 @@ def main():
                           Cloud,
                           Identity)
         workloads = args.config["source"].get("workloads", {})
-        management.setup(events, src, "source", args.num_tenants,
-                         args.num_servers, workloads)
+        management.setup(config, events, src, "source",
+                         args.num_tenants,
+                         args.num_servers,
+                         workloads)
     elif args.action == "evacuate":
         cloud_config = args.config["source"]
         cloud = init_client(cloud_config,

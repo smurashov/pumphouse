@@ -13,9 +13,9 @@
 # limitations under the License.
 
 import logging
-import os
 import random
 import urllib
+import tempfile
 
 from keystoneclient.openstack.common.apiclient import exceptions \
     as keystone_excs
@@ -23,6 +23,7 @@ from novaclient import exceptions as nova_excs
 
 from pumphouse import exceptions
 from pumphouse import utils
+from pumphouse import plugin
 
 LOG = logging.getLogger(__name__)
 
@@ -30,11 +31,12 @@ RO_SECURITY_GROUPS = ['default']
 TEST_IMAGE_URL = ("http://download.cirros-cloud.net/0.3.2/"
                   "cirros-0.3.2-x86_64-disk.img")
 TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
-TEST_RESOURCE_PREFIX = "pumphouse-"
+TEST_RESOURCE_PREFIX = "pumphouse"
 FLOATING_IP_STRING = "172.16.0.{}"
 # TODO(ogelbukh): make FLATDHCP actual configuration parameter and/or
 # command-line parameter, maybe autodetected in future
-FLATDHCP = True
+network_manager = plugin.Plugin("network_manager", default="FlatDHCP")
+network_generator = plugin.Plugin("network_generator", default="FlatDHCP")
 
 
 def become_admin_in_tenant(cloud, user, tenant):
@@ -180,8 +182,9 @@ def cleanup(events, cloud, target):
 
 
 def generate_flavors_list(num):
-    yield {"name": "{}-flavor"
-           .format(TEST_RESOURCE_PREFIX),
+    flavor_ref = str(random.randint(1, 0x7fffffff))
+    yield {"name": "{}-flavor-{}"
+           .format(TEST_RESOURCE_PREFIX, flavor_ref),
            "ram": 1024,
            "vcpu": 1,
            "disk": 5}
@@ -197,21 +200,34 @@ def generate_tenants_list(num):
 
 
 def generate_floating_ips_list(num):
-    pool = "{}-pool".format(TEST_RESOURCE_PREFIX)
+    pool_ref = str(random.randint(1, 0x7fffffff))
+    pool = "{}-pool-{}".format(TEST_RESOURCE_PREFIX, pool_ref)
     addr_list = [FLOATING_IP_STRING.format(136 + i) for i in xrange(num)]
     yield {pool: addr_list}
 
 
-def generate_networks_list(num):
+@network_generator.add("FlatDHCP")
+def generate_flat_networks_list(num):
+    yield {
+        "label": "novanetwork",
+        "cidr": "10.10.0.0/24",
+        "project_id": None
+    }
+
+
+@network_generator.add("VLAN")
+def generate_vlan_networks_list(num):
     for i in xrange(num):
         yield {
             "label": "{}-{}".format(TEST_RESOURCE_PREFIX, i),
             "cidr": "10.42.{}.0/24".format(i),
+            "vlan": "20{}".format(i + 3)
         }
 
 
 def generate_images_list(num):
-    yield {"name": "{}-image".format(TEST_RESOURCE_PREFIX),
+    image_ref = str(random.randint(1, 0x7fffffff))
+    yield {"name": "{}-image-{}".format(TEST_RESOURCE_PREFIX, image_ref),
            "disk_format": "qcow2",
            "container_format": "bare",
            "visibility": "public",
@@ -226,6 +242,32 @@ def generate_servers_list(num, images, flavors):
         yield {"name": "{}-{}".format(TEST_RESOURCE_PREFIX, server_ref),
                "image": image,
                "flavor": flavor}
+
+
+def _create_networks(events, cloud, networks):
+    for network_dict in networks:
+        net = cloud.nova.networks.create(**network_dict)
+        LOG.info("Created: %s", net._info)
+        events.emit("network created", {
+            "id": net.id,
+            "name": net.label,
+            "cloud": "source",
+        }, namespace="/events")
+
+
+@network_manager.add("FlatDHCP")
+def setup_network_flatdhcp(events, cloud, networks):
+    for net in cloud.nova.networks.findall(project_id=None):
+        if net.label == "novanetwork":
+            LOG.info("Already exists: %s", net._info)
+            return
+    else:
+        _create_networks(events, cloud, networks)
+
+
+@network_manager.add("VLAN")
+def setup_network_vlans(events, cloud, networks):
+    _create_networks(events, cloud, networks)
 
 
 def setup_floating_ip(cloud, floating_ip):
@@ -264,15 +306,15 @@ def setup_image(cloud, image_dict):
     if not cloud.__module__ == "pumphouse.fake":
         image_file = cache_image_file(url)
         cloud.glance.images.upload(image.id,
-                                   open(image_file.name, "rb"))
+                                   open(image_file, "rb"))
     return image
 
 
 def cache_image_file(url=TEST_IMAGE_URL):
-    tmpfile = os.tmpfile()
-    LOG.info("Caching test image from %s: %s", url, tmpfile.name)
-    urllib.urlretrieve(url, tmpfile.name)
-    return tmpfile
+    _, path = tempfile.mkstemp()
+    LOG.info("Caching test image from %s: %s", url, path)
+    urllib.urlretrieve(url, path)
+    return path
 
 
 def setup_server(cloud, server_dict):
@@ -313,7 +355,8 @@ def setup_server_floating_ip(cloud, server):
         return server, floating_ip
 
 
-def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
+def setup(config, events, cloud, target,
+          num_tenants=0, num_servers=0, workloads={}):
 
     """Prepares test resources in the source cloud
 
@@ -343,6 +386,8 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
     floating_ips = workloads.get(
         'floating_ips', list(generate_floating_ips_list(
             num_tenants * sum([len(t["servers"]) for t in tenants]))))
+    generate_networks_list = network_generator.select(
+        config.get("network_manager"))
     networks = workloads.get('networks',
                              generate_networks_list(num_tenants))
     for image_dict in images:
@@ -368,28 +413,8 @@ def setup(events, cloud, target, num_tenants=0, num_servers=0, workloads={}):
             "cloud": target
         }, namespace="/events")
 
-    if FLATDHCP:
-        for net in cloud.nova.networks.findall(project_id=None):
-            if net.label == "novanetwork":
-                LOG.info("Already exists: %s", net._info)
-                break
-        else:
-            net = cloud.nova.networks.create(
-                label="novanetwork",
-                cidr="10.10.0.0/24",
-                project_id=None)
-            LOG.info("Created: %s", net._info)
-    else:
-        raise NotImplementedError()
-
-    for network_dict in networks:
-        network = cloud.nova.networks.create(**network_dict)
-        LOG.info("Created: %s", network.to_dict())
-        events.emit("network created", {
-            "id": network.id,
-            "name": network.label,
-            "cloud": target,
-        }, namespace="/events")
+    setup_network = network_manager.select(config.get("network_manager"))
+    setup_network(events, cloud, networks)
 
     for pool in floating_ips:
         for poolname in pool:
