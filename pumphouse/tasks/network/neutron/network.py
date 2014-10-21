@@ -15,6 +15,22 @@ def get_port_by(client, **port_filter):
         LOG.exception("Error in listing ports: %s" % e.message)
         raise
 
+def get_security_groups_by(client, **sg_filter): 
+    try:
+        LOG.debug("security_groups_filter: %s", str(sg_filter)) 
+        return client.list_security_groups( **sg_filter )
+    except Exception as e:
+        LOG.exception("Error in listing ports: %s" % e.message)
+        raise
+
+def get_network_by(client, **net_filter):
+    try:
+        LOG.debug("get_network_by: %s", str(net_filter)) 
+        return client.list_networks( **net_filter )
+    except Exception as e:
+        LOG.exception("Error in listing ports: %s" % e.message)
+    
+
 def del_port(client, **port_filter):
     try:
         i = 0 
@@ -27,18 +43,20 @@ def del_port(client, **port_filter):
         raise
 
 
-def create_port(client, network_id, mac, security_groups, ip_address):
-    port_params = {
-        'network_id': network_id,
-        'mac_address': mac,
-        'security_groups': security_groups
-    }
-    if (ip_address):
-        port_params['fixed_ips'] = [{"ip_address": ip_address}]
+def create_port(client, **create_params):
+    default_params = {
+        "admin_state_up": True,
+    } 
+
+    port_params = default_params.update(dict(create_params)) 
+
+    if (network_id not in port_params or subnet_id not in port_params):
+        LOG.warning("Require network_id and subnet_id properties")
+        return -1
 
     # TODO Keyerror
     try:
-        return client.create_port({'port': port_params})['port']
+        return client.create_port(body = port_params)['port']
     except Exception as e:
         LOG.exception("Error in create_port: %s, network_id: %s, mac: %s, \
             ip_address: %s" % (e.message, network_id, mac, ip_address))
