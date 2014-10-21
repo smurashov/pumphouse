@@ -15,14 +15,21 @@ def get_port_by(client, **port_filter):
         LOG.exception("Error in listing ports: %s" % e.message)
         raise
 
-
 def get_security_groups_by(client, **sg_filter): 
     try:
         LOG.debug("security_groups_filter: %s", str(sg_filter)) 
         return client.list_security_groups( **sg_filter )
     except Exception as e:
-        LOG.exception("Error in listing ports: %s" % e.message)
+        LOG.exception("Error in security_groups: %s" % e.message)
         raise
+
+def get_subnet_by(client, **subnet_filter): 
+    try:
+        LOG.debug("subnet filter: %s", str(subnet_filter)) 
+        return client.list_subnets( **subnet_filter )
+    except Exception as e:
+        LOG.exception("Error in subnet: %s" % e.message)
+        
 
 # Network. An isolated virtual layer-2 domain. A network can also be a virtual, or logical, switch.
 def get_network_by(client, **net_filter):
@@ -30,7 +37,7 @@ def get_network_by(client, **net_filter):
         LOG.debug("get_network_by: %s", str(net_filter)) 
         return client.list_networks( **net_filter )
     except Exception as e:
-        LOG.exception("Error in listing ports: %s" % e.message)
+        LOG.exception("Error in network: %s" % e.message)
     
 
 def del_port(client, **port_filter):
@@ -70,15 +77,19 @@ def create_port(client, **create_params):
 
 def get_security_groups(client, **sg_filter):
     try:
-        return client.list_security_groups(security_group_id=sg_id)['security_groups']
+        return get_security_groups( **sg_filter )['security_groups']
     except Exception as e:
         LOG.exception("Error in get security groups: %s" % e.message)
         raise
 
 
-def del_security_groups(client, sg_id):
+def del_security_groups(client, **sg_filter ):
     try:
-        client.delete_security_group(security_group_id=sg_id)
+        i = 0
+        for security_group in get_security_groups_by( **sg_filter):
+            client.delete_security_group(security_group_id = security_group['id'])
+            i++
+        return i
     except Exception as e:
         LOG.exception("Error in get security groups: %s" % e.message)
         raise
@@ -96,18 +107,21 @@ def create_security_group(client, name, description):
         LOG.exception("Error in get security groups: %s" % e.message)
         raise
 
-
 def list_subnets(client, net_id):
     try:
-        return client.list_subnets(network_id=net_id)['subnets']
+        return get_subnet_by(client, network_id = net_id)['subnets']
     except Exception as e:
         LOG.exception("Error in list subnets: %s" % e.message)
         raise
 
 
-def del_subnet(client, subnet_id):
+def del_subnet(client, **subnet_filter):
     try:
-        return client.delete_subnet(id=subnet_id)
+        i = 0
+        for subnet in get_subnet_by(client, subnet_filter): 
+            client.delete_subnet( subnet_id = subnet['id'] )
+            i++
+        return i
     except Exception as e:
         LOG.exception("Error in list subnets: %s" % e.message)
         raise
