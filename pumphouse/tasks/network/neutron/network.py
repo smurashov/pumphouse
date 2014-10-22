@@ -2,7 +2,7 @@ import logging
 
 from taskflow.patterns import graph_flow
 
-from pumphouse import task
+# from pumphouse import task
 
 LOG = logging.getLogger(__name__)
 
@@ -65,11 +65,8 @@ def del_port(client, **port_filter):
 def create_port(client, **create_params):
     default_params = {
         "admin_state_up": True,  # Administrative state of port.
-        """
-            status
-            Indicates whether network is currently operational. Possible values include:
-            ACTIVE, DOWN, BUILD, ERROR
-        """
+        """Indicates whether network is currently operational.
+           Possible values include: ACTIVE, DOWN, BUILD, ERROR"""
         "status": "ACTIVE",
     }
     required_params = ["network_id", "subnet_id", "tenant_id"]
@@ -169,8 +166,6 @@ def create_network(client, network_name):
         raise
 
 
-
-
 def migrate_ports(context, port_id):
     port_binding = "neutron-network-port-{}".format(port_id)
     port_retrieve = "{}-retrieve".format(port_binding)
@@ -185,8 +180,7 @@ def migrate_ports(context, port_id):
 
 
 def migrate_network(context, tenant_id, network_id=None):
-    all_networks = list_network(
-        context.dst_cloud, network_id, tenant_id)
+    # all_networks = get_network_by()
     # XXX (sryabin) nova migration driver uses "networks-src, networks-dst"
     all_src_networks = "neutron-network-src"
     all_dst_networks = "neutron-network-dst"
@@ -204,23 +198,23 @@ def migrate_network(context, tenant_id, network_id=None):
         "migrate-{}".format(network_binding))
 
     if ("all_src_networks_retrieve" not in context.store):
-
-        flow.add(RetrieveAllNetworks(context.src_cloud,
-                                     name=all_src_networks,
-                                     provides=all_src_networks))
-
         context.store[all_src_networks] = None
 
+#        flow.add(RetrieveAllNetworks(context.src_cloud,
+#                                     name=all_src_networks,
+#                                     provides=all_src_networks))
+#
+
     if ("all_dst_networks_retrieve" not in context.store):
-
-        flow.add(RetrieveAllNetworks(context.dst_cloud,
-                                     name=all_dst_networks,
-                                     provides=all_dst_networks))
-
         context.store[all_dst_networks] = None
 
-    flow.add(EnsureNetwork(context.dst_cloud,
-                           name=network_ensure,
-                           rebind=[all_dst_networks, network_retrieve]))
+#        flow.add(RetrieveAllNetworks(context.dst_cloud,
+#                                     name=all_dst_networks,
+#                                     provides=all_dst_networks))
+
+
+#    flow.add(EnsureNetwork(context.dst_cloud,
+#                           name=network_ensure,
+#                           rebind=[all_dst_networks, network_retrieve]))
 
     return flow, network_ensure
