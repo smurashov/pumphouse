@@ -169,58 +169,6 @@ def create_network(client, network_name):
         raise
 
 
-def list_network(client, net_info, tenant_id):
-    try:
-        if net_info:
-            if 'id' in net_info:
-                # XXX change to get_network_by
-                return client.list_networks(network_id=net_info['id'])['networks'][0]
-            elif 'name' in net_info:
-                # XXX change to get_network_by
-                return client.list_networks(name=net_info['name'])['networks'][0]
-        else:
-            # XXX change to get_network_by
-            return client.list_networks()
-    except Exception as e:
-        LOG.exception("Error in get network: %s" % e.message)
-        raise
-
-
-class RetrieveAllNetworks(task.BaseCloudTask):
-
-    def execute(self):
-        # XXX change to get_network_by
-        return list_network(self.cloud.neutron, None)
-
-
-class RetrieveAllNetworksById(task.BaseCloudTask):
-
-    def execute(self, network_id):
-        # XXX change to get_network_by
-        return list_network(self.cloud.neutron, {"name": network_id})
-
-
-class EnsureNetwork(task.baseCloudTask):
-
-    def exists(self, network_id):
-        # XXX change to get_network_by
-        return 1 if list_network(self.cloud.neutron, {"id": network_id}) else 0
-
-    def exceute(self, network_id):
-        if not self.exists(network_id):
-            # XXX network params
-            create_network(self.cloud.neutron, network_id)
-        # XXX change to get_network_by
-        return list_network(self.cloud.neutron, {"id": network_id})
-
-
-class RetrievePorts(task.baseCloudTask):
-
-    def execute(self, net_id):
-        return get_port_by(self.cloud.neutron, network_id=net_id)
-
-# Ports and subnets are always associated with a
-# network.
 
 
 def migrate_ports(context, port_id):
