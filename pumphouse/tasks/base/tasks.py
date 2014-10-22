@@ -16,7 +16,7 @@ __all__ = ['UnboundTask', 'Task', 'task']
 
 
 class UnboundTask(object):
-    def __init__(self, fn=None, name=None, id_based=False,
+    def __init__(self, fn=None, name=None,
                  requires=[], after=[], before=[]):
         self._resource_task = {}
         self.fn = fn
@@ -24,7 +24,6 @@ class UnboundTask(object):
             self.name = fn.__name__
         else:
             self.name = name
-        self.id_based = id_based
         self.requires = frozenset(requires)
         self.after = frozenset(after)
         self.before = frozenset(before)
@@ -82,12 +81,8 @@ class BoundTask(object):
 
     def get_for_resource(self, resource):
         runner = resource.runner
-        if self.task.id_based:
-            id_ = self.resource.get_id(resource)
-            bound_res = runner.get_resource_by_id(self.resource, id_)
-        else:
-            data = self.resource.get_data(resource)
-            bound_res = runner.get_resource(self.resource, data)
+        data = self.resource.get_data(resource)
+        bound_res = runner.get_resource(self.resource, data)
         return self.get_for_bound_resource(bound_res)
 
     def __repr__(self):

@@ -20,18 +20,19 @@ from pumphouse.tasks import base
 
 
 class Tenant(base.Resource):
-    def from_id(self, tenant_id):
-        return self.env.cloud.keystone.tenants.get(tenant_id)
-
-    @base.task(id_based=True)
+    @base.task
     def delete(self):
-        self.env.cloud.keystone.tenants.delete(self.tenant_id)
+        self.env.cloud.keystone.tenants.delete(self.tenant["id"])
 
 
 class Server(base.Resource):
+    @classmethod
+    def get_id_for(cls, data):
+        return (data["tenant_id"], data["id"])
+
     @Tenant()
     def tenant(self):
-        return self.server.tenant_id
+        return {"id": self.server["tenant_id"]}
 
     @base.task(before=[tenant.delete])
     def delete(self):
@@ -45,26 +46,26 @@ class TenantWorkload(base.Resource):
     def servers(self):
         return self.env.cloud.nova.servers.list(search_opts={
             "all_tenants": 1,
-            "tenant_id": self.tenant_id,
+            "tenant_id": self.tenant["id"],
         })
 
-    delete = base.task(name="delete", id_based=True,
+    delete = base.task(name="delete",
                        requires=[tenant.delete, servers.each().delete])
 
 
 class TasksBaseTestCase(unittest.TestCase):
-    def test_basic_tasks(self):
-        tenant = mock.Mock(id='tenid1', name='tenant1')
+    def test_delete_tasks(self):
+        tenant = {"id": "tenid1", "name": "tenant1"}
         servers = [
-            mock.Mock(id='servid1', name='server1', tenant_id=tenant.id),
-            mock.Mock(id='servid2', name='server2', tenant_id=tenant.id),
+            {"id": "servid1", "name": "server1", "tenant_id": tenant["id"]},
+            {"id": "servid2", "name": "server2", "tenant_id": tenant["id"]},
         ]
         env = mock.Mock()
         env.cloud.nova.servers.list.return_value = servers
         env.cloud.keystone.tenants.get.return_value = tenant
 
         runner = base.TaskflowRunner(env)
-        workload = runner.get_resource_by_id(TenantWorkload, tenant.id)
+        workload = runner.get_resource(TenantWorkload, tenant)
         runner.add(workload.delete)
         runner.run()
 
@@ -72,12 +73,12 @@ class TasksBaseTestCase(unittest.TestCase):
             env.cloud.nova.servers.list.call_args_list,
             [mock.call(search_opts={
                 "all_tenants": 1,
-                "tenant_id": tenant.id,
+                "tenant_id": tenant["id"],
             })],
         )
         self.assertEqual(
             env.cloud.keystone.tenants.delete.call_args_list,
-            [mock.call(tenant.id)],
+            [mock.call(tenant["id"])],
         )
         self.assertItemsEqual(
             env.cloud.nova.servers.delete.call_args_list,

@@ -17,17 +17,6 @@ from . import tasks
 __all__ = ['Resource', 'Collection']
 
 
-class IdAttr(object):
-    def __init__(self, resource):
-        self.resource = resource
-
-    def __get__(self, instance, owner):
-        return self.resource.get_id(instance)
-
-    def __set__(self, instance, value):
-        self.resource.set_id(instance, value)
-
-
 class Resource(object):
     class __metaclass__(type):
         def __new__(mcs, name, bases, cls_vars):
@@ -36,7 +25,6 @@ class Resource(object):
                 # Chicken and egg problem
                 if name != "Resource" and isinstance(v, Resource):
                     resources.append(k)
-                    cls_vars[k + "_id"] = IdAttr(v)
                 elif isinstance(v, tasks.UnboundTask):
                     tasks_.append(k)
             cls_vars["_resources"] = tuple(resources)
@@ -49,45 +37,22 @@ class Resource(object):
             if name != "Collection" and main_res_name not in resources:
                 self_attr = res()
                 setattr(res, main_res_name, self_attr)
-                setattr(res, main_res_name + "_id", IdAttr(self_attr))
             return res
 
-    def __init__(self, id_=None, value=None, runner=None):
-        self._resource_id = {}
+    def __init__(self, data=None, runner=None):
         self._resource_data = {}
         self.runner = runner
         self.bound = False
-        if id_ is not None:
-            setattr(self, self._main_resource + "_id", id_)
+        if data is not None:
+            setattr(self, self._main_resource, data)
             self.bound = True
-        if value is not None:
-            setattr(self, self._main_resource, value)
-            self.bound = True
-        self.id_fn = None
         self.data_fn = None
 
-    def by_id(self, id_fn):
-        self.id_fn = id_fn
-        return self
-
-    def by_data(self, data_fn):
+    def set_data_fn(self, data_fn):
         self.data_fn = data_fn
         return self
 
-    __call__ = by_id
-
-    def get_id(self, resource):
-        try:
-            return self._resource_id[resource]
-        except KeyError:
-            if self.id_fn is None:
-                raise
-            id_ = self.id_fn(resource)
-            self.set_id(resource, id_)
-            return id_
-
-    def set_id(self, resource, id_):
-        self._resource_id[resource] = id_
+    __call__ = set_data_fn
 
     def get_data(self, resource):
         try:
@@ -96,8 +61,7 @@ class Resource(object):
             if self.data_fn is not None:
                 data = self.data_fn(resource)
             else:
-                id_ = self.get_id(resource)
-                data = self.from_id(id_)
+                raise
             self.set_data(resource, data)
             return data
 
@@ -111,7 +75,7 @@ class Resource(object):
 
     @classmethod
     def get_id_for(cls, data):
-        return data.id
+        return data["id"]
 
     def __get__(self, instance, owner):
         if instance is not None:
@@ -125,10 +89,7 @@ class Resource(object):
 
     def __repr__(self):
         if self.bound:
-            try:
-                value = getattr(self, self._main_resource)
-            except (AttributeError, KeyError):
-                value = getattr(self, self._main_resource + "_id")
+            value = getattr(self, self._main_resource)
         else:
             value = 'unbound'
         return '<{} {}>'.format(type(self).__name__, value)
@@ -142,8 +103,6 @@ class Collection(Resource):
     def __init__(self, base_cls, **kwargs):
         super(Collection, self).__init__(**kwargs)
         self.base_cls = base_cls
-
-    __call__ = Resource.by_data
 
     def each(self):
         return CollectionProxy(self)
