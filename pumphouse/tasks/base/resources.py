@@ -167,7 +167,10 @@ class CollectionProxy(object):
 
 class CollectionUnboundTask(tasks.UnboundTask):
     def __init__(self, task):
-        super(CollectionUnboundTask, self).__init__(task.fn, task.requires)
+        super(CollectionUnboundTask, self).__init__(
+            task.fn,
+            requires=task.requires,
+        )
         self.base_task = task
 
     def realize_with(self, resource):
