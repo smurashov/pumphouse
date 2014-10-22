@@ -19,7 +19,7 @@ from taskflow.patterns import linear_flow, unordered_flow
 from pumphouse import events
 from pumphouse import flows
 from pumphouse import task
-from pumphouse.tasks import floating_ip as fip_tasks
+from pumphouse.tasks.network.nova import floating_ip as fip_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import snapshot as snapshot_tasks
 from pumphouse.tasks import utils as task_utils
