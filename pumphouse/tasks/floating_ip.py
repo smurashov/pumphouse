@@ -71,7 +71,8 @@ class EnsureFloatingIPBulk(task.BaseCloudTask):
 class EnsureFloatingIP(task.BaseCloudTask):
     # TODO(ogelbukh): this task must be refactored in a way that replaces a
     # while loop with built-in retry mechanism of Taskflow lib
-    def execute(self, server_info, floating_ip_address, fixed_ip_info):
+    def execute(self, server_info, floating_ip_info, fixed_ip_info):
+        floating_ip_address = floating_ip_info["address"]
         fixed_ip_address = fixed_ip_info["addr"]
         server_id = server_info["id"]
         try:
@@ -147,7 +148,7 @@ def migrate_floating_ip(context, address):
 def associate_floating_ip_server(context, floating_ip_address,
                                  fixed_ip_info, server_id):
     """Associates Floating IP to Nova instance"""
-    floating_ip_retrieve = "floating-ip-{}-retrieve".format(
+    floating_ip_bulk_ensure = "floating-ip-bulk-{}-retrieve".format(
         floating_ip_address)
     floating_ip_sync = "floating-ip-{}-{}-sync".format(server_id,
                                                        floating_ip_address)
@@ -157,13 +158,13 @@ def associate_floating_ip_server(context, floating_ip_address,
     flow = linear_flow.Flow("associate-floating-ip-{}-server-{}"
                             .format(floating_ip_address, server_id))
     flow.add(task_utils.SyncPoint(name=floating_ip_sync,
-                                  requires=[floating_ip_retrieve,
+                                  requires=[floating_ip_bulk_ensure,
                                             server_boot]))
     flow.add(EnsureFloatingIP(context.dst_cloud,
                               name=floating_ip_ensure,
                               provides=floating_ip_ensure,
                               rebind=[server_boot,
-                                      floating_ip_retrieve,
+                                      floating_ip_bulk_ensure,
                                       fixed_ip_binding]))
     context.store[fixed_ip_binding] = fixed_ip_info
     return flow

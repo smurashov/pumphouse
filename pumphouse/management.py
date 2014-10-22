@@ -33,8 +33,6 @@ TEST_IMAGE_URL = ("http://download.cirros-cloud.net/0.3.2/"
 TEST_IMAGE_FILE = '/tmp/cirros-0.3.2.img'
 TEST_RESOURCE_PREFIX = "pumphouse"
 FLOATING_IP_STRING = "172.16.0.{}"
-# TODO(ogelbukh): make FLATDHCP actual configuration parameter and/or
-# command-line parameter, maybe autodetected in future
 network_manager = plugin.Plugin("network_manager", default="FlatDHCP")
 network_generator = plugin.Plugin("network_generator", default="FlatDHCP")
 
