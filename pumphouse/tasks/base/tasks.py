@@ -76,14 +76,9 @@ class BoundTask(object):
         self.resource = resource
         self.task = unbound_task
 
-    def get_for_bound_resource(self, resource):
-        return self.task.get_for_bound_resource(resource)
-
     def get_for_resource(self, resource):
-        runner = resource.runner
-        data = self.resource.get_data(resource)
-        bound_res = runner.get_resource(self.resource, data)
-        return self.get_for_bound_resource(bound_res)
+        bound_res = self.resource.get_bound_subres(resource)
+        return self.task.get_for_bound_resource(bound_res)
 
     def __repr__(self):
         return '<{} {} {}>'.format(
