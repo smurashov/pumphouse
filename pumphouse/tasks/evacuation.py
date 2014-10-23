@@ -41,13 +41,11 @@ def evacuate_servers(context, hostname):
                                           inject={"hostname": hostname}))
     servers_flow = unordered_flow.Flow("evacuate-{}-servers".format(hostname))
     for hyperv in hypervs:
-        for server in hyperv.servers:
-            server_flow = server_tasks.evacuate_server(context, server["uuid"])
-            if server_flow is not None:
-                servers_flow.add(server_flow)
+        if hasattr(hyperv, "servers"):
+            for server in hyperv.servers:
+                server_flow = server_tasks.evacuate_server(context,
+                                                           server["uuid"])
+                if server_flow is not None:
+                    servers_flow.add(server_flow)
     flow.add(servers_flow)
     return flow
-
-
-def reassign_host(context, hostname):
-    pass
