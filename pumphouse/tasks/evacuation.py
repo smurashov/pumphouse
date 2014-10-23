@@ -33,12 +33,12 @@ def evacuate_servers(context, hostname):
         LOG.exception("Could not find hypervisors at the host %r.", hostname)
         raise
     hostname_bind = "evacuate-{}".format(hostname)
-    context.store[hostname_bind] = hostname
     flow = linear_flow.Flow(hostname_bind)
     flow.add(service_tasks.DisableService("nova-compute",
                                           context.src_cloud,
                                           name=hostname_bind,
-                                          rebind=[hostname_bind]))
+                                          rebind=[hostname_bind],
+                                          inject={"hostname": hostname}))
     servers_flow = unordered_flow.Flow("evacuate-{}-servers".format(hostname))
     for hyperv in hypervs:
         for server in hyperv.servers:
