@@ -31,16 +31,18 @@ class DisableService(task.BaseCloudTask):
         self.cloud.nova.services.disable(hostname, self.binary)
         self.block_event(hostname)
 
-    def revert(self, hostname, result, flow_failures):
-        self.cloud.nova.services.enable(hostname, self.binary)
-        self.unblock_event(hostname)
-
     def block_event(self, hostname):
         LOG.info("Service %r was blocked on host %r", self.binary, hostname)
         events.emit("host block", {
             "name": hostname,
             "cloud": self.cloud.name,
         }, namespace="/events")
+
+
+class DiableServiceWithRollback(DisableService):
+    def revert(self, hostname, result, flow_failures):
+        self.cloud.nova.services.enable(hostname, self.binary)
+        self.unblock_event(hostname)
 
     def unblock_event(self, hostname):
         LOG.info("Service %r was unblocked on host %r",
