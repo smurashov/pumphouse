@@ -106,9 +106,9 @@ class TestEnsureFloatingIP(TestFloatingIP):
         self.assertIsInstance(ensure_floating_ip, task.BaseCloudTask)
 
         fip = ensure_floating_ip.execute(self.server_info,
-                                         self.test_address,
+                                         self.floating_ip_info,
                                          self.fixed_ip_info)
-        self.cloud.nova.floating_ips_bulk.assert_run_once_with(
+        self.cloud.nova.floating_ips_bulk.find.assert_run_once_with(
             address=self.test_address)
         self.assertEquals(
             self.floating_ip_info, fip)
@@ -121,7 +121,7 @@ class TestEnsureFloatingIP(TestFloatingIP):
 
         with self.assertRaises(exceptions.nova_excs.NotFound):
             ensure_floating_ip.execute(self.server_info,
-                                       self.test_address,
+                                       self.floating_ip_info,
                                        self.fixed_ip_info)
 
     def test_execute_add_floating_ip(self):
@@ -132,7 +132,7 @@ class TestEnsureFloatingIP(TestFloatingIP):
             self.side_effect
 
         ensure_floating_ip.execute(self.server_info,
-                                   self.test_address,
+                                   self.floating_ip_info,
                                    self.fixed_ip_info)
         self.cloud.nova.servers.add_floating_ip.assert_run_once_with(
             self.test_instance_uuid, self.test_address, None)
@@ -148,7 +148,7 @@ class TestEnsureFloatingIP(TestFloatingIP):
 
         with self.assertRaises(exceptions.TimeoutException):
             ensure_floating_ip.execute(self.server_info,
-                                       self.test_address,
+                                       self.floating_ip_info,
                                        self.fixed_ip_info)
         ensure_floating_ip.assigning_error_event.assert_called_once_with(
             self.test_address, self.test_instance_uuid)
@@ -167,7 +167,7 @@ class TestEnsureFloatingIP(TestFloatingIP):
 
         with self.assertRaises(exceptions.Conflict):
             ensure_floating_ip.execute(self.server_info,
-                                       self.test_address,
+                                       self.floating_ip_info,
                                        self.fixed_ip_info)
 
 
