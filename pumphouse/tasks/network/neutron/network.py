@@ -1,6 +1,7 @@
 import logging
 
 from taskflow.patterns import graph_flow
+from sets import Set
 
 # from pumphouse import task
 
@@ -16,7 +17,7 @@ LOG = logging.getLogger(__name__)
 def get_port_by(client, **port_filter):
     try:
         LOG.debug("port_filter: %s" % str(port_filter))
-        return client.list_ports(**port_filter)['ports']
+        return client.list_ports(**port_filter)['ports'].to_dict()
     except Exception as e:
         LOG.exception("Error in listing ports: %s" % e.message)
         raise
@@ -44,7 +45,7 @@ def get_subnet_by(client, **subnet_filter):
 def get_network_by(client, **net_filter):
     try:
         LOG.debug("get_network_by: %s" % str(net_filter))
-        return client.list_networks(**net_filter)
+        return client.list_networks(**net_filter)['network'].to_dict()
     except Exception as e:
         LOG.exception("Error in network: %s" % e.message)
 
@@ -54,7 +55,7 @@ def del_port(client, **port_filter):
         i = 0
         for port in get_port_by(client, **port_filter):
             client.delete_port(id=port['id'])
-            # i = i + 1
+            i = i + 1
         return i
     except Exception as e:
         LOG.exception("Error in delete port: %s, pord_id: %s" %
@@ -164,6 +165,19 @@ def create_network(client, network_name):
     except Exception as e:
         LOG.exception("Error in list subnets: %s" % e.message)
         raise
+
+
+def migrate_neutron_ports(ctx, server_id):
+    network_dep = Set()
+    subnet_dep = Set()
+    for port in get_port_by(device_id=server_id):
+        try:
+            network_dep.add(port['network_id'])
+            subnet_dep.update(set(ip['subnet_id'] for ip in port['fixed_ips']))
+
+        except KeyError:
+            LOG.exception("Missing keys in get_port_by asnwer: %s" % str(port))
+            raise
 
 
 def migrate_ports(context, port_id):
