@@ -43,7 +43,7 @@ class EvacuateServer(task.BaseCloudTask):
         self.block_migration = block_migration
         self.disk_over_commit = disk_over_commit
 
-    def execute(self, server_info):
+    def execute(self, server_info, **requires):
         server_id = server_info["id"]
         self.evacuation_start_event(server_info)
         # NOTE(akscram): The destination host will be chosen by the
