@@ -225,9 +225,9 @@ def evacuate_host(hostname):
 
         try:
             flow = evacuation.evacuate_servers(ctx, hostname)
-            LOG.debug("Reassigning flow: %s", flow)
+            LOG.debug("Evacuation flow: %s", flow)
             result = flows.run_flow(flow, ctx.store)
-            LOG.debug("Result of migration: %s", result)
+            LOG.debug("Result of evacuation: %s", result)
         except Exception:
             LOG.exception("Error is occured during evacuating host %r",
                           hostname)
