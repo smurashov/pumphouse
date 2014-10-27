@@ -106,6 +106,13 @@ class Cloud(object):
             _, client = clouds.connect(self.target)
             return client
 
+    def config(self):
+        ctx = flask._app_ctx_stack.top
+        if ctx is not None:
+            clouds = self.get_extension(ctx.app)
+            service, _ = clouds.connect(self.target)
+            return service.cloud_config
+
     @property
     def cloud_urls(self):
         ctx = flask._app_ctx_stack.top

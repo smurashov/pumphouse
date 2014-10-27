@@ -269,11 +269,8 @@ class Events(object):
 
 
 def init_client(config, name, client_class, identity_class):
-    endpoint_config = config.get("endpoint")
-    identity_config = config.get("identity")
-    connection = identity_config.get("connection")
-    identity = identity_class(connection)
-    client = client_class.from_dict(name, endpoint_config, identity)
+    identity = identity_class(config["identity"]["connection"])
+    client = client_class.from_dict(identity, config)
     return client
 
 
