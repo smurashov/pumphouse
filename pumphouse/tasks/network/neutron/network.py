@@ -176,7 +176,8 @@ class RetrieveNeutronNetwork(task.BaseCloudTask):
         try:
             return get_network_by(self.cloud.neutron, id=net_id)[0]
         except IndexError:
-            raise exceptions.Error("Empty answer for network_id: %s" % str(net_id))
+            raise exceptions.Error(
+                "Empty answer for network_id: %s" % str(net_id))
 
 
 class RetrieveNeutronPort(task.BaseCloudTask):
@@ -220,6 +221,7 @@ class EnsureNeutronPort(task.BaseCloudTask):
             assert self.verifyPort(port, port_data) == 1
             return port
 
+
 class EnsureNeutronSubnet(task.BaseCloudTask):
 
     # XXX (sryabin) similar verify in EnsureNeutronNetwork
@@ -244,8 +246,10 @@ class EnsureNeutronSubnet(task.BaseCloudTask):
             assert self.verifySubnet(subnet, dst_subnet)
             return subnet
 
+
 class EnsureNeutronNetwork(task.BaseCloudTask):
     # XXX (sryabin) similar verify in EnsureNeutronSubnet
+
     def verify(self, src, dst):
         try:
             return src['name'] == dst['name']
@@ -257,16 +261,12 @@ class EnsureNeutronNetwork(task.BaseCloudTask):
         try:
             # TODO (sryabin) catch KeyError
             # TODO (sryabin) stub
-            dst = get_network_by(self.cloud.neutron, name = src['name'])
+            dst = get_network_by(self.cloud.neutron, name=src['name'])
         except IndexError:
             return create_network(self.cloud.neutron, src)
-        else
+        else:
             assert self.verify(src, dst)
-            return dst;
-
-
-
-
+            return dst
 
 
 def migrate_neutron_subnet(context, subnet_id):
