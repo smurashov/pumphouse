@@ -176,8 +176,7 @@ class RetrieveNeutronNetwork(task.BaseCloudTask):
         try:
             return get_network_by(self.cloud.neutron, id=net_id)[0]
         except IndexError:
-            LOG.exception("Empty answer for network_id: %s" % str(net_id))
-            raise exceptions.Error
+            raise exceptions.Error("Empty answer for network_id: %s" % str(net_id))
 
 
 class RetrieveNeutronPort(task.BaseCloudTask):
@@ -221,9 +220,9 @@ class EnsureNeutronPort(task.BaseCloudTask):
             assert self.verifyPort(port, port_data) == 1
             return port
 
-
 class EnsureNeutronSubnet(task.BaseCloudTask):
 
+    # XXX (sryabin) similar verify in EnsureNeutronNetwork
     def verifySubnet(self, src_subnet, dst_subnet):
         try:
             # TODO (sryabin) more complex check
@@ -238,11 +237,36 @@ class EnsureNeutronSubnet(task.BaseCloudTask):
                 self.cloud.neutron, name=subnet['name'])[0]
         except IndexError:
             # subnet not found in dst cloud
-            # XXX (sryabin) stub
+            # TODO (sryabin) stub
+            # TODO (sryabin) catch KeyError
             return create_subnet(self.cloud.neutron, subnet)
         else:
             assert self.verifySubnet(subnet, dst_subnet)
             return subnet
+
+class EnsureNeutronNetwork(task.BaseCloudTask):
+    # XXX (sryabin) similar verify in EnsureNeutronSubnet
+    def verify(self, src, dst):
+        try:
+            return src['name'] == dst['name']
+        except KeyError:
+            raise exceptions.Error("Bad dicts src: %s, dst: %s" %
+                                   (str(src), str(dst)))
+
+    def execute(self, src):
+        try:
+            # TODO (sryabin) catch KeyError
+            # TODO (sryabin) stub
+            dst = get_network_by(self.cloud.neutron, name = src['name'])
+        except IndexError:
+            return create_network(self.cloud.neutron, src)
+        else
+            assert self.verify(src, dst)
+            return dst;
+
+
+
+
 
 
 def migrate_neutron_subnet(context, subnet_id):
