@@ -15,6 +15,7 @@
 import datetime
 import functools
 import gevent
+import os
 import logging
 
 import flask
@@ -26,6 +27,7 @@ from pumphouse import events
 from pumphouse import flows
 from pumphouse.tasks import evacuation
 from pumphouse.tasks import resources as resource_tasks
+from pumphouse.tasks import node as node_tasks
 
 
 LOG = logging.getLogger(__name__)
@@ -240,6 +242,49 @@ def evacuate_host(hostname):
             "status": status,
         }, namespace="/events")
     gevent.spawn(evacuate)
+    return flask.make_response()
+
+
+@pump.route("/hosts/<hostname>", methods=["DELETE"])
+@crossdomain()
+def reassign_host(hostname):
+    @flask.copy_current_request_context
+    def reassign():
+        # NOTE(akscram): Initialization of fuelclient.
+        fuel_config = flask.current_app.config["CLOUDS"]["fuel"]["endpoint"]
+        os.environ["SERVER_ADDRESS"] = fuel_config["host"]
+        os.environ["LISTEN_PORT"] = str(fuel_config["port"])
+        os.environ["KEYSTONE_USER"] = fuel_config["username"]
+        os.environ["KEYSTONE_PASS"] = fuel_config["password"]
+
+        src_config = hooks.source.config()
+        dst_config = hooks.destination.config()
+        config = {
+            "source": src_config["environment"],
+            "destination": dst_config["environment"],
+        }
+        ctx = context.Context(config, None, None)
+        events.emit("host reassign", {
+            "id": hostname,
+        }, namespace="/events")
+
+        try:
+            flow = node_tasks.reassign_node(ctx, hostname)
+            LOG.debug("Reassigning flow: %s", flow)
+            result = flows.run_flow(flow, ctx.store)
+            LOG.debug("Result of migration: %s", result)
+        except Exception:
+            LOG.exception("Error is occured during reassigning host %r",
+                          hostname)
+            status = "error"
+        else:
+            status = ""
+
+        events.emit("host reassigned", {
+            "id": hostname,
+            "status": status,
+        }, namespace="/events")
+    gevent.spawn(reassign)
     return flask.make_response()
 
 
