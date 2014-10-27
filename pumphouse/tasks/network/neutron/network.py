@@ -70,7 +70,7 @@ def create_port(client, **create_params):
            Possible values include: ACTIVE, DOWN, BUILD, ERROR"""
         "status": "ACTIVE",
     }
-    required_params = ["network_id", "subnet_id", "tenant_id"]
+    required_params = ["mac_address"]
 
     port_params = default_params.update(dict(create_params))
 
@@ -167,17 +167,56 @@ def create_network(client, network_name):
         raise
 
 
-def migrate_neutron_ports(ctx, server_id):
+def migrate_neutron_ports(context, server_id):
     network_dep = Set()
     subnet_dep = Set()
-    for port in get_port_by(device_id=server_id):
+
+    ports = get_port_by(context.src_cloud, device_id=server_id):
+
+    for port in ports:
         try:
             network_dep.add(port['network_id'])
             subnet_dep.update(set(ip['subnet_id'] for ip in port['fixed_ips']))
-
         except KeyError:
             LOG.exception("Missing keys in get_port_by asnwer: %s" % str(port))
             raise
+
+def RetrieveNeutronNetwork(task.BaseCloudTask):
+    def execute(self, net_id):
+        try:
+            return get_network_by(self.cloud.neutron, id = net_id)[0]
+        except IndexError:
+            LOG.exception("Empty answer for network_id: %s" % str(network_id))
+            raise
+
+
+def RetrieveNeutronPort(task.BaseCloudTask):
+    def execute(self, port_id):
+        try:
+            return get_port_by(self.cloud.neutron, id=port_id)[0]
+        except IndexError:
+            LOG.exception("Empty answer for port_id: %s" % str(port_id))
+            raise
+
+def EnsureNeutronPort(task.BaseCloudTask):
+    def verifyPort(self, dstPort, srtPort):
+        # TODO (sryabin) more complex check
+        try:
+            return dstPort['mac_address'] == srtPort['mac_address']
+        except KeyError:
+            LOG.exception("Wrong dicts for port verifying: %s" % str(port_id))
+            raise
+    def execute(self, port_id, port_data):
+        try:
+            port = get_port_by(self.cloud.neutron, id=port_id)[0]
+        except IndexError:
+            # port not found
+            # XXX (sryabin) stub
+            return create_port(self.cloud.neutron, port_data)
+        else:
+            sert self.verifyPort(port, port_data) == 1
+
+
 
 
 def migrate_ports(context, port_id):
@@ -188,8 +227,6 @@ def migrate_ports(context, port_id):
     if (port_binding in context.store):
         return None, port_ensure
 
-    flow = graph_flow.Flow(
-        "migrate-{}".format(port_binding))
 #   flow.add()
 
 
