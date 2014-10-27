@@ -3,7 +3,7 @@ import logging
 from taskflow.patterns import graph_flow
 from sets import Set
 
-# from pumphouse import task
+from pumphouse import task
 
 LOG = logging.getLogger(__name__)
 
@@ -171,7 +171,7 @@ def migrate_neutron_ports(context, server_id):
     network_dep = Set()
     subnet_dep = Set()
 
-    ports = get_port_by(context.src_cloud, device_id=server_id):
+    ports = get_port_by(context.src_cloud, device_id=server_id)
 
     for port in ports:
         try:
@@ -181,16 +181,19 @@ def migrate_neutron_ports(context, server_id):
             LOG.exception("Missing keys in get_port_by asnwer: %s" % str(port))
             raise
 
-def RetrieveNeutronNetwork(task.BaseCloudTask):
+
+class RetrieveNeutronNetwork(task.BaseCloudTask):
+
     def execute(self, net_id):
         try:
-            return get_network_by(self.cloud.neutron, id = net_id)[0]
+            return get_network_by(self.cloud.neutron, id=net_id)[0]
         except IndexError:
-            LOG.exception("Empty answer for network_id: %s" % str(network_id))
+            LOG.exception("Empty answer for network_id: %s" % str(net_id))
             raise
 
 
-def RetrieveNeutronPort(task.BaseCloudTask):
+class RetrieveNeutronPort(task.BaseCloudTask):
+
     def execute(self, port_id):
         try:
             return get_port_by(self.cloud.neutron, id=port_id)[0]
@@ -198,14 +201,18 @@ def RetrieveNeutronPort(task.BaseCloudTask):
             LOG.exception("Empty answer for port_id: %s" % str(port_id))
             raise
 
-def EnsureNeutronPort(task.BaseCloudTask):
-    def verifyPort(self, dstPort, srtPort):
+
+class EnsureNeutronPort(task.BaseCloudTask):
+
+    def verifyPort(self, dstPort, srcPort):
         # TODO (sryabin) more complex check
         try:
-            return dstPort['mac_address'] == srtPort['mac_address']
+            return dstPort['mac_address'] == srcPort['mac_address']
         except KeyError:
-            LOG.exception("Wrong dicts for port verifying: %s" % str(port_id))
+            LOG.exception("Bad dicts srcPort: %s, dstPort: %s" %
+                          (str(srcPort), str(dstPort)))
             raise
+
     def execute(self, port_id, port_data):
         try:
             port = get_port_by(self.cloud.neutron, id=port_id)[0]
@@ -214,9 +221,7 @@ def EnsureNeutronPort(task.BaseCloudTask):
             # XXX (sryabin) stub
             return create_port(self.cloud.neutron, port_data)
         else:
-            sert self.verifyPort(port, port_data) == 1
-
-
+            assert self.verifyPort(port, port_data) == 1
 
 
 def migrate_ports(context, port_id):
