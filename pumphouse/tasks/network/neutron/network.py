@@ -167,19 +167,6 @@ def create_network(client, network_name):
         raise
 
 
-def migrate_neutron_ports(context, server_id):
-    network_dep = Set()
-    subnet_dep = Set()
-
-    ports = get_port_by(context.src_cloud, device_id=server_id)
-
-    for port in ports:
-        try:
-            network_dep.add(port['network_id'])
-            subnet_dep.update(set(ip['subnet_id'] for ip in port['fixed_ips']))
-        except KeyError:
-            LOG.exception("Missing keys in get_port_by asnwer: %s" % str(port))
-            raise
 
 
 class RetrieveNeutronNetwork(task.BaseCloudTask):
@@ -201,6 +188,14 @@ class RetrieveNeutronPort(task.BaseCloudTask):
             LOG.exception("Empty answer for port_id: %s" % str(port_id))
             raise
 
+class RetrieveNeutronSubnet(task.BaseCloudTask):
+
+    def execute(self, subnet_id):
+        try:
+            return get_subnet_by(self.cloud.neutron, id=subnet_id)[0]
+        except IndexError:
+            LOG.exception("Empty answer for subnet_id: %s" % str(subnet_id))
+            raise
 
 class EnsureNeutronPort(task.BaseCloudTask):
 
@@ -222,6 +217,85 @@ class EnsureNeutronPort(task.BaseCloudTask):
             return create_port(self.cloud.neutron, port_data)
         else:
             assert self.verifyPort(port, port_data) == 1
+
+def migrate_neutron_subnet(context, subnet_id):
+    subnet_binding = "neutron-network-subnet".format(subnet_id)
+
+    if (subnet_binding in context.store):
+        return None
+
+    flow = graph_flow.Flow("migrate-neutron-network-subnet-{}".format(subnet_id)
+
+    # generate new flow for subnet migration
+    subnet_retrieve = "{}-retrieve".format(subnet_binding)
+    subnet_ensure = "{}-ensure".format(subnet_binding)
+
+
+    context.store[subnet_binding] = None
+    return flow
+
+
+def migrate_single_neutron_port(context, port):
+    port_binding = "neutron-net-port-{}".format(port['id'])
+    port_retrieve = "{}-retrieve".format(port_binding)
+    port_ensure = "{}-ensure".format(port_binding)
+
+
+    flow = graph_flow.Flow("migrate-neutron-network-port-{}".format(port['id']))
+
+    if (port_binding in context.store)
+        return None, port_ensure
+
+    if ('subnet_id' in port):
+        subnetFlow = migrate_neutron_subnet(context, port['subnet_id'])
+        flow.add(subnetFlow)
+
+
+    flow.add(RetrieveNeutronPort(context.src._cloud,
+                                name=port_binding,
+                                provides=port_binding))
+    flow.add(EnsureNeutronPort(context.dst_cloud,
+                               name=port_ensure,
+                               provides=port_ensure))
+
+    context.store[port_binding] = None
+
+
+
+def migrate_neutron_ports(context, server_id):
+    network_dep = Set()
+    subnet_dep = Set()
+
+    ports = get_port_by(context.src_cloud, device_id=server_id)
+
+    if (not len(ports)):
+        LOG.warning("server_id: %d no port assignmnet" % server_id)
+        return None, None
+
+    flow = graph_flow.Flow("migrate-neutron-network-{}".format(server_id))
+
+
+    for port in ports:
+        try:
+            # TODO (sryabin) change namespace policy to neutron-net-(network|subnet|port)-{}.format(entity_id)
+
+
+            network_binding = "neuton-network-{}".format(port['network_id'])
+
+            if (network_binding not in context.store):
+                # generate new flow for network migrate
+                network_retrieve = "{}-retrieve".format(network_binding)
+                network_ensure = "{}-ensure".format(network_binding)
+
+                context.store[network_binding] = None
+
+
+
+
+
+        except KeyError:
+            LOG.exception("Missing keys in get_port_by asnwer: %s" % str(port))
+            raise
 
 
 def migrate_ports(context, port_id):
