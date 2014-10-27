@@ -161,6 +161,7 @@ def create_subnet(client, **subnet_params):
 
 def create_network(client, network_name):
     try:
+        # TODO (sryabin) stub create_network
         return client.create_network({
             'network': network_name
         })
@@ -176,7 +177,7 @@ class RetrieveNeutronNetwork(task.BaseCloudTask):
             return get_network_by(self.cloud.neutron, id=net_id)[0]
         except IndexError:
             LOG.exception("Empty answer for network_id: %s" % str(net_id))
-            raise
+            raise exceptions.Error
 
 
 class RetrieveNeutronPort(task.BaseCloudTask):
@@ -185,8 +186,8 @@ class RetrieveNeutronPort(task.BaseCloudTask):
         try:
             return get_port_by(self.cloud.neutron, id=port_id)[0]
         except IndexError:
-            LOG.exception("Empty answer for port_id: %s" % str(port_id))
-            raise
+            raise exceptions.Error(
+                "Empty answer for port_id: %s" % str(port_id))
 
 
 class RetrieveNeutronSubnet(task.BaseCloudTask):
@@ -201,14 +202,13 @@ class RetrieveNeutronSubnet(task.BaseCloudTask):
 
 class EnsureNeutronPort(task.BaseCloudTask):
 
-    def verifyPort(self, dstPort, srcPort):
+    def verifyPort(self, src_port, dst_port):
         # TODO (sryabin) more complex check
         try:
-            return dstPort['mac_address'] == srcPort['mac_address']
+            return dst_port['mac_address'] == src_port['mac_address']
         except KeyError:
-            LOG.exception("Bad dicts srcPort: %s, dstPort: %s" %
-                          (str(srcPort), str(dstPort)))
-            raise
+            raise exceptions.Error("Bad dicts src: %s, dst: %s" %
+                                   (str(src_port), str(dst_port)))
 
     def execute(self, port_id, port_data):
         try:
@@ -219,17 +219,18 @@ class EnsureNeutronPort(task.BaseCloudTask):
             return create_port(self.cloud.neutron, port_data)
         else:
             assert self.verifyPort(port, port_data) == 1
+            return port
 
 
 class EnsureNeutronSubnet(task.BaseCloudTask):
 
     def verifySubnet(self, src_subnet, dst_subnet):
         try:
+            # TODO (sryabin) more complex check
             return src_subnet['name'] == dst_subnet['name']
         except KeyError:
-            LOG.exception("Bad disct source: %s, dst: %s" %
-                          (str(src_subnet), str(dst_subnet)))
-            raise exceptions.Error
+            raise exceptions.Error("Bad dicts src: %s, dst: %s" %
+                                   (str(src_subnet), str(dst_subnet)))
 
     def execute(self, subnet):
         try:
@@ -322,8 +323,8 @@ def migrate_neutron_ports(context, server_id):
                 context.store[network_binding] = None
 
         except KeyError:
-            LOG.exception("Missing keys in get_port_by asnwer: %s" % str(port))
-            raise
+            raise exceptions.Error(
+                "Missing keys in get_port_by asnwer: %s" % str(port))
 
 
 def migrate_ports(context, port_id):
