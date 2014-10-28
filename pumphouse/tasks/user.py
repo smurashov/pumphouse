@@ -57,7 +57,7 @@ class EnsureUser(task.BaseCloudTask):
         events.emit("user created", {
             "id": user.id,
             "name": user.name,
-            "cloud": self.cloud.name
+            "cloud": self.cloud.name,
         }, namespace="/events")
 
 
@@ -83,9 +83,8 @@ class EnsureUserRole(task.BaseCloudTask):
                  role_info["id"], user_info["id"], tenant_info["id"])
         events.emit("user role assigned", {
             "id": user_info["id"],
-            "name": user_info["name"],
+            "role_id": role_info["id"],
             "tenant_id": tenant_info["id"],
-            "cloud": self.cloud.name
         }, namespace="/events")
 
 
