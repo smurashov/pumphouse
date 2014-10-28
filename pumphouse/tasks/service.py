@@ -22,6 +22,13 @@ from pumphouse import utils
 LOG = logging.getLogger(__name__)
 
 
+class RetrieveServices(task.BaseCloudTask):
+    def execute(self):
+        services = dict((s.id, s.to_dict())
+                        for s in self.cloud.nova.services.list())
+        return services
+
+
 class DisableService(task.BaseCloudTask):
     def __init__(self, binary, *args, **kwargs):
         super(DisableService, self).__init__(*args, **kwargs)

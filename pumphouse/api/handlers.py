@@ -123,6 +123,7 @@ def cloud_resources(client):
         } for floating_ip in cloud.nova.floating_ips_bulk.list()
         ],
         "hosts": [{
+            "id": str(hyperv.service["id"]),
             "name": hyperv.service["host"],
             "status": get_host_status(hyperv.service["host"]),
         } for hyperv in cloud.nova.hypervisors.list()
@@ -212,9 +213,9 @@ def migrate_tenant(tenant_id):
     return flask.make_response()
 
 
-@pump.route("/hosts/<hostname>", methods=["POST"])
+@pump.route("/hosts/<host_id>", methods=["POST"])
 @crossdomain()
-def evacuate_host(hostname):
+def evacuate_host(host_id):
     @flask.copy_current_request_context
     def evacuate():
         config = flask.current_app.config.get("PLUGINS") or {}
@@ -222,32 +223,32 @@ def evacuate_host(hostname):
         dst = hooks.destination.connect()
         ctx = context.Context(config, src, dst)
         events.emit("host evacuate", {
-            "id": hostname,
+            "id": host_id,
         }, namespace="/events")
 
         try:
-            flow = evacuation.evacuate_servers(ctx, hostname)
+            flow = evacuation.evacuate_servers(ctx, host_id)
             LOG.debug("Evacuation flow: %s", flow)
             result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of evacuation: %s", result)
         except Exception:
             LOG.exception("Error is occured during evacuating host %r",
-                          hostname)
+                          host_id)
             status = "error"
         else:
             status = ""
 
         events.emit("host evacuated", {
-            "id": hostname,
+            "id": host_id,
             "status": status,
         }, namespace="/events")
     gevent.spawn(evacuate)
     return flask.make_response()
 
 
-@pump.route("/hosts/<hostname>", methods=["DELETE"])
+@pump.route("/hosts/<host_id>", methods=["DELETE"])
 @crossdomain()
-def reassign_host(hostname):
+def reassign_host(host_id):
     @flask.copy_current_request_context
     def reassign():
         # NOTE(akscram): Initialization of fuelclient.
@@ -265,7 +266,7 @@ def reassign_host(hostname):
         }
 
         events.emit("host reassign", {
-            "id": hostname,
+            "id": host_id,
         }, namespace="/events")
 
         try:
@@ -273,22 +274,22 @@ def reassign_host(hostname):
             dst = hooks.destination.connect()
             ctx = context.Context(config, src, dst)
 
-            flow = node_tasks.reassign_node(ctx, hostname)
+            flow = node_tasks.reassign_node(ctx, host_id)
             LOG.debug("Reassigning flow: %s", flow)
             result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of migration: %s", result)
         except Exception:
             LOG.exception("Error is occured during reassigning host %r",
-                          hostname)
+                          host_id)
             status = "error"
             new_hostname = ""
         else:
             status = ""
-            hostname_attr = "node-assigned-hosetname-{}".format(hostname)
+            hostname_attr = "node-assigned-hosetname-{}".format(host_id)
             new_hostname = result[hostname_attr]
 
         events.emit("host reassigned", {
-            "id": hostname,
+            "id": host_id,
             "host_name": new_hostname,
             "status": status,
         }, namespace="/events")
