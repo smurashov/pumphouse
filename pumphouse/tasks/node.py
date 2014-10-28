@@ -20,6 +20,7 @@ from taskflow import task
 
 from pumphouse import events
 from pumphouse import exceptions
+from pumphouse.tasks import service as service_tasks
 from pumphouse import utils
 
 
@@ -181,7 +182,6 @@ class CopyNetAttributesFromNode(task.Task):
 
 class WaitUnassignedNode(task.Task):
     def execute(self, node_info, **requires):
-        node_data = self.retirieve_unassigned(node_info)
         condition_check = lambda x: x is not None
         unassigned_node_info = utils.wait_for(node_info,
                                               self.retirieve_unassigned,
@@ -227,6 +227,20 @@ class AssignNode(task.Task):
         return node.data
 
 
+class UpdateNodeInfo(task.Task):
+    def execute(self, node_info, **requires):
+        from pumphouse._vendor.fuelclient.objects.node import Node
+        node = Node.init_with_data(node_info)
+        node.update()
+        return node.data
+
+
+class GetNodeHostname(task.Task):
+    def execute(self, node_info):
+        hostname = extract_hostname(node_info["fqdn"])
+        return hostname
+
+
 def unassign_node(context, flow, env_name, hostname):
     env = "src-env-{}".format(env_name)
     deployed_env = "src-env-deployed-{}".format(env_name)
@@ -251,6 +265,19 @@ def unassign_node(context, flow, env_name, hostname):
                            provides=unassigned_node,
                            rebind=[pending_node],
                            requires=[deployed_env]),
+    )
+
+
+def remove_computes(context, flow, env_name, hostname):
+    unassigned_node = "node-unassigned-{}".format(hostname)
+    delete_services = "services-delete-{}".format(hostname)
+
+    flow.add(
+        service_tasks.DeleteServicesSilently(context.src_cloud,
+                                             name=delete_services,
+                                             provides=delete_services,
+                                             inject={"hostname": hostname},
+                                             requires=[unassigned_node]),
     )
 
 
@@ -288,6 +315,29 @@ def assign_node(context, flow, env_name, hostname):
     )
 
 
+def wait_computes(context, flow, env_name, hostname):
+    deployed_env = "dst-env-deployed-{}".format(env_name)
+    assigned_node = "node-assigned-{}".format(hostname)
+    updated_assigned_node = "node-assigned-updated-{}".format(hostname)
+    assigned_node_hostname = "node-assigned-hosetname-{}".format(hostname)
+    wait_computes = "wait-computes-{}".format(hostname)
+
+    flow.add(
+        UpdateNodeInfo(name=updated_assigned_node,
+                       provides=updated_assigned_node,
+                       rebind=[assigned_node],
+                       requires=[deployed_env]),
+        GetNodeHostname(name=assigned_node_hostname,
+                        provides=assigned_node_hostname,
+                        rebind=[updated_assigned_node]),
+        service_tasks.WaitComputesServices(context.dst_cloud,
+                                           name=wait_computes,
+                                           provides=wait_computes,
+                                           rebind=[assigned_node_hostname],
+                                           requires=[deployed_env]),
+    )
+
+
 def reassign_node(context, hostname):
     src_env_name = context.config["source"]
     dst_env_name = context.config["destination"]
@@ -320,5 +370,7 @@ def reassign_node(context, hostname):
                          rebind=[dst_env]),
     )
     unassign_node(context, flow, src_env_name, hostname)
+    remove_computes(context, flow, src_env_name, hostname)
     assign_node(context, flow, dst_env_name, hostname)
+    wait_computes(context, flow, dst_env_name, hostname)
     return flow

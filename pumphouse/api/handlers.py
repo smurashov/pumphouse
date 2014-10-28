@@ -263,12 +263,16 @@ def reassign_host(hostname):
             "source": src_config["environment"],
             "destination": dst_config["environment"],
         }
-        ctx = context.Context(config, None, None)
+
         events.emit("host reassign", {
             "id": hostname,
         }, namespace="/events")
 
         try:
+            src = hooks.source.connect()
+            dst = hooks.destination.connect()
+            ctx = context.Context(config, src, dst)
+
             flow = node_tasks.reassign_node(ctx, hostname)
             LOG.debug("Reassigning flow: %s", flow)
             result = flows.run_flow(flow, ctx.store)
@@ -277,11 +281,15 @@ def reassign_host(hostname):
             LOG.exception("Error is occured during reassigning host %r",
                           hostname)
             status = "error"
+            new_hostname = ""
         else:
             status = ""
+            hostname_attr = "node-assigned-hosetname-{}".format(hostname)
+            new_hostname = result[hostname_attr]
 
         events.emit("host reassigned", {
             "id": hostname,
+            "host_name": new_hostname,
             "status": status,
         }, namespace="/events")
     gevent.spawn(reassign)

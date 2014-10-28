@@ -14,9 +14,9 @@
 
 import logging
 
-
 from pumphouse import events
 from pumphouse import task
+from pumphouse import utils
 
 
 LOG = logging.getLogger(__name__)
@@ -51,3 +51,37 @@ class DiableServiceWithRollback(DisableService):
             "name": hostname,
             "cloud": self.cloud.name,
         }, namespace="/events")
+
+
+class DeleteServicesSilently(task.BaseCloudTask):
+    def execute(self, hostname, **requires):
+        services = []
+        for service in self.cloud.nova.services.list(host=hostname):
+            try:
+                self.cloud.nova.services.delete(service.id)
+            except Exception:
+                LOG.exception("Error occurred during deleting of the service "
+                              "%s/%s", service.host, service.binary)
+            else:
+                services.append(service.to_dict())
+        return services
+
+
+class WaitComputesServices(task.BaseCloudTask):
+    def execute(self, hostname, **requires):
+        hypervisors = utils.wait_for(hostname,
+                                     self.get_hypervisors,
+                                     attribute_getter=bool,
+                                     value=True)
+        return hypervisors
+
+    def get_hypervisors(self, hostname):
+        hypervisors = []
+        services = self.cloud.nova.services.list(host=hostname,
+                                                 binary="nova-compute")
+        for s in services:
+            if s.state == "up" and s.status == "enabled":
+                hypervisors.append(s.to_dict())
+            else:
+                return False
+        return hypervisors
