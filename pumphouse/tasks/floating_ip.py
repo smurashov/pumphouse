@@ -148,7 +148,7 @@ def migrate_floating_ip(context, address):
 def associate_floating_ip_server(context, floating_ip_address,
                                  fixed_ip_info, server_id):
     """Associates Floating IP to Nova instance"""
-    floating_ip_bulk_ensure = "floating-ip-bulk-{}-retrieve".format(
+    floating_ip_bulk_ensure = "floating-ip-bulk-{}-ensure".format(
         floating_ip_address)
     floating_ip_sync = "floating-ip-{}-{}-sync".format(server_id,
                                                        floating_ip_address)
