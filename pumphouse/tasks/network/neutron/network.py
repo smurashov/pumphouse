@@ -269,8 +269,33 @@ class EnsureNeutronNetwork(task.BaseCloudTask):
             return dst
 
 
+def migrate_neutron_network(context, network_id):
+    network_binding = "neutron-network-{}".format(network_id)
+
+    if (network_binding in context.store):
+        return None
+
+    # generate new flor for network migration
+    flow = graph_flow.Flow("migrate-neutron-network-{}".format(network_id))
+
+    network_retrieve = "{}-retrieve".format(network_binding)
+    network_ensure = "{}-ensure".format(network_binding)
+
+    flow.add(RetrieveNeutronNetwork(context.src_cloud,
+                                    name=network_binding,
+                                    provides=network_binding))
+
+    flow.add(EnsureNeutronNetwork(context.dst_cloud,
+                                  name=network_ensure,
+                                  provides=network_ensure))
+
+    context.store[network_binding] = None
+
+    return flow
+
+
 def migrate_neutron_subnet(context, subnet_id):
-    subnet_binding = "neutron-network-subnet".format(subnet_id)
+    subnet_binding = "neutron-network-subnet-{}".format(subnet_id)
 
     if (subnet_binding in context.store):
         return None
@@ -282,7 +307,7 @@ def migrate_neutron_subnet(context, subnet_id):
     subnet_retrieve = "{}-retrieve".format(subnet_binding)
     subnet_ensure = "{}-ensure".format(subnet_binding)
 
-    flow.add(RetrieveNeutronSubnet(context.src._cloud,
+    flow.add(RetrieveNeutronSubnet(context.src_cloud,
                                    name=subnet_binding,
                                    provides=subnet_binding))
     flow.add(EnsureNeutronSubnet(context.dst_cloud,
@@ -313,7 +338,7 @@ def migrate_single_neutron_port(context, port):
         pass
 
     try:
-        network_flow = migrate_neutron_network(context, port['network_id']
+        network_flow = migrate_neutron_network(context, port['network_id'])
         if (network_flow):
             flow.add(network_flow)
     except KeyError:
@@ -327,6 +352,8 @@ def migrate_single_neutron_port(context, port):
                                provides=port_ensure))
 
     context.store[port_binding] = None
+
+    return flow
 
 
 def migrate_neutron_ports(context, server_id):
@@ -345,19 +372,15 @@ def migrate_neutron_ports(context, server_id):
         try:
             # TODO (sryabin) change namespace policy to
             # neutron-net-(network|subnet|port)-{}.format(entity_id)
-
-            network_binding = "neuton-network-{}".format(port['network_id'])
-
-            if (network_binding not in context.store):
-                # generate new flow for network migrate
-                network_retrieve = "{}-retrieve".format(network_binding)
-                network_ensure = "{}-ensure".format(network_binding)
-
-                context.store[network_binding] = None
+            port_flow = migrate_single_neutron_port(context, port)
+            if (port_flow):
+                flow.add(port_flow)
 
         except KeyError:
             raise exceptions.Error(
                 "Missing keys in get_port_by asnwer: %s" % str(port))
+
+    return flow
 
 
 def migrate_ports(context, port_id):
