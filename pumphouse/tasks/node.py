@@ -241,35 +241,6 @@ class GetNodeHostname(task.Task):
         return hostname
 
 
-class GetService(task.Task):
-    def execute(self, services, service_id):
-        return services[service_id]
-
-
-class GetServiceHostname(task.Task):
-    def execute(self, service_info):
-        return service_info["host"]
-
-
-def get_hostname(context, flow, host_id):
-    hostname = "hostname-{}".format(host_id)
-    services = "services-{}".format(host_id)
-    service = "service-{}".format(host_id)
-
-    flow.add(
-        service_tasks.RetrieveServices(context.src_cloud,
-                                       name=services,
-                                       provides=services),
-        GetService(name=service,
-                   provides=service,
-                   rebind=[services],
-                   inject={"service_id": int(host_id)}),
-        GetServiceHostname(name=hostname,
-                           provides=hostname,
-                           rebind=[service]),
-    )
-
-
 def unassign_node(context, flow, env_name, host_id):
     hostname = "hostname-{}".format(host_id)
     env = "src-env-{}".format(env_name)
@@ -398,7 +369,7 @@ def reassign_node(context, host_id):
                          provides=dst_env_nodes,
                          rebind=[dst_env]),
     )
-    get_hostname(context, flow, host_id)
+    service_tasks.get_hostname(context, flow, host_id)
     unassign_node(context, flow, src_env_name, host_id)
     remove_computes(context, flow, src_env_name, host_id)
     assign_node(context, flow, dst_env_name, host_id)

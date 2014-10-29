@@ -14,6 +14,8 @@
 
 import logging
 
+import taskflow.task
+
 from pumphouse import events
 from pumphouse import task
 from pumphouse import utils
@@ -92,3 +94,32 @@ class WaitComputesServices(task.BaseCloudTask):
             else:
                 return False
         return hypervisors
+
+
+class GetService(taskflow.task.Task):
+    def execute(self, services, service_id):
+        return services[service_id]
+
+
+class GetServiceHostname(taskflow.task.Task):
+    def execute(self, service_info):
+        return service_info["host"]
+
+
+def get_hostname(context, flow, service_id):
+    hostname = "hostname-{}".format(service_id)
+    services = "services-{}".format(service_id)
+    service = "service-{}".format(service_id)
+
+    flow.add(
+        RetrieveServices(context.src_cloud,
+                         name=services,
+                         provides=services),
+        GetService(name=service,
+                   provides=service,
+                   rebind=[services],
+                   inject={"service_id": int(service_id)}),
+        GetServiceHostname(name=hostname,
+                           provides=hostname,
+                           rebind=[service]),
+    )
