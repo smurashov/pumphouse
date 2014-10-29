@@ -305,10 +305,19 @@ def migrate_single_neutron_port(context, port):
     if (port_binding in context.store):
         return None, port_ensure
 
-    if ('subnet_id' in port):
+    try:
         subnet_flow = migrate_neutron_subnet(context, port['subnet_id'])
         if (subnet_flow):
             flow.add(subnet_flow)
+    except KeyError:
+        pass
+
+    try:
+        network_flow = migrate_neutron_network(context, port['network_id']
+        if (network_flow):
+            flow.add(network_flow)
+    except KeyError:
+        pass
 
     flow.add(RetrieveNeutronPort(context.src._cloud,
                                  name=port_binding,
