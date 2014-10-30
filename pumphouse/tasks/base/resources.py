@@ -129,7 +129,8 @@ class Collection(Resource):
         return CollectionProxy(self)
 
     def get_id_for(self, data):
-        return frozenset(self.base_cls.get_id_for(el) for el in data)
+        elements = frozenset(self.base_cls.get_id_for(el) for el in data)
+        return (self.base_cls, elements)
 
 
 class CollectionProxy(object):

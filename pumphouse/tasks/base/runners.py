@@ -71,7 +71,9 @@ def _make_str_id(id_):
     if isinstance(id_, tuple):
         return "-".join(map(_make_str_id, id_))
     elif isinstance(id_, frozenset):
-        return "+".join(map(_make_str_id, id_))
+        return "+".join(map(_make_str_id, sorted(id_)))
+    elif isinstance(id_, type):
+        return id_.__name__
     else:
         return id_
 
