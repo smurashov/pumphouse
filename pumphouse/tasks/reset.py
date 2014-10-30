@@ -39,6 +39,13 @@ def filter_prefixed(lst, dict_=False):
             for e in lst if is_prefixed(e.name)]
 
 
+def gen_to_list(f):
+    @functools.wraps(f)
+    def inner(*args, **kwargs):
+        return list(f(*args, **kwargs))
+    return inner
+
+
 def make_kwargs(**kwargs):
     return {k: v for k, v in kwargs.iteritems() if v is not None}
 
@@ -50,13 +57,22 @@ class Tenant(base.Resource):
 
     @base.task
     def create(self):
-        self.tenant = self.env.cloud.keystone.tenants.create(
+        tenant = self.env.cloud.keystone.tenants.create(
             self.tenant["name"],
             **make_kwargs(
                 description=self.tenant.get("description"),
                 enabled=self.tenant.get("enabled"),
             )
-        ).to_dict()
+        )
+        our_user_id = self.env.cloud.keystone.auth_ref.user_id
+        all_roles = cloud.keystone.roles.list()
+        admin_role = [r for r in all_roles if r.name == "admin"][0]
+        self.env.cloud.keystone.tenants.add_user(
+            tenant.id,
+            our_user_id,
+            admin_role.id,
+        )
+        self.tenant = tenant.to_dict()
 
     @base.task
     def delete(self):
@@ -125,6 +141,38 @@ class Flavor(base.Resource):
     @base.task
     def delete(self):
         self.env.cloud.nova.flavors.delete(self.flavor["id"])
+
+
+class SecurityGroup(base.Resource):
+    @classmethod
+    def get_id_for(cls, data):
+        return (data["tenant"]["name"], data["name"])
+
+    @Tenant()
+    def tenant(self):
+        return self.securitygroup["tenant"]
+
+    @base.task(requires=[tenant.create])
+    def create(self):
+        cloud = self.env.cloud.restrict(
+            tenant_name=self.tenant["name"],
+        )
+        sg_name = self.securitygroup["name"]
+        if sg_name != "default":
+            sg = cloud.nova.security_groups.create(name=sg_name)
+        else:
+            sg = cloud.nova.security_groups.find(name=sg_name)
+        for rule in self.securitygroup["rules"]:
+            cloud.nova.security_group_rules.create(sg.id, **rule)
+        self.securitygroup = cloud.nova.security_groups.get(sg.id).to_dict()
+
+    @base.task(before=[tenant.delete])
+    def delete(self):
+        if self.securitygroup["name"] != "default":
+            cloud.nova.security_groups.delete(self.securitygroup["id"])
+        else:
+            for rule in self.securitygroup["rules"]:
+                self.env.cloud.nova.security_group_rules.delete(rule["id"])
 
 
 class CachedImage(base.Resource):
@@ -262,6 +310,16 @@ class CleanupWorkload(base.Resource):
     def flavors(self):
         return filter_prefixed(self.env.cloud.nova.flavors.list())
 
+    @base.Collection(SecurityGroup)
+    @gen_to_list
+    def security_groups(self):
+        tenants = {tenant["id"]: tenant for tenant in self.tenants}
+        for sg in self.env.cloud.nova.security_groups.list():
+            if sg.tenant_id in tenants:
+                sg = sg.to_dict()
+                sg["tenant"] = tenants[sg["tenant_id"]]
+                yield sg
+
     @base.Collection(Image)
     def images(self):
         return filter_prefixed(self.env.cloud.glance.images.list(), dict_=True)
@@ -272,15 +330,9 @@ class CleanupWorkload(base.Resource):
         users.each().delete,
         servers.each().delete,
         flavors.each().delete,
+        security_groups.each().delete,
         images.each().delete,
     ])
-
-
-def gen_to_list(f):
-    @functools.wraps(f)
-    def inner(*args, **kwargs):
-        return list(f(*args, **kwargs))
-    return inner
 
 
 class SetupWorkload(base.Resource):
@@ -340,6 +392,29 @@ class SetupWorkload(base.Resource):
             "disk": 5,
         }]
 
+    @base.Collection(SecurityGroup)
+    @gen_to_list
+    def security_groups(self):
+        for tenant in self.tenants:
+            yield {
+                "name": "default",
+                "rules": [
+                    {
+                        "ip_protocol": "ICMP",
+                        "from_port": "-1",
+                        "to_port": "-1",
+                        "cidr": "0.0.0.0/0",
+                    },
+                    {
+                        "ip_protocol": "TCP",
+                        "from_port": "80",
+                        "to_port": "80",
+                        "cidr": "0.0.0.0/0",
+                    },
+                ],
+                "tenant": tenant,
+            }
+
     @base.Collection(Server)
     @gen_to_list
     def servers(self):
@@ -370,6 +445,7 @@ class SetupWorkload(base.Resource):
         users.each().create,
         images.each().create,
         flavors.each().create,
+        security_groups.each().create,
         servers.each().create,
     ])
 
