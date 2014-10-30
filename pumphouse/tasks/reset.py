@@ -192,10 +192,8 @@ class Image(base.Resource):
 class Server(base.Resource):
     @Tenant()
     def tenant(self):
-        try:
-            return {"id": self.server["tenant_id"]}
-        except KeyError:
-            return self.server["tenant"]
+        # FIXME(yorik-sar): Use just id here and bind it to real data later
+        return self.server["tenant"]
 
     @User()
     def user(self):
@@ -253,7 +251,12 @@ class CleanupWorkload(base.Resource):
     def servers(self):
         servers = self.env.cloud.nova.servers.list(
             search_opts={"all_tenants": 1})
-        return filter_prefixed(servers)
+        servers = filter_prefixed(servers)
+        # FIXME(yorik-sar): workaroud for missing resource lookup by id
+        tenants = {tenant["id"]: tenant for tenant in self.tenants}
+        for server in servers:
+            server["tenant"] = tenants[server["tenant_id"]]
+        return servers
 
     @base.Collection(Flavor)
     def flavors(self):
