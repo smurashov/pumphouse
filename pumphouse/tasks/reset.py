@@ -216,21 +216,22 @@ class Image(base.Resource):
 
     @base.task(requires=[cached_image.cache])
     def create(self):
-        # TODO(yorik-sar): split into create and upload once we have support
-        # for requirements between tasks within one resource
         image = self.image.copy()
         image.pop("url")
         image.setdefault("visibility", "public")
         image = self.env.cloud.glance.images.create(**image)
-        self.image = image = dict(image)
+        self.image = dict(image)
+
+    @base.task(requires=[create])
+    def upload(self):
         # upload starts here
         clone_fd = os.dup(self.cached_image["file"].fileno())
         try:
             f = os.fdopen(clone_fd)
-            self.env.cloud.glance.images.upload(image["id"], f)
+            self.env.cloud.glance.images.upload(self.image["id"], f)
         finally:
             os.close(clone_fd)
-        image = self.env.cloud.glance.images.get(image["id"])
+        image = self.env.cloud.glance.images.get(self.image["id"])
         self.image = dict(image)
 
     @base.task
@@ -256,7 +257,7 @@ class Server(base.Resource):
     def flavor(self):
         return self.server["flavor"]
 
-    @base.task(requires=[image.create, tenant.create, flavor.create,
+    @base.task(requires=[image.upload, tenant.create, flavor.create,
                          user.create])
     def create(self):
         cloud = self.env.cloud.restrict(
@@ -503,7 +504,7 @@ class SetupWorkload(base.Resource):
     create = base.task(name="create", requires=[
         tenants.each().create,
         users.each().create,
-        images.each().create,
+        images.each().upload,
         flavors.each().create,
         security_groups.each().create,
         networks.each().create,

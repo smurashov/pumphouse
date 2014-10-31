@@ -174,7 +174,7 @@ class CollectionUnboundTask(tasks.UnboundTask):
         requires = []
         for data in resource.collection:
             res = runner.get_resource(resource.base_cls, data)
-            requires.append(self.base_task.get_for_bound_resource(res))
+            requires.append(self.base_task.get_for_resource(res))
         return tasks.Task(
             None,  # Wow! We'll call this None!
             self.name,

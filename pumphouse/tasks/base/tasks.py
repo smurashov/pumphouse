@@ -40,9 +40,9 @@ class UnboundTask(object):
         if not instance.bound:
             return BoundTask(instance, self)
         else:
-            return self.get_for_bound_resource(instance)
+            return self.get_for_resource(instance)
 
-    def get_for_bound_resource(self, resource):
+    def get_for_resource(self, resource):
         assert resource.bound
         try:
             return self._resource_task[resource]
@@ -78,7 +78,7 @@ class BoundTask(object):
 
     def get_for_resource(self, resource):
         bound_res = self.resource.get_bound_subres(resource)
-        return self.task.get_for_bound_resource(bound_res)
+        return self.task.get_for_resource(bound_res)
 
     def __repr__(self):
         return '<{} {} {}>'.format(
