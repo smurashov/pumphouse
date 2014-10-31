@@ -14,6 +14,7 @@
 
 import collections
 import functools
+import itertools
 import os
 import random
 import tempfile
@@ -34,9 +35,9 @@ def is_prefixed(string):
     return string.startswith(TEST_RESOURCE_PREFIX)
 
 
-def filter_prefixed(lst, dict_=False):
+def filter_prefixed(lst, dict_=False, key="name"):
     return [(dict(e) if dict_ else e.to_dict())
-            for e in lst if is_prefixed(e.name)]
+            for e in lst if is_prefixed(getattr(e, key))]
 
 
 def gen_to_list(f):
@@ -279,6 +280,33 @@ class Server(base.Resource):
                        stop_excs=(nova_excs.NotFound,))
 
 
+class Network(base.Resource):
+    @classmethod
+    def get_id_for(cls, data):
+        return data["label"]
+
+    @Tenant()
+    def tenant(self):
+        return self.network["tenant"]
+
+    @base.Collection(Server)
+    def servers(self):
+        return self.network["servers"]
+
+    @base.task(requires=[tenant.create])
+    def create(self):
+        self.network = self.env.cloud.nova.networks.create(
+            label=self.network["label"],
+            cidr=self.network["cidr"],
+            project_id=self.tenant["id"],
+        ).to_dict()
+
+    @base.task(requires=[servers.each().delete])
+    def delete(self):
+        self.env.cloud.nova.networks.disassociate(self.network["id"])
+        self.env.cloud.nova.networks.delete(self.network["id"])
+
+
 class CleanupWorkload(base.Resource):
     @base.Collection(Tenant)
     def tenants(self):
@@ -320,6 +348,18 @@ class CleanupWorkload(base.Resource):
                 sg["tenant"] = tenants[sg["tenant_id"]]
                 yield sg
 
+    @base.Collection(Network)
+    @gen_to_list
+    def networks(self):
+        networks = self.env.cloud.nova.networks.list()
+        servers = collections.defaultdict(list)
+        for server in self.servers:
+            for net_label in server["addresses"]:
+                servers[net_label].append(server)
+        for network in filter_prefixed(networks, key="label"):
+            network["servers"] = servers[network["label"]]
+            yield network
+
     @base.Collection(Image)
     def images(self):
         return filter_prefixed(self.env.cloud.glance.images.list(), dict_=True)
@@ -331,6 +371,7 @@ class CleanupWorkload(base.Resource):
         servers.each().delete,
         flavors.each().delete,
         security_groups.each().delete,
+        networks.each().delete,
         images.each().delete,
     ])
 
@@ -415,6 +456,25 @@ class SetupWorkload(base.Resource):
                 "tenant": tenant,
             }
 
+    @base.Collection(Network)
+    @gen_to_list
+    def networks(self):
+        networks = self.setup["workloads"].get("networks")
+        if networks is not None:
+            for network in networks:
+                yield network
+            return
+        counter = itertools.count(1)
+        for tenant in self.tenants:
+            yield {
+                "label": "{}-network-{}".format(
+                    TEST_RESOURCE_PREFIX,
+                    tenant["name"].rsplit("-", 1)[-1],
+                ),
+                "cidr": "10.42.{}.0/24".format(counter.next()),
+                "tenant": tenant,
+            }
+
     @base.Collection(Server)
     @gen_to_list
     def servers(self):
@@ -446,6 +506,7 @@ class SetupWorkload(base.Resource):
         images.each().create,
         flavors.each().create,
         security_groups.each().create,
+        networks.each().create,
         servers.each().create,
     ])
 
