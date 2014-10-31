@@ -57,7 +57,7 @@ def get_parser():
                              "back-end from config.yaml")
 
     parser.add_argument("--dump",
-                        default=False
+                        default=False,
                         action="store_true",
                         help="Dump flow without execution")
 

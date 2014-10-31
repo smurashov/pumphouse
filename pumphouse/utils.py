@@ -18,6 +18,8 @@ import sys
 import time
 import traceback
 import yaml
+import re
+from collections import defaultdict
 
 from . import exceptions
 
@@ -73,6 +75,14 @@ def wait_for(resource, update_resource,
         time.sleep(check_interval)
         if time.time() - start > timeout:
             raise exceptions.TimeoutException()
+
+counter = (chr(i) for i in range(ord('A'), ord('Z')))
+ids = defaultdict(lambda: next(counter))
+
+
+def eat_ids(s):
+    return re.sub('(?<=-)[0-9a-f-]+(?=$|-)',
+                  lambda match: ids[match.group(0)], s)
 
 
 def dump_flow(flow, f, first=False, prev=None):
