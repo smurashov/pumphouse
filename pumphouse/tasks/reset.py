@@ -239,6 +239,33 @@ class Image(base.Resource):
         self.env.cloud.glance.images.delete(self.image["id"])
 
 
+class FloatingIP(base.Resource):
+    @classmethod
+    def get_id_for(self, data):
+        return data["address"]
+
+    @base.task
+    def create(self):
+        self.env.cloud.nova.floating_ips_bulk.create(
+            self.floatingip["address"],
+            pool=self.floatingip["pool"],
+        )
+
+    @base.task
+    def disassociate(self):
+        if self.floatingip.get("server"):
+            self.env.cloud.nova.servers.remove_floating_ip(
+                self.floatingip["server"]["id"],
+                self.floatingip["address"],
+            )
+
+    @base.task(requires=[disassociate])
+    def delete(self):
+        self.env.cloud.nova.floating_ips_bulk.delete(
+            self.floatingip["address"],
+        )
+
+
 class Server(base.Resource):
     @Tenant()
     def tenant(self):
@@ -257,8 +284,16 @@ class Server(base.Resource):
     def flavor(self):
         return self.server["flavor"]
 
+    @base.Collection(FloatingIP)
+    @gen_to_list
+    def floating_ips(self):
+        for floating_ip in self.server["floating_ips"]:
+            floating_ip = floating_ip.copy()
+            floating_ip["server"] = self.server
+            yield floating_ip
+
     @base.task(requires=[image.upload, tenant.create, flavor.create,
-                         user.create])
+                         user.create, floating_ips.each().create])
     def create(self):
         cloud = self.env.cloud.restrict(
             username=self.user["name"],
@@ -272,9 +307,25 @@ class Server(base.Resource):
             self.flavor["id"],
         )
         server = utils.wait_for(server.id, servers.get, value="ACTIVE")
-        self.server = server.to_dict()
+        self.server = server = server.to_dict()
+        for net, addresses in server["addresses"].iteritems():
+            fixed_ips = [addr["addr"] for addr in addresses
+                         if addr["OS-EXT-IPS:type"] == "fixed"]
+            if fixed_ips:
+                fixed_ip = fixed_ips[0]
+                break
+        else:
+            fixed_ip = None
+        if fixed_ip:
+            for floating_ip in self.floating_ips:
+                self.env.cloud.nova.servers.add_floating_ip(
+                    server["id"],
+                    floating_ip["address"],
+                    fixed_ip,
+                )
 
-    @base.task(before=[tenant.delete])
+    @base.task(before=[tenant.delete],
+               requires=[floating_ips.each().disassociate])
     def delete(self):
         self.env.cloud.nova.servers.delete(self.server["id"])
         utils.wait_for(self.server["id"], self.env.cloud.nova.servers.get,
@@ -331,8 +382,14 @@ class CleanupWorkload(base.Resource):
         servers = filter_prefixed(servers)
         # FIXME(yorik-sar): workaroud for missing resource lookup by id
         tenants = {tenant["id"]: tenant for tenant in self.tenants}
+        floating_ips = collections.defaultdict(list)
+        for floating_ip in self.floating_ips:
+            server_id = floating_ip["instance_uuid"]
+            if server_id:
+                floating_ips[server_id].append(floating_ip)
         for server in servers:
             server["tenant"] = tenants[server["tenant_id"]]
+            server["floating_ips"] = floating_ips[server["id"]]
         return servers
 
     @base.Collection(Flavor)
@@ -361,6 +418,11 @@ class CleanupWorkload(base.Resource):
             network["servers"] = servers[network["label"]]
             yield network
 
+    @base.Collection(FloatingIP)
+    def floating_ips(self):
+        floating_ips = self.env.cloud.nova.floating_ips_bulk.list()
+        return [f.to_dict() for f in floating_ips]
+
     @base.Collection(Image)
     def images(self):
         return filter_prefixed(self.env.cloud.glance.images.list(), dict_=True)
@@ -373,6 +435,7 @@ class CleanupWorkload(base.Resource):
         flavors.each().delete,
         security_groups.each().delete,
         networks.each().delete,
+        floating_ips.each().delete,
         images.each().delete,
     ])
 
@@ -476,6 +539,23 @@ class SetupWorkload(base.Resource):
                 "tenant": tenant,
             }
 
+    @base.Collection(FloatingIP)
+    @gen_to_list
+    def floating_ips(self):
+        floating_ips = self.setup["workloads"].get("floating_ips")
+        if floating_ips is not None:
+            for floating_ip in floating_ips:
+                yield floating_ip
+            return
+        counter = itertools.count(136)
+        for server in self.servers:
+            floating_ip = {
+                "address": "127.16.0.{}".format(counter.next()),
+                "pool": TEST_RESOURCE_PREFIX + "-pool",
+            }
+            server["floating_ips"] = [floating_ip]
+            yield floating_ip
+
     @base.Collection(Server)
     @gen_to_list
     def servers(self):
@@ -508,6 +588,7 @@ class SetupWorkload(base.Resource):
         flavors.each().create,
         security_groups.each().create,
         networks.each().create,
+        floating_ips.each().create,
         servers.each().create,
     ])
 
