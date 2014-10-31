@@ -559,27 +559,33 @@ class SetupWorkload(base.Resource):
     @base.Collection(Server)
     @gen_to_list
     def servers(self):
-        servers = self.setup["workloads"].get("servers")
-        if servers is not None:
-            for server in servers:
-                yield server
-            return
         for tenant in self.tenants:
-            tenant_ref = tenant["name"].rsplit("-", 1)[-1]
-            for i in xrange(self.setup["populate"].get("num_servers", 2)):
-                server_ref = str(random.randint(1, 0x7fffffff))
-                image = random.choice(self.images)
-                flavor = random.choice(self.flavors)
-                yield {
-                    "name": "{}-{}".format(TEST_RESOURCE_PREFIX, server_ref),
-                    "image": image,
-                    "flavor": flavor,
-                    "tenant": tenant,
-                    "user": {
-                        "name": tenant["username"],
+            if "servers" in tenant:
+                for server in tenant["servers"]:
+                    server.update({
                         "tenant": tenant,
-                    },
-                }
+                        "user": {
+                            "name": tenant["username"],
+                            "tenant": tenant,
+                        },
+                    })
+                    yield server
+            else:
+                for i in xrange(self.setup["populate"].get("num_servers", 2)):
+                    server_ref = str(random.randint(1, 0x7fffffff))
+                    image = random.choice(self.images)
+                    flavor = random.choice(self.flavors)
+                    yield {
+                        "name": "{}-{}".format(TEST_RESOURCE_PREFIX,
+                                               server_ref),
+                        "image": image,
+                        "flavor": flavor,
+                        "tenant": tenant,
+                        "user": {
+                            "name": tenant["username"],
+                            "tenant": tenant,
+                        },
+                    }
 
     create = base.task(name="create", requires=[
         tenants.each().create,
@@ -613,8 +619,8 @@ if __name__ == "__main__":
     runner = base.TaskflowRunner(env)
     setup_workload = runner.get_resource(SetupWorkload, {
         "id": "src",
-        "populate": source_config["populate"],
-        "workloads": source_config["workloads"],
+        "populate": source_config.get("populate"),
+        "workloads": source_config.get("workloads"),
     })
     runner.add(setup_workload.create)
     runner.run()
