@@ -57,7 +57,8 @@ def get_parser():
                              "back-end from config.yaml")
 
     parser.add_argument("--dump",
-                        default=False,
+                        nargs="?",
+                        const="flow.dot",
                         action="store_true",
                         help="Dump flow without execution")
 
@@ -320,10 +321,8 @@ def main():
         ctx = context.Context(config, src, dst)
         resources_flow = migrate_function(ctx, flow, ids)
         if (args.dump):
-            # TODO custom output filename
-            with open("flow.dot", "w") as f:
+            with open(args.dump, "w") as f:
                 utils.dump_flow(resources_flow, f, True)
-            # XXX (sryabin) change to exit
             return 0
 
         flows.run_flow(resources_flow, ctx.store)
