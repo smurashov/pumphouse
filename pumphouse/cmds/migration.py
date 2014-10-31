@@ -55,6 +55,12 @@ def get_parser():
                         action="store_true",
                         help="Work with FakeCloud back-end instead real "
                              "back-end from config.yaml")
+
+    parser.add_argument("--dump",
+                        default=False
+                        action="store_true",
+                        help="Dump flow without execution")
+
     subparsers = parser.add_subparsers()
     migrate_parser = subparsers.add_parser("migrate",
                                            help="Perform a migration of "
@@ -313,6 +319,13 @@ def main():
             raise exceptions.UsageError("Missing tenant ID")
         ctx = context.Context(config, src, dst)
         resources_flow = migrate_function(ctx, flow, ids)
+        if (args.dump):
+            # TODO custom output filename
+            with open("flow.dot", "w") as f:
+                utils.dump_flow(resources_flow, f, True)
+            # XXX (sryabin) change to exit
+            return 0
+
         flows.run_flow(resources_flow, ctx.store)
     elif args.action == "cleanup":
         cloud_config = args.config[args.target]
