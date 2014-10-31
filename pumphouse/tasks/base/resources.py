@@ -121,6 +121,8 @@ class Resource(object):
 
 
 class Collection(Resource):
+    _colletion_tasks = {}
+
     def __init__(self, base_cls, **kwargs):
         super(Collection, self).__init__(**kwargs)
         self.base_cls = base_cls
@@ -132,17 +134,25 @@ class Collection(Resource):
         elements = frozenset(self.base_cls.get_id_for(el) for el in data)
         return (self.base_cls, elements)
 
+    def get_unbound_task(self, name):
+        key = (self.base_cls, name)
+        try:
+            return self._colletion_tasks[key]
+        except KeyError:
+            assert name in self.base_cls._tasks
+            task = CollectionUnboundTask(getattr(self.base_cls, name))
+            self._colletion_tasks[key] = task
+            return task
+
 
 class CollectionProxy(object):
     def __init__(self, collection):
         self.collection = collection
 
     def __getattr__(self, name):
-        base_cls = self.collection.base_cls
-        assert name in base_cls._tasks
         return tasks.BoundTask(
             self.collection,
-            CollectionUnboundTask(getattr(base_cls, name)),
+            self.collection.get_unbound_task(name),
         )
 
 
