@@ -14,7 +14,7 @@
 
 import logging
 
-from taskflow.patterns import graph_flow, linear_flow, unordered_flow
+from taskflow.patterns import linear_flow, unordered_flow
 
 from pumphouse import events
 from pumphouse import flows
@@ -66,7 +66,7 @@ class EvacuateServer(task.BaseCloudTask):
         else:
             LOG.info("Perform evacuation of server %r from %r host",
                      server_id, hostname)
-            events.emit("server evacuate", {
+            events.emit("server live migration", {
                 "id": server_id,
                 "cloud": self.cloud.name,
             }, namespace="/events")
@@ -80,9 +80,9 @@ class EvacuateServer(task.BaseCloudTask):
                         HYPERVISOR_HOSTNAME_ATTR, server_id)
         else:
             LOG.info("Server %r evacuated to host %r", server_id, hostname)
-            events.emit("server evacuated", {
+            events.emit("server live migrated", {
                 "id": server_id,
-                "host_name": hostname,
+                "host_id": hostname,
                 "cloud": self.cloud.name,
             }, namespace="/events")
 
@@ -180,7 +180,7 @@ class BootServerFromImage(task.BaseCloudTask):
                 "name": server.name,
                 "tenant_id": server.tenant_id,
                 "image_id": server.image["id"],
-                "host_name": hostname,
+                "host_id": hostname,
                 "status": "active",
             }, namespace="/events")
 
@@ -298,22 +298,19 @@ def restore_floating_ips(context, server_info):
     return flow
 
 
-def evacuate_server(context, server_id):
-    server_retrieve = "server-{}-retrieve".format(server_id)
-    server_binding = "server-{}".format(server_id)
-    server_evacuate = "server-{}-evacuate".format(server_id)
-    server_evacuated = "server-{}-evacuated".format(server_id)
-    evacuate = EvacuateServer(context.src_cloud,
-                              name=server_evacuate,
-                              provides=server_evacuated,
-                              rebind=[server_retrieve])
+def evacuate_server(context, flow, hostname, requires=None):
+    server_retrieve = "server-{}-retrieve".format(hostname)
+    server_binding = "server-{}".format(hostname)
+    server_evacuate = "server-{}-evacuate".format(hostname)
+    server_evacuated = "server-{}-evacuated".format(hostname)
+    flow.add(EvacuateServer(context.src_cloud,
+                            name=server_evacuate,
+                            provides=server_evacuated,
+                            rebind=[server_retrieve],
+                            requires=requires or []))
     if server_binding not in context.store:
-        context.store[server_binding] = server_id
-        flow = graph_flow.Flow("evacuate-server-{}".format(server_id))
+        context.store[server_binding] = hostname
         flow.add(RetrieveServer(context.src_cloud,
                                 name=server_binding,
                                 provides=server_retrieve,
                                 rebind=[server_binding]))
-        flow.add(evacuate)
-        return flow
-    return evacuate

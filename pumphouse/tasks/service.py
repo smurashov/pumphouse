@@ -43,7 +43,7 @@ class DisableService(task.BaseCloudTask):
     def block_event(self, hostname):
         LOG.info("Service %r was blocked on host %r", self.binary, hostname)
         events.emit("host block", {
-            "name": hostname,
+            "id": hostname,
             "cloud": self.cloud.name,
         }, namespace="/events")
 
@@ -57,7 +57,7 @@ class DiableServiceWithRollback(DisableService):
         LOG.info("Service %r was unblocked on host %r",
                  self.binary, hostname)
         events.emit("host unblock", {
-            "name": hostname,
+            "id": hostname,
             "cloud": self.cloud.name,
         }, namespace="/events")
 

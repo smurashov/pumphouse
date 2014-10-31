@@ -14,9 +14,8 @@
 
 import logging
 
-from taskflow.patterns import linear_flow, unordered_flow
+from taskflow.patterns import graph_flow
 
-# from pumphouse.tasks import hypervisor as hypervisor_tasks
 from pumphouse import exceptions
 from pumphouse.tasks import server as server_tasks
 from pumphouse.tasks import service as service_tasks
@@ -32,22 +31,19 @@ def evacuate_servers(context, hostname):
     except exceptions.nova_excs.NotFound:
         LOG.exception("Could not find hypervisors at the host %r.", hostname)
         raise
-    hostname_bind = "evacuate-{}".format(hostname)
-    flow = linear_flow.Flow(hostname_bind)
+
+    disable_services = "disable-services-{}".format(hostname)
+    flow = graph_flow.Flow(disable_services)
     flow.add(service_tasks.DiableServiceWithRollback("nova-compute",
                                                      context.src_cloud,
-                                                     name=hostname_bind,
-                                                     rebind=[hostname_bind],
+                                                     name=disable_services,
+                                                     provides=disable_services,
                                                      inject={
                                                          "hostname": hostname,
                                                      }))
-    servers_flow = unordered_flow.Flow("evacuate-{}-servers".format(hostname))
     for hyperv in hypervs:
         if hasattr(hyperv, "servers"):
             for server in hyperv.servers:
-                server_flow = server_tasks.evacuate_server(context,
-                                                           server["uuid"])
-                if server_flow is not None:
-                    servers_flow.add(server_flow)
-    flow.add(servers_flow)
+                server_tasks.evacuate_server(context, flow, server["uuid"],
+                                             requires=[disable_services])
     return flow

@@ -241,19 +241,19 @@ class GetNodeHostname(task.Task):
         return hostname
 
 
-def unassign_node(context, flow, env_name, host_id):
-    hostname = "hostname-{}".format(host_id)
+def unassign_node(context, flow, env_name, hostname):
     env = "src-env-{}".format(env_name)
     deployed_env = "src-env-deployed-{}".format(env_name)
     env_nodes = "src-env-nodes-{}".format(env_name)
-    node = "node-{}".format(host_id)
-    pending_node = "node-pending-{}".format(host_id)
-    unassigned_node = "node-unassigned-{}".format(host_id)
+    node = "node-{}".format(hostname)
+    pending_node = "node-pending-{}".format(hostname)
+    unassigned_node = "node-unassigned-{}".format(hostname)
 
     flow.add(
         RetrieveNode(name=node,
                      provides=node,
-                     rebind=[env_nodes, hostname]),
+                     rebind=[env_nodes],
+                     inject={"hostname": hostname}),
         UnassignNode(name=pending_node,
                      provides=pending_node,
                      rebind=[node, env]),
@@ -281,16 +281,16 @@ def remove_computes(context, flow, env_name, hostname):
     )
 
 
-def assign_node(context, flow, env_name, host_id):
+def assign_node(context, flow, env_name, hostname):
     env = "dst-env-{}".format(env_name)
     deployed_env = "dst-env-deployed-{}".format(env_name)
     env_nodes = "dst-env-nodes-{}".format(env_name)
-    unassigned_node = "node-unassigned-{}".format(host_id)
-    assigned_node = "node-assigned-{}".format(host_id)
+    unassigned_node = "node-unassigned-{}".format(hostname)
+    assigned_node = "node-assigned-{}".format(hostname)
     compute_node = "node-compute-{}".format(env_name)
     compute_roles = "compute-roles-{}".format(env_name)
-    node_with_disks = "node-with-disks-{}".format(host_id)
-    node_with_nets = "node-with-nets-{}".format(host_id)
+    node_with_disks = "node-with-disks-{}".format(hostname)
+    node_with_nets = "node-with-nets-{}".format(hostname)
 
     flow.add(
         ChooseAnyComputeNode(name=compute_node,
@@ -315,30 +315,30 @@ def assign_node(context, flow, env_name, host_id):
     )
 
 
-def wait_computes(context, flow, env_name, host_id):
+def wait_computes(context, flow, env_name, hostname):
     deployed_env = "dst-env-deployed-{}".format(env_name)
-    assigned_node = "node-assigned-{}".format(host_id)
-    updated_assigned_node = "node-assigned-updated-{}".format(host_id)
-    assigned_node_host_id = "node-assigned-hosetname-{}".format(host_id)
-    wait_computes = "wait-computes-{}".format(host_id)
+    assigned_node = "node-assigned-{}".format(hostname)
+    updated_assigned_node = "node-assigned-updated-{}".format(hostname)
+    assigned_node_hostname = "node-assigned-hosetname-{}".format(hostname)
+    wait_computes = "wait-computes-{}".format(hostname)
 
     flow.add(
         UpdateNodeInfo(name=updated_assigned_node,
                        provides=updated_assigned_node,
                        rebind=[assigned_node],
                        requires=[deployed_env]),
-        GetNodeHostname(name=assigned_node_host_id,
-                        provides=assigned_node_host_id,
+        GetNodeHostname(name=assigned_node_hostname,
+                        provides=assigned_node_hostname,
                         rebind=[updated_assigned_node]),
         service_tasks.WaitComputesServices(context.dst_cloud,
                                            name=wait_computes,
                                            provides=wait_computes,
-                                           rebind=[assigned_node_host_id],
+                                           rebind=[assigned_node_hostname],
                                            requires=[deployed_env]),
     )
 
 
-def reassign_node(context, host_id):
+def reassign_node(context, hostname):
     src_env_name = context.config["source"]
     dst_env_name = context.config["destination"]
 
@@ -348,7 +348,7 @@ def reassign_node(context, host_id):
     src_env_nodes = "src-env-nodes-{}".format(src_env_name)
     dst_env_nodes = "dst-env-nodes-{}".format(dst_env_name)
 
-    flow = graph_flow.Flow(name="reassign-node-{}".format(host_id))
+    flow = graph_flow.Flow(name="reassign-node-{}".format(hostname))
     flow.add(
         RetrieveAllEnvironments(name=envs,
                                 provides=envs),
@@ -369,9 +369,8 @@ def reassign_node(context, host_id):
                          provides=dst_env_nodes,
                          rebind=[dst_env]),
     )
-    service_tasks.get_hostname(context, flow, host_id)
-    unassign_node(context, flow, src_env_name, host_id)
-    remove_computes(context, flow, src_env_name, host_id)
-    assign_node(context, flow, dst_env_name, host_id)
-    wait_computes(context, flow, dst_env_name, host_id)
+    unassign_node(context, flow, src_env_name, hostname)
+    remove_computes(context, flow, src_env_name, hostname)
+    assign_node(context, flow, dst_env_name, hostname)
+    wait_computes(context, flow, dst_env_name, hostname)
     return flow

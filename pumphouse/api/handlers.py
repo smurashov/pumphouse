@@ -107,8 +107,8 @@ def cloud_resources(client):
             "image_id": server.image["id"],
             # TODO(akscram): Mapping of real hardware servers to
             #                hypervisors should be here.
-            "host_name": getattr(server,
-                                 "OS-EXT-SRV-ATTR:hypervisor_hostname"),
+            "host_id": getattr(server,
+                               "OS-EXT-SRV-ATTR:hypervisor_hostname"),
         } for server in cloud.nova.servers.list(search_opts={"all_tenants": 1})
         ],
         "images": [{
@@ -123,7 +123,7 @@ def cloud_resources(client):
         } for floating_ip in cloud.nova.floating_ips_bulk.list()
         ],
         "hosts": [{
-            "id": str(hyperv.service["id"]),
+            "id": hyperv.service["host"],
             "name": hyperv.service["host"],
             "status": get_host_status(hyperv.service["host"]),
         } for hyperv in cloud.nova.hypervisors.list()
