@@ -97,6 +97,10 @@ class Resource(object):
         except KeyError:
             return data["name"]
 
+    def get_id(self):
+        assert self.bound
+        return self.get_id_for(getattr(self, self._main_resource))
+
     def __get__(self, instance, owner):
         if instance is not None:
             bound_res = self.get_bound_subres(instance)
@@ -110,7 +114,7 @@ class Resource(object):
 
     def __repr__(self):
         if self.bound:
-            value = getattr(self, self._main_resource)
+            value = self.get_id()
         else:
             value = 'unbound'
         return '<{} {}>'.format(type(self).__name__, value)
