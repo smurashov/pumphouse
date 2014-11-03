@@ -270,7 +270,7 @@ class Events(object):
 
 def init_client(config, name, client_class, identity_class):
     identity = identity_class(config["identity"]["connection"])
-    client = client_class.from_dict(identity, config)
+    client = client_class.from_dict(name, identity, config)
     return client
 
 
