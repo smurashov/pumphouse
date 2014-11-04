@@ -41,11 +41,11 @@ class SyncPointTestCase(unittest.TestCase):
 class FileProxyTestCase(unittest.TestCase):
     def setUp(self):
         self.data = mock.Mock()
-        self.resp = self.data._resp
-        self.resp.getheader.return_value = "1024"
-        self.resp.read.side_effect = ["*" * 512] + ["*" * 512] + [None]
+        self.resp = self.data
+        self.size = "1024"
+        self.data.next.side_effect = ["*" * 512] + ["*" * 512] + [None]
         self.reporter = mock.Mock()
-        self.fproxy = utils.FileProxy(self.data, self.reporter)
+        self.fproxy = utils.FileProxy(self.data, self.size, self.reporter)
 
     def test_read(self):
         chunk_one = self.fproxy.read(512)
@@ -57,7 +57,7 @@ class FileProxyTestCase(unittest.TestCase):
         self.assertIsNone(chunk_none)
         chunk_calls = [mock.call(512), mock.call(512)]
         self.reporter.update.assert_calls(chunk_calls)
-        self.resp.read.assert_calls(chunk_calls + [mock.call(512)])
+        self.data.next.assert_calls(chunk_calls + [mock.call(512)])
 
     def test_close(self):
         self.fproxy.close()
