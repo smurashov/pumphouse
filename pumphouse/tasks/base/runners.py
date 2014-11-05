@@ -80,8 +80,7 @@ def _make_str_id(id_):
 
 class TaskflowRunner(Runner):
     def get_task_name(self, task):
-        data = getattr(task.resource, task.resource._main_resource)
-        id_ = _make_str_id(task.resource.get_id_for(data))
+        id_ = _make_str_id(task.resource.get_id())
         return "_".join((type(task.resource).__name__, id_, task.name))
 
     def convert_task(self, task):

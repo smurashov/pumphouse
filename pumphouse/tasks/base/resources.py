@@ -43,22 +43,14 @@ class Resource(object):
                     tasks_.append(k)
             cls_vars["_resources"] = tuple(resources)
             cls_vars["_tasks"] = tuple(tasks_)
-            main_res_name = name.lower()
-            if main_res_name.endswith("workload"):
-                main_res_name = main_res_name[:-len("workload")]
-            cls_vars["_main_resource"] = main_res_name
-            if name != "Collection" and main_res_name not in resources:
-                cls_vars[main_res_name] = SelfDataAttr()
             return type.__new__(mcs, name, bases, cls_vars)
 
     def __init__(self, data=None, runner=None):
         self._resource_subres = {}
         self.runner = runner
-        self.bound = False
+        self.bound = data is not None
+        self.data = data
         self.data_fn = None
-        if data is not None:
-            self.bound = True
-            setattr(self, self._main_resource, data)
 
     def set_data_fn(self, data_fn):
         self.data_fn = data_fn
@@ -83,11 +75,11 @@ class Resource(object):
 
     def get_data(self):
         assert self.bound
-        return getattr(self, self._main_resource)
+        return self.data
 
     def set_data(self, data):
         assert self.bound
-        setattr(self, self._main_resource, data)
+        self.data = data
 
     def get_runner(self):
         assert self.bound
@@ -103,7 +95,7 @@ class Resource(object):
 
     def get_id(self):
         assert self.bound
-        return self.get_id_for(getattr(self, self._main_resource))
+        return self.get_id_for(self.data)
 
     def __get__(self, instance, owner):
         if instance is not None:
@@ -176,7 +168,7 @@ class CollectionUnboundTask(tasks.UnboundTask):
         assert resource.bound
         runner = resource.get_runner()
         requires = []
-        for data in resource.collection:
+        for data in resource.data:
             res = runner.get_resource(resource.base_cls, data)
             requires.append(self.base_task.get_for_resource(res))
         return tasks.Task(

@@ -52,10 +52,10 @@ class Tenant(base.Resource):
     @base.task
     def create(self):
         tenant = self.env.cloud.keystone.tenants.create(
-            self.tenant["name"],
+            self.data["name"],
             **make_kwargs(
-                description=self.tenant.get("description"),
-                enabled=self.tenant.get("enabled"),
+                description=self.data.get("description"),
+                enabled=self.data.get("enabled"),
             )
         )
         our_user_id = self.env.cloud.keystone.auth_ref.user_id
@@ -66,11 +66,11 @@ class Tenant(base.Resource):
             our_user_id,
             admin_role.id,
         )
-        self.tenant = tenant.to_dict()
+        self.data = tenant.to_dict()
 
     @base.task
     def delete(self):
-        self.env.cloud.keystone.tenants.delete(self.tenant["id"])
+        self.env.cloud.keystone.tenants.delete(self.data["id"])
 
 
 class Role(base.Resource):
@@ -80,13 +80,13 @@ class Role(base.Resource):
 
     @base.task
     def create(self):
-        self.role = self.cloud.keystone.role.create(
-            name=self.role["name"],
+        self.data = self.env.cloud.keystone.role.create(
+            name=self.data["name"],
         ).to_dict()
 
     @base.task
     def delete(self):
-        self.env.cloud.keystone.roles.delete(self.role["id"])
+        self.env.cloud.keystone.roles.delete(self.data["id"])
 
 
 class User(base.Resource):
@@ -96,19 +96,19 @@ class User(base.Resource):
 
     @Tenant()
     def tenant(self):
-        return self.user["tenant"]
+        return self.data["tenant"]
 
     @base.task(requires=[tenant.create])
     def create(self):
-        self.user = self.env.cloud.keystone.users.create(
-            name=self.user["name"],
+        self.data = self.env.cloud.keystone.users.create(
+            name=self.data["name"],
             password="default",
             tenant_id=self.tenant["id"],
         ).to_dict()
 
     @base.task
     def delete(self):
-        self.env.cloud.keystone.users.delete(self.user["id"])
+        self.env.cloud.keystone.users.delete(self.data["id"])
 
 
 class Flavor(base.Resource):
@@ -118,23 +118,23 @@ class Flavor(base.Resource):
 
     @base.task
     def create(self):
-        self.flavor = cloud.nova.flavors.create(
-            self.flavor["name"],
-            self.flavor["ram"],
-            self.flavor["vcpu"],
-            self.flavor["disk"],
+        self.data = cloud.nova.flavors.create(
+            self.data["name"],
+            self.data["ram"],
+            self.data["vcpu"],
+            self.data["disk"],
             **make_kwargs(
-                flavorid=self.flavor.get("id"),
-                ephemeral=self.flavor.get("ephemeral"),
-                swap=self.flavor.get("swap"),
-                rxtx_factor=self.flavor.get("rxtx_factor"),
-                is_public=self.flavor.get("is_public"),
+                flavorid=self.data.get("id"),
+                ephemeral=self.data.get("ephemeral"),
+                swap=self.data.get("swap"),
+                rxtx_factor=self.data.get("rxtx_factor"),
+                is_public=self.data.get("is_public"),
             )
         ).to_dict()
 
     @base.task
     def delete(self):
-        self.env.cloud.nova.flavors.delete(self.flavor["id"])
+        self.env.cloud.nova.flavors.delete(self.data["id"])
 
 
 class SecurityGroup(base.Resource):
@@ -144,28 +144,28 @@ class SecurityGroup(base.Resource):
 
     @Tenant()
     def tenant(self):
-        return self.securitygroup["tenant"]
+        return self.data["tenant"]
 
     @base.task(requires=[tenant.create])
     def create(self):
         cloud = self.env.cloud.restrict(
             tenant_name=self.tenant["name"],
         )
-        sg_name = self.securitygroup["name"]
+        sg_name = self.data["name"]
         if sg_name != "default":
             sg = cloud.nova.security_groups.create(name=sg_name)
         else:
             sg = cloud.nova.security_groups.find(name=sg_name)
-        for rule in self.securitygroup["rules"]:
+        for rule in self.data["rules"]:
             cloud.nova.security_group_rules.create(sg.id, **rule)
-        self.securitygroup = cloud.nova.security_groups.get(sg.id).to_dict()
+        self.data = cloud.nova.security_groups.get(sg.id).to_dict()
 
     @base.task(before=[tenant.delete])
     def delete(self):
-        if self.securitygroup["name"] != "default":
-            cloud.nova.security_groups.delete(self.securitygroup["id"])
+        if self.data["name"] != "default":
+            cloud.nova.security_groups.delete(self.data["id"])
         else:
-            for rule in self.securitygroup["rules"]:
+            for rule in self.data["rules"]:
                 self.env.cloud.nova.security_group_rules.delete(rule["id"])
 
 
@@ -177,7 +177,7 @@ class CachedImage(base.Resource):
     @base.task
     def cache(self):
         f = tempfile.TemporaryFile()
-        img = urllib.urlopen(self.cachedimage["url"])
+        img = urllib.urlopen(self.data["url"])
         # Based on urllib.URLOpener.retrieve
         try:
             headers = img.info()
@@ -199,21 +199,21 @@ class CachedImage(base.Resource):
                 "retrieval incomplete: got only %i out of %i bytes" % (
                     read, size), (None, headers))
 
-        self.cachedimage = {"file": f}
+        self.data = {"file": f}
 
 
 class Image(base.Resource):
     @CachedImage()
     def cached_image(self):
-        return {"url": self.image["url"]}
+        return {"url": self.data["url"]}
 
     @base.task(requires=[cached_image.cache])
     def create(self):
-        image = self.image.copy()
+        image = self.data.copy()
         image.pop("url")
         image.setdefault("visibility", "public")
         image = self.env.cloud.glance.images.create(**image)
-        self.image = dict(image)
+        self.data = dict(image)
 
     @base.task(requires=[create])
     def upload(self):
@@ -221,15 +221,15 @@ class Image(base.Resource):
         clone_fd = os.dup(self.cached_image["file"].fileno())
         try:
             f = os.fdopen(clone_fd)
-            self.env.cloud.glance.images.upload(self.image["id"], f)
+            self.env.cloud.glance.images.upload(self.data["id"], f)
         finally:
             os.close(clone_fd)
-        image = self.env.cloud.glance.images.get(self.image["id"])
-        self.image = dict(image)
+        image = self.env.cloud.glance.images.get(self.data["id"])
+        self.data = dict(image)
 
     @base.task
     def delete(self):
-        self.env.cloud.glance.images.delete(self.image["id"])
+        self.env.cloud.glance.images.delete(self.data["id"])
 
 
 class FloatingIP(base.Resource):
@@ -240,22 +240,22 @@ class FloatingIP(base.Resource):
     @base.task
     def create(self):
         self.env.cloud.nova.floating_ips_bulk.create(
-            self.floatingip["address"],
-            pool=self.floatingip["pool"],
+            self.data["address"],
+            pool=self.data["pool"],
         )
 
     @base.task
     def disassociate(self):
-        if self.floatingip.get("server"):
+        if self.data.get("server"):
             self.env.cloud.nova.servers.remove_floating_ip(
-                self.floatingip["server"]["id"],
-                self.floatingip["address"],
+                self.data["server"]["id"],
+                self.data["address"],
             )
 
     @base.task(requires=[disassociate])
     def delete(self):
         self.env.cloud.nova.floating_ips_bulk.delete(
-            self.floatingip["address"],
+            self.data["address"],
         )
 
 
@@ -263,25 +263,25 @@ class Server(base.Resource):
     @Tenant()
     def tenant(self):
         # FIXME(yorik-sar): Use just id here and bind it to real data later
-        return self.server["tenant"]
+        return self.data["tenant"]
 
     @User()
     def user(self):
-        return self.server["user"]
+        return self.data["user"]
 
     @Image()
     def image(self):
-        return self.server["image"]
+        return self.data["image"]
 
     @Flavor()
     def flavor(self):
-        return self.server["flavor"]
+        return self.data["flavor"]
 
     @base.Collection(FloatingIP)
     def floating_ips(self):
-        for floating_ip in self.server["floating_ips"]:
+        for floating_ip in self.data["floating_ips"]:
             floating_ip = floating_ip.copy()
-            floating_ip["server"] = self.server
+            floating_ip["server"] = self.data
             yield floating_ip
 
     @base.task(requires=[image.upload, tenant.create, flavor.create,
@@ -294,12 +294,12 @@ class Server(base.Resource):
         )
         servers = cloud.nova.servers
         server = servers.create(
-            self.server["name"],
+            self.data["name"],
             self.image["id"],
             self.flavor["id"],
         )
         server = utils.wait_for(server.id, servers.get, value="ACTIVE")
-        self.server = server = server.to_dict()
+        self.data = server = server.to_dict()
         for net, addresses in server["addresses"].iteritems():
             fixed_ips = [addr["addr"] for addr in addresses
                          if addr["OS-EXT-IPS:type"] == "fixed"]
@@ -319,8 +319,8 @@ class Server(base.Resource):
     @base.task(before=[tenant.delete],
                requires=[floating_ips.each().disassociate])
     def delete(self):
-        self.env.cloud.nova.servers.delete(self.server["id"])
-        utils.wait_for(self.server["id"], self.env.cloud.nova.servers.get,
+        self.env.cloud.nova.servers.delete(self.data["id"])
+        utils.wait_for(self.data["id"], self.env.cloud.nova.servers.get,
                        stop_excs=(nova_excs.NotFound,))
 
 
@@ -331,24 +331,24 @@ class Network(base.Resource):
 
     @Tenant()
     def tenant(self):
-        return self.network["tenant"]
+        return self.data["tenant"]
 
     @base.Collection(Server)
     def servers(self):
-        return self.network["servers"]
+        return self.data["servers"]
 
     @base.task(requires=[tenant.create])
     def create(self):
-        self.network = self.env.cloud.nova.networks.create(
-            label=self.network["label"],
-            cidr=self.network["cidr"],
+        self.data = self.env.cloud.nova.networks.create(
+            label=self.data["label"],
+            cidr=self.data["cidr"],
             project_id=self.tenant["id"],
         ).to_dict()
 
     @base.task(requires=[servers.each().delete])
     def delete(self):
-        self.env.cloud.nova.networks.disassociate(self.network["id"])
-        self.env.cloud.nova.networks.delete(self.network["id"])
+        self.env.cloud.nova.networks.disassociate(self.data["id"])
+        self.env.cloud.nova.networks.delete(self.data["id"])
 
 
 class CleanupWorkload(base.Resource):
@@ -433,12 +433,12 @@ class CleanupWorkload(base.Resource):
 class SetupWorkload(base.Resource):
     @base.Collection(Tenant)
     def tenants(self):
-        tenants = self.setup["workloads"].get("tenants")
+        tenants = self.data["workloads"].get("tenants")
         if tenants is not None:
             for tenant in tenants:
                 yield tenant
             return
-        for i in xrange(self.setup["populate"].get("num_tenants", 2)):
+        for i in xrange(self.data["populate"].get("num_tenants", 2)):
             tenant_ref = str(random.randint(1, 0x7fffffff))
             yield {
                 "name": "{}-{}".format(TEST_RESOURCE_PREFIX, tenant_ref),
@@ -449,7 +449,7 @@ class SetupWorkload(base.Resource):
 
     @base.Collection(User)
     def users(self):
-        users = self.setup["workloads"].get("users")
+        users = self.data["workloads"].get("users")
         if users is not None:
             for user in users:
                 yield user
@@ -462,7 +462,7 @@ class SetupWorkload(base.Resource):
 
     @base.Collection(Image)
     def images(self):
-        images = self.setup["workloads"].get("images")
+        images = self.data["workloads"].get("images")
         if images is not None:
             return images
         return [{
@@ -475,7 +475,7 @@ class SetupWorkload(base.Resource):
 
     @base.Collection(Flavor)
     def flavors(self):
-        flavors = self.setup["workloads"].get("flavors")
+        flavors = self.data["workloads"].get("flavors")
         if flavors is not None:
             return flavors
         return [{
@@ -509,7 +509,7 @@ class SetupWorkload(base.Resource):
 
     @base.Collection(Network)
     def networks(self):
-        networks = self.setup["workloads"].get("networks")
+        networks = self.data["workloads"].get("networks")
         if networks is not None:
             for network in networks:
                 yield network
@@ -527,7 +527,7 @@ class SetupWorkload(base.Resource):
 
     @base.Collection(FloatingIP)
     def floating_ips(self):
-        floating_ips = self.setup["workloads"].get("floating_ips")
+        floating_ips = self.data["workloads"].get("floating_ips")
         if floating_ips is not None:
             for floating_ip in floating_ips:
                 yield floating_ip
@@ -556,7 +556,7 @@ class SetupWorkload(base.Resource):
                     })
                     yield server
             else:
-                for i in xrange(self.setup["populate"].get("num_servers", 2)):
+                for i in xrange(self.data["populate"].get("num_servers", 2)):
                     server_ref = str(random.randint(1, 0x7fffffff))
                     image = random.choice(self.images)
                     flavor = random.choice(self.flavors)
