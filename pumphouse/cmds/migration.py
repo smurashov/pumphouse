@@ -55,6 +55,13 @@ def get_parser():
                         action="store_true",
                         help="Work with FakeCloud back-end instead real "
                              "back-end from config.yaml")
+
+    parser.add_argument("--dump",
+                        nargs="?",
+                        const="flow.dot",
+                        action="store_true",
+                        help="Dump flow without execution")
+
     subparsers = parser.add_subparsers()
     migrate_parser = subparsers.add_parser("migrate",
                                            help="Perform a migration of "
@@ -285,19 +292,20 @@ def main():
     events = Events()
     flow = graph_flow.Flow("migrate-resources")
     Cloud, Identity = load_cloud_driver(is_fake=args.fake)
-    config = args.config["PLUGINS"]
+    clouds_config = args.config["CLOUDS"]
+    plugins_config = args.config["PLUGINS"]
     if args.action == "migrate":
         store = {}
-        src_config = args.config["source"]
+        src_config = clouds_config["source"]
         src = init_client(src_config,
                           "source",
                           Cloud,
                           Identity)
         if args.setup:
-            workloads = args.config["source"].get("workloads", {})
+            workloads = clouds_config["source"].get("workloads", {})
             management.setup(events, src, "source", args.num_tenants,
                              args.num_servers, workloads)
-        dst_config = args.config["destination"]
+        dst_config = clouds_config["destination"]
         dst = init_client(dst_config,
                           "destination",
                           Cloud,
@@ -311,29 +319,34 @@ def main():
             ids = get_ids_by_host(src, args.resource, args.host)
         else:
             raise exceptions.UsageError("Missing tenant ID")
-        ctx = context.Context(config, src, dst)
+        ctx = context.Context(plugins_config, src, dst)
         resources_flow = migrate_function(ctx, flow, ids)
+        if (args.dump):
+            with open(args.dump, "w") as f:
+                utils.dump_flow(resources_flow, f, True)
+            return 0
+
         flows.run_flow(resources_flow, ctx.store)
     elif args.action == "cleanup":
-        cloud_config = args.config[args.target]
+        cloud_config = clouds_config[args.target]
         cloud = init_client(cloud_config,
                             args.target,
                             Cloud,
                             Identity)
         management.cleanup(events, cloud, args.target)
     elif args.action == "setup":
-        src_config = args.config["source"]
+        src_config = clouds_config["source"]
         src = init_client(src_config,
                           "source",
                           Cloud,
                           Identity)
-        workloads = args.config["source"].get("workloads", {})
-        management.setup(config, events, src, "source",
+        workloads = clouds_config["source"].get("workloads", {})
+        management.setup(plugins_config, events, src, "source",
                          args.num_tenants,
                          args.num_servers,
                          workloads)
     elif args.action == "evacuate":
-        cloud_config = args.config["source"]
+        cloud_config = clouds_config["source"]
         cloud = init_client(cloud_config,
                             "source",
                             Cloud,

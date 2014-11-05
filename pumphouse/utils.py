@@ -18,6 +18,8 @@ import sys
 import time
 import traceback
 import yaml
+import re
+from collections import defaultdict
 
 from . import exceptions
 
@@ -73,3 +75,46 @@ def wait_for(resource, update_resource,
         time.sleep(check_interval)
         if time.time() - start > timeout:
             raise exceptions.TimeoutException()
+
+counter = (chr(i) for i in range(ord('A'), ord('Z')))
+ids = defaultdict(lambda: next(counter))
+
+
+def eat_ids(s):
+    return re.sub('(?<=-)[0-9a-f-]+(?=$|-)',
+                  lambda match: ids[match.group(0)], s)
+
+
+def dump_flow(flow, f, first=False, prev=None):
+    import taskflow.flow
+    import taskflow.patterns.linear_flow
+    linear = isinstance(flow, taskflow.patterns.linear_flow.Flow)
+    if first:
+        f.write('digraph "%s" {\n' % (eat_ids(flow.name),))
+    else:
+        f.write('subgraph "cluster_%s" {\n'
+                'graph[style=%s,rankdir=LR]\n' % (
+                    eat_ids(flow.name),
+                    'dashed' if linear else 'dotted'))
+    last = None
+    for item in flow:
+        if isinstance(item, taskflow.flow.Flow):
+            last = dump_flow(item, f, prev=prev)
+        else:
+            last = dump_task(item, f, prev=prev)
+        if linear:
+            prev = last
+        else:
+            prev = None
+    f.write('}\n')
+    return last
+
+
+def dump_task(task, f, prev=None):
+    for r in task.requires:
+        if not prev or prev.name != r:
+            f.write('"%s" -> "%s"\n' % (eat_ids(r), eat_ids(task.name)))
+    if prev:
+        f.write('"%s" -> "%s" [style=bold]\n' % (eat_ids(prev.name),
+                                                 eat_ids(task.name)))
+    return task

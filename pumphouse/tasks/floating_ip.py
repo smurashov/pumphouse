@@ -73,7 +73,7 @@ class EnsureFloatingIP(task.BaseCloudTask):
     # while loop with built-in retry mechanism of Taskflow lib
     def execute(self, server_info, floating_ip_info, fixed_ip_info):
         floating_ip_address = floating_ip_info["address"]
-        fixed_ip_address = fixed_ip_info["addr"]
+        fixed_ip_address = fixed_ip_info["v4-fixed-ip"]
         server_id = server_info["id"]
         try:
             floating_ip = self.cloud.nova.floating_ips_bulk.find(
@@ -148,11 +148,12 @@ def migrate_floating_ip(context, address):
 def associate_floating_ip_server(context, floating_ip_address,
                                  fixed_ip_info, server_id):
     """Associates Floating IP to Nova instance"""
-    floating_ip_bulk_ensure = "floating-ip-bulk-{}-retrieve".format(
+    floating_ip_bulk_ensure = "floating-ip-bulk-{}-ensure".format(
         floating_ip_address)
     floating_ip_sync = "floating-ip-{}-{}-sync".format(server_id,
                                                        floating_ip_address)
-    fixed_ip_binding = "fixed-ip-{}".format(server_id)
+    fixed_ip_address = fixed_ip_info["addr"]
+    fixed_ip_nic = "fixed-ip-{}-nic".format(fixed_ip_address)
     server_boot = "server-{}-boot".format(server_id)
     floating_ip_ensure = "floating-ip-{}-ensure".format(floating_ip_address)
     flow = linear_flow.Flow("associate-floating-ip-{}-server-{}"
@@ -165,6 +166,5 @@ def associate_floating_ip_server(context, floating_ip_address,
                               provides=floating_ip_ensure,
                               rebind=[server_boot,
                                       floating_ip_bulk_ensure,
-                                      fixed_ip_binding]))
-    context.store[fixed_ip_binding] = fixed_ip_info
+                                      fixed_ip_nic]))
     return flow
