@@ -553,7 +553,7 @@ class SetupWorkload(base.Resource):
                 "address": "127.16.0.{}".format(counter.next()),
                 "pool": TEST_RESOURCE_PREFIX + "-pool",
             }
-            server["floating_ips"] = [floating_ip]
+            server["floating_ips"].append(floating_ip)
             yield floating_ip
 
     @base.Collection(Server)
@@ -568,6 +568,7 @@ class SetupWorkload(base.Resource):
                             "name": tenant["username"],
                             "tenant": tenant,
                         },
+                        "floating_ips": [],
                     })
                     yield server
             else:
@@ -585,6 +586,7 @@ class SetupWorkload(base.Resource):
                             "name": tenant["username"],
                             "tenant": tenant,
                         },
+                        "floating_ips": [],
                     }
 
     create = base.task(name="create", requires=[
