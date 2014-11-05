@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and#
 # limitations under the License.
 
+import types
+
 from . import tasks
 
 __all__ = ['Resource', 'Collection']
@@ -73,6 +75,8 @@ class Resource(object):
             assert data is not None or self.data_fn is not None
         if data is None:
             data = self.data_fn(resource)
+            if isinstance(data, types.GeneratorType):
+                data = list(data)
         res = resource.get_runner().get_resource(self, data)
         self._resource_subres[resource] = res
         return res

@@ -40,13 +40,6 @@ def filter_prefixed(lst, dict_=False, key="name"):
             for e in lst if is_prefixed(getattr(e, key))]
 
 
-def gen_to_list(f):
-    @functools.wraps(f)
-    def inner(*args, **kwargs):
-        return list(f(*args, **kwargs))
-    return inner
-
-
 def make_kwargs(**kwargs):
     return {k: v for k, v in kwargs.iteritems() if v is not None}
 
@@ -285,7 +278,6 @@ class Server(base.Resource):
         return self.server["flavor"]
 
     @base.Collection(FloatingIP)
-    @gen_to_list
     def floating_ips(self):
         for floating_ip in self.server["floating_ips"]:
             floating_ip = floating_ip.copy()
@@ -397,7 +389,6 @@ class CleanupWorkload(base.Resource):
         return filter_prefixed(self.env.cloud.nova.flavors.list())
 
     @base.Collection(SecurityGroup)
-    @gen_to_list
     def security_groups(self):
         tenants = {tenant["id"]: tenant for tenant in self.tenants}
         for sg in self.env.cloud.nova.security_groups.list():
@@ -407,7 +398,6 @@ class CleanupWorkload(base.Resource):
                 yield sg
 
     @base.Collection(Network)
-    @gen_to_list
     def networks(self):
         networks = self.env.cloud.nova.networks.list()
         servers = collections.defaultdict(list)
@@ -442,7 +432,6 @@ class CleanupWorkload(base.Resource):
 
 class SetupWorkload(base.Resource):
     @base.Collection(Tenant)
-    @gen_to_list
     def tenants(self):
         tenants = self.setup["workloads"].get("tenants")
         if tenants is not None:
@@ -459,7 +448,6 @@ class SetupWorkload(base.Resource):
             }
 
     @base.Collection(User)
-    @gen_to_list
     def users(self):
         users = self.setup["workloads"].get("users")
         if users is not None:
@@ -498,7 +486,6 @@ class SetupWorkload(base.Resource):
         }]
 
     @base.Collection(SecurityGroup)
-    @gen_to_list
     def security_groups(self):
         for tenant in self.tenants:
             yield {
@@ -521,7 +508,6 @@ class SetupWorkload(base.Resource):
             }
 
     @base.Collection(Network)
-    @gen_to_list
     def networks(self):
         networks = self.setup["workloads"].get("networks")
         if networks is not None:
@@ -540,7 +526,6 @@ class SetupWorkload(base.Resource):
             }
 
     @base.Collection(FloatingIP)
-    @gen_to_list
     def floating_ips(self):
         floating_ips = self.setup["workloads"].get("floating_ips")
         if floating_ips is not None:
@@ -557,7 +542,6 @@ class SetupWorkload(base.Resource):
             yield floating_ip
 
     @base.Collection(Server)
-    @gen_to_list
     def servers(self):
         for tenant in self.tenants:
             if "servers" in tenant:
