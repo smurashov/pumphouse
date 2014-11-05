@@ -109,6 +109,16 @@ def cloud_resources(client):
                                  "OS-EXT-SRV-ATTR:hypervisor_hostname"),
         } for server in cloud.nova.servers.list(search_opts={"all_tenants": 1})
         ],
+        "volumes": [{
+            "id": volume.id,
+            "status": volume.status.lower(),
+            "display_name": volume.display_name,
+            "tenant_id": getattr(volume, "os-vol-tenant-attr:tenant_id"),
+            "attachment_server_ids": [attachment["server_id"] for attachment in
+                                      volume.attachments]
+        } for volume in cloud.cinder.volumes.list(
+            search_opts={"all_tenants": 1})
+        ],
         "images": [{
             "id": image["id"],
             "status": "",
