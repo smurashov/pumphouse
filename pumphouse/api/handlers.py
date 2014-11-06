@@ -78,58 +78,83 @@ def crossdomain(origin='*', methods=None, headers=('Accept', 'Content-Type'),
     return decorator
 
 
-def cloud_resources(client):
-    def get_host_status(hostname):
+def cloud_resources(cloud):
+    for tenant in cloud.keystone.tenants.list():
+        yield {
+            "id": tenant.id,
+            "cloud": cloud.name,
+            "type": "tenant",
+            "data": {
+                "id": tenant.id,
+                "name": tenant.name,
+                "description": tenant.description,
+            },
+        }
+    for server in cloud.nova.servers.list(search_opts={"all_tenants": 1}):
+        yield {
+            "id": server.id,
+            "cloud": cloud.name,
+            "type": "server",
+            "data": {
+                "id": server.id,
+                "name": server.name,
+                "status": server.status.lower(),
+                "tenant_id": server.tenant_id,
+                "image_id": server.image["id"],
+                # TODO(akscram): Mapping of real hardware servers to
+                #                hypervisors should be here.
+                "host_id": getattr(server,
+                                   "OS-EXT-SRV-ATTR:hypervisor_hostname"),
+            },
+        }
+    for image in cloud.glance.images.list():
+        yield {
+            "id": image["id"],
+            "cloud": cloud.name,
+            "type": "image",
+            "data": {
+                "id": image["id"],
+                "status": "",
+                "name": image["name"],
+            },
+        }
+    for floating_ip in cloud.nova.floating_ips_bulk.list():
+        yield {
+            "id": floating_ip.address,
+            "cloud": cloud.name,
+            "type": "floating_ip",
+            "data": {
+                "id": floating_ip.address,
+                "server_id": floating_ip.instance_uuid,
+            }
+        }
+    for hyperv in cloud.nova.hypervisors.list():
         services = cloud.nova.services.list(host=hyperv.service["host"],
                                             binary="nova-compute")
         service = services[0]
         if service.state == "up":
             if service.status == "enabled":
-                return "available"
+                status = "available"
             else:
-                return "blocked"
-        return "error"
-
-    cloud = client.connect()
-    resources = {
-        "urls": client.cloud_urls,
-        "tenants": [{
-            "id": tenant.id,
-            "name": tenant.name,
-            "description": tenant.description,
-        } for tenant in cloud.keystone.tenants.list()
-        ],
-        "servers": [{
-            "id": server.id,
-            "name": server.name,
-            "status": server.status.lower(),
-            "tenant_id": server.tenant_id,
-            "image_id": server.image["id"],
-            # TODO(akscram): Mapping of real hardware servers to
-            #                hypervisors should be here.
-            "host_id": getattr(server,
-                               "OS-EXT-SRV-ATTR:hypervisor_hostname"),
-        } for server in cloud.nova.servers.list(search_opts={"all_tenants": 1})
-        ],
-        "images": [{
-            "id": image["id"],
-            "status": "",
-            "name": image["name"],
-        } for image in cloud.glance.images.list()
-        ],
-        "floating_ips": [{
-            "id": floating_ip.address,
-            "server_id": floating_ip.instance_uuid
-        } for floating_ip in cloud.nova.floating_ips_bulk.list()
-        ],
-        "hosts": [{
+                status = "blocked"
+        else:
+            status = "error"
+        yield {
             "id": hyperv.service["host"],
-            "name": hyperv.service["host"],
-            "status": get_host_status(hyperv.service["host"]),
-        } for hyperv in cloud.nova.hypervisors.list()
-        ]
+            "cloud": cloud.name,
+            "type": "host",
+            "data": {
+                "name": hyperv.service["host"],
+                "status": status,
+            },
+        }
+
+
+def cloud_view(client):
+    return {
+        "urls": client.cloud_urls,
+        "resources": list(cloud_resources(client.connect())),
     }
-    return resources
 
 
 @pump.route("/")
@@ -168,8 +193,8 @@ def reset():
 def resources():
     return flask.jsonify(
         reset=flask.current_app.config["CLOUDS_RESET"],
-        source=cloud_resources(hooks.source),
-        destination=cloud_resources(hooks.destination),
+        source=cloud_view(hooks.source),
+        destination=cloud_view(hooks.destination),
         # TODO(akscram): A set of hosts that don't belong to any cloud.
         hosts=[],
         # TODO(akscram): A set of current events.
