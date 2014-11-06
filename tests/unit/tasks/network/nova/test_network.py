@@ -18,8 +18,8 @@ import mock
 
 from pumphouse import context
 from pumphouse import exceptions
-from pumphouse.tasks import floating_ip
-from pumphouse.tasks import network
+from pumphouse.tasks.network.nova import floating_ip
+from pumphouse.tasks.network.nova import network
 
 
 class TestNetwork(unittest.TestCase):

@@ -3,7 +3,7 @@ import unittest
 from mock import Mock, patch, call
 from pumphouse import exceptions
 from pumphouse import task
-from pumphouse.tasks import floating_ip
+from pumphouse.tasks.network.nova import floating_ip
 
 
 class TestFloatingIP(unittest.TestCase):
@@ -11,6 +11,7 @@ class TestFloatingIP(unittest.TestCase):
         self.test_address = "10.0.0.1"
         self.test_pool = "test-pool"
         self.test_instance_uuid = "123"
+        self.test_net_id = "234"
 
         self.floating_ip_info = {
             "address": self.test_address,
@@ -19,6 +20,10 @@ class TestFloatingIP(unittest.TestCase):
         }
         self.fixed_ip_info = {
             "addr": self.test_address
+        }
+        self.fixed_ip_nic = {
+            "net-id": self.test_net_id,
+            "v4-fixed-ip": self.test_address
         }
         self.server_info = {
             "id": self.test_instance_uuid
@@ -106,9 +111,9 @@ class TestEnsureFloatingIP(TestFloatingIP):
         self.assertIsInstance(ensure_floating_ip, task.BaseCloudTask)
 
         fip = ensure_floating_ip.execute(self.server_info,
-                                         self.test_address,
-                                         self.fixed_ip_info)
-        self.cloud.nova.floating_ips_bulk.assert_run_once_with(
+                                         self.floating_ip_info,
+                                         self.fixed_ip_nic)
+        self.cloud.nova.floating_ips_bulk.find.assert_run_once_with(
             address=self.test_address)
         self.assertEquals(
             self.floating_ip_info, fip)
@@ -121,8 +126,8 @@ class TestEnsureFloatingIP(TestFloatingIP):
 
         with self.assertRaises(exceptions.nova_excs.NotFound):
             ensure_floating_ip.execute(self.server_info,
-                                       self.test_address,
-                                       self.fixed_ip_info)
+                                       self.floating_ip_info,
+                                       self.fixed_ip_nic)
 
     def test_execute_add_floating_ip(self):
         ensure_floating_ip = floating_ip.EnsureFloatingIP(self.cloud)
@@ -132,8 +137,8 @@ class TestEnsureFloatingIP(TestFloatingIP):
             self.side_effect
 
         ensure_floating_ip.execute(self.server_info,
-                                   self.test_address,
-                                   self.fixed_ip_info)
+                                   self.floating_ip_info,
+                                   self.fixed_ip_nic)
         self.cloud.nova.servers.add_floating_ip.assert_run_once_with(
             self.test_instance_uuid, self.test_address, None)
 
@@ -148,8 +153,8 @@ class TestEnsureFloatingIP(TestFloatingIP):
 
         with self.assertRaises(exceptions.TimeoutException):
             ensure_floating_ip.execute(self.server_info,
-                                       self.test_address,
-                                       self.fixed_ip_info)
+                                       self.floating_ip_info,
+                                       self.fixed_ip_nic)
         ensure_floating_ip.assigning_error_event.assert_called_once_with(
             self.test_address, self.test_instance_uuid)
 
@@ -167,8 +172,8 @@ class TestEnsureFloatingIP(TestFloatingIP):
 
         with self.assertRaises(exceptions.Conflict):
             ensure_floating_ip.execute(self.server_info,
-                                       self.test_address,
-                                       self.fixed_ip_info)
+                                       self.floating_ip_info,
+                                       self.fixed_ip_nic)
 
 
 class TestMigrateFloatingIP(TestFloatingIP):
@@ -211,8 +216,6 @@ class TestAssociateFloatingIPServer(TestFloatingIP):
             self.fixed_ip_info,
             self.test_instance_uuid)
 
-        self.assertEqual({fixed_ip_binding: self.fixed_ip_info},
-                         self.context.store)
         flow_mock.assert_called_once_with("associate-floating-ip-{}-server-{}"
                                           .format(self.test_address,
                                                   self.test_instance_uuid))

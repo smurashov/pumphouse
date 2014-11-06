@@ -12,18 +12,8 @@
 # See the License for the specific language governing permissions and#
 # limitations under the License.
 
+from pumphouse import flows
+from . import nova
 
-from flask.ext import socketio
-
-
-__all__ = ("emit", "init_app", "on", "run")
-
-
-sio = socketio.SocketIO()
-
-# NOTE(akscram): Now we use directly SocketIO and keep their interface
-#                for events in the module.
-emit = sio.emit
-init_app = sio.init_app
-on = sio.on
-run = sio.run
+migrate_nic = flows.register("network", default="nova")
+migrate_nic.add("nova", nova.migrate_nic)

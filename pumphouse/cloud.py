@@ -19,6 +19,7 @@ import sqlalchemy as sqla
 from novaclient.v1_1 import client as nova_client
 from keystoneclient.v2_0 import client as keystone_client
 from glanceclient import client as glance
+from neutronclient.neutron import client as neutron_client
 
 
 LOG = logging.getLogger(__name__)
@@ -126,12 +127,14 @@ class Cloud(object):
         self.glance = glance.Client("2",
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
+        self.neutron = neutron_client.Client("2.0", **self.namespace.to_dict())
 
     def ping(self):
         try:
             self.keystone.users.list(limit=1)
             self.nova.servers.list(limit=1)
             iter(self.glance.images.list(limit=1)).next()
+            self.neutron.list_networks(limit=1)
         except Exception:
             LOG.exception("The client check is failed for cloud %r", self)
             return False

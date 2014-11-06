@@ -46,7 +46,7 @@ class EnsureRole(task.BaseCloudTask):
         events.emit("role created", {
             "id": role.id,
             "name": role.name,
-            "cloud": self.cloud.name
+            "cloud": self.cloud.name,
         }, namespace="/events")
 
 

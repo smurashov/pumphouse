@@ -12,18 +12,6 @@
 # See the License for the specific language governing permissions and#
 # limitations under the License.
 
-
-from flask.ext import socketio
-
-
-__all__ = ("emit", "init_app", "on", "run")
-
-
-sio = socketio.SocketIO()
-
-# NOTE(akscram): Now we use directly SocketIO and keep their interface
-#                for events in the module.
-emit = sio.emit
-init_app = sio.init_app
-on = sio.on
-run = sio.run
+# from .floating_ip import migrate_floating_ip
+# from .network import migrate_network
+# from .network import migrate_nic
