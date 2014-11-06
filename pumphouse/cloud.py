@@ -128,7 +128,6 @@ class Cloud(object):
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
         self.neutron = neutron_client.Client("2.0", **self.namespace.to_dict())
-                                             
 
     def ping(self):
         try:
