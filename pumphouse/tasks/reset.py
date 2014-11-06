@@ -333,6 +333,11 @@ class FloatingIP(EventResource):
 
 
 class Server(EventResource):
+    def event_data(self):
+        data = self.data.copy()
+        data["image_id"] = data["image"]["id"]
+        return data
+
     @Tenant()
     def tenant(self):
         # FIXME(yorik-sar): Use just id here and bind it to real data later
