@@ -306,6 +306,11 @@ class FloatingIP(EventResource):
     def event_id(self):
         return self.data["address"]
 
+    def event_data(self):
+        data = self.data.copy()
+        data["name"] = data["address"]
+        return data
+
     @classmethod
     def get_id_for(self, data):
         return data["address"]
