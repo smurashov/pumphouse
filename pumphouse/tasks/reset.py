@@ -87,7 +87,7 @@ class EventResource(base.Resource):
         event = {
             "id": self.get_id(),
             "type": self.events_type,
-            "cloud": self.env.cloud_name,
+            "cloud": self.env.cloud.name,
             "action": None,
             "progress": None,
             "data": self.event_data(),
@@ -644,7 +644,7 @@ class SetupWorkload(EventResource):
     ])
 
 
-Environment = collections.namedtuple("Environment", ["cloud", "cloud_name"])
+Environment = collections.namedtuple("Environment", ["cloud"])
 
 if __name__ == "__main__":
     import logging
@@ -656,7 +656,7 @@ if __name__ == "__main__":
     config = api.get_parser().parse_args().config
     source_config = config["CLOUDS"]["source"]
     cloud = p_cloud.Cloud.from_dict("src", source_config["endpoint"], None)
-    env = Environment(cloud, "src")
+    env = Environment(cloud)
     runner = base.TaskflowRunner(env)
     cleanup_workload = runner.get_resource(CleanupWorkload, {"id": "src"})
     runner.add(cleanup_workload.delete)
