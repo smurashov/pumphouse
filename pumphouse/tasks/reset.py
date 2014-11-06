@@ -22,6 +22,7 @@ import urllib
 
 from novaclient import exceptions as nova_excs
 
+from pumphouse import events
 from pumphouse.tasks import base
 from pumphouse import utils
 
@@ -44,12 +45,66 @@ def make_kwargs(**kwargs):
     return {k: v for k, v in kwargs.iteritems() if v is not None}
 
 
-class Tenant(base.Resource):
+class EventTask(base.UnboundTask):
+    def __init__(self, *args, **kwargs):
+        self.pre_event = kwargs.pop("pre_event", None)
+        self.post_event = kwargs.pop("post_event", None)
+        super(EventTask, self).__init__(*args, **kwargs)
+
+    def wrapper(self, fn):
+        @functools.wraps(fn)
+        def inner(resource):
+            if self.pre_event is None:
+                resource.pre_event(self.name)
+            else:
+                self.pre_event(resource)
+            res = fn(resource)
+            if self.post_event is None:
+                resource.post_event(self.name)
+            else:
+                self.post_event(resource)
+            return res
+        return inner
+
+task = EventTask
+
+
+class EventResource(base.Resource):
+    class __metaclass__(base.Resource.__metaclass__):
+        def __new__(mcs, name, bases, cls_vars):
+            if "events_type" not in cls_vars:
+                cls_vars["events_type"] = name.lower()
+            return base.Resource.__metaclass__.__new__(mcs, name, bases,
+                                                       cls_vars)
+
+    def event_data(self):
+        return self.data
+
+    def pre_event(self, name):
+        pass
+
+    def post_event(self, name):
+        event = {
+            "id": self.get_id(),
+            "type": self.events_type,
+            "cloud": self.env.cloud_name,
+            "action": None,
+            "progress": None,
+            "data": self.event_data(),
+        }
+        if name == "create":
+            events.emit(name, event)
+        elif name == "delete":
+            event["data"] = None
+            events.emit(name, event)
+
+
+class Tenant(EventResource):
     @classmethod
     def get_id_for(cls, data):
         return data["name"]
 
-    @base.task
+    @task
     def create(self):
         tenant = self.env.cloud.keystone.tenants.create(
             self.data["name"],
@@ -68,28 +123,28 @@ class Tenant(base.Resource):
         )
         self.data = tenant.to_dict()
 
-    @base.task
+    @task
     def delete(self):
         self.env.cloud.keystone.tenants.delete(self.data["id"])
 
 
-class Role(base.Resource):
+class Role(EventResource):
     @classmethod
     def get_id_for(cls, data):
         return data["name"]
 
-    @base.task
+    @task
     def create(self):
         self.data = self.env.cloud.keystone.role.create(
             name=self.data["name"],
         ).to_dict()
 
-    @base.task
+    @task
     def delete(self):
         self.env.cloud.keystone.roles.delete(self.data["id"])
 
 
-class User(base.Resource):
+class User(EventResource):
     @classmethod
     def get_id_for(cls, data):
         return data["name"]
@@ -98,7 +153,7 @@ class User(base.Resource):
     def tenant(self):
         return self.data["tenant"]
 
-    @base.task(requires=[tenant.create])
+    @task(requires=[tenant.create])
     def create(self):
         self.data = self.env.cloud.keystone.users.create(
             name=self.data["name"],
@@ -106,17 +161,17 @@ class User(base.Resource):
             tenant_id=self.tenant["id"],
         ).to_dict()
 
-    @base.task
+    @task
     def delete(self):
         self.env.cloud.keystone.users.delete(self.data["id"])
 
 
-class Flavor(base.Resource):
+class Flavor(EventResource):
     @classmethod
     def get_id_for(cls, data):
         return data["name"]
 
-    @base.task
+    @task
     def create(self):
         self.data = cloud.nova.flavors.create(
             self.data["name"],
@@ -132,12 +187,14 @@ class Flavor(base.Resource):
             )
         ).to_dict()
 
-    @base.task
+    @task
     def delete(self):
         self.env.cloud.nova.flavors.delete(self.data["id"])
 
 
-class SecurityGroup(base.Resource):
+class SecurityGroup(EventResource):
+    events_type = "secgroup"
+
     @classmethod
     def get_id_for(cls, data):
         return (data["tenant"]["name"], data["name"])
@@ -146,7 +203,7 @@ class SecurityGroup(base.Resource):
     def tenant(self):
         return self.data["tenant"]
 
-    @base.task(requires=[tenant.create])
+    @task(requires=[tenant.create])
     def create(self):
         cloud = self.env.cloud.restrict(
             tenant_name=self.tenant["name"],
@@ -160,7 +217,7 @@ class SecurityGroup(base.Resource):
             cloud.nova.security_group_rules.create(sg.id, **rule)
         self.data = cloud.nova.security_groups.get(sg.id).to_dict()
 
-    @base.task(before=[tenant.delete])
+    @task(before=[tenant.delete])
     def delete(self):
         if self.data["name"] != "default":
             cloud.nova.security_groups.delete(self.data["id"])
@@ -169,12 +226,12 @@ class SecurityGroup(base.Resource):
                 self.env.cloud.nova.security_group_rules.delete(rule["id"])
 
 
-class CachedImage(base.Resource):
+class CachedImage(EventResource):
     @classmethod
     def get_id_for(cls, data):
         return data["url"]
 
-    @base.task
+    @task
     def cache(self):
         f = tempfile.TemporaryFile()
         img = urllib.urlopen(self.data["url"])
@@ -199,15 +256,15 @@ class CachedImage(base.Resource):
                 "retrieval incomplete: got only %i out of %i bytes" % (
                     read, size), (None, headers))
 
-        self.data = {"file": f}
+        self.data = {"url": self.data["url"], "file": f}
 
 
-class Image(base.Resource):
+class Image(EventResource):
     @CachedImage()
     def cached_image(self):
         return {"url": self.data["url"]}
 
-    @base.task(requires=[cached_image.cache])
+    @task(requires=[cached_image.cache])
     def create(self):
         image = self.data.copy()
         image.pop("url")
@@ -215,7 +272,7 @@ class Image(base.Resource):
         image = self.env.cloud.glance.images.create(**image)
         self.data = dict(image)
 
-    @base.task(requires=[create])
+    @task(requires=[create])
     def upload(self):
         # upload starts here
         clone_fd = os.dup(self.cached_image["file"].fileno())
@@ -227,24 +284,26 @@ class Image(base.Resource):
         image = self.env.cloud.glance.images.get(self.data["id"])
         self.data = dict(image)
 
-    @base.task
+    @task
     def delete(self):
         self.env.cloud.glance.images.delete(self.data["id"])
 
 
-class FloatingIP(base.Resource):
+class FloatingIP(EventResource):
+    events_type = "floating_ip"
+
     @classmethod
     def get_id_for(self, data):
         return data["address"]
 
-    @base.task
+    @task
     def create(self):
         self.env.cloud.nova.floating_ips_bulk.create(
             self.data["address"],
             pool=self.data["pool"],
         )
 
-    @base.task
+    @task
     def disassociate(self):
         if self.data.get("server"):
             self.env.cloud.nova.servers.remove_floating_ip(
@@ -252,14 +311,14 @@ class FloatingIP(base.Resource):
                 self.data["address"],
             )
 
-    @base.task(requires=[disassociate])
+    @task(requires=[disassociate])
     def delete(self):
         self.env.cloud.nova.floating_ips_bulk.delete(
             self.data["address"],
         )
 
 
-class Server(base.Resource):
+class Server(EventResource):
     @Tenant()
     def tenant(self):
         # FIXME(yorik-sar): Use just id here and bind it to real data later
@@ -284,7 +343,7 @@ class Server(base.Resource):
             floating_ip["server"] = self.data
             yield floating_ip
 
-    @base.task(requires=[image.upload, tenant.create, flavor.create,
+    @task(requires=[image.upload, tenant.create, flavor.create,
                          user.create, floating_ips.each().create])
     def create(self):
         cloud = self.env.cloud.restrict(
@@ -316,7 +375,7 @@ class Server(base.Resource):
                     fixed_ip,
                 )
 
-    @base.task(before=[tenant.delete],
+    @task(before=[tenant.delete],
                requires=[floating_ips.each().disassociate])
     def delete(self):
         self.env.cloud.nova.servers.delete(self.data["id"])
@@ -324,7 +383,7 @@ class Server(base.Resource):
                        stop_excs=(nova_excs.NotFound,))
 
 
-class Network(base.Resource):
+class Network(EventResource):
     @classmethod
     def get_id_for(cls, data):
         return data["label"]
@@ -337,7 +396,7 @@ class Network(base.Resource):
     def servers(self):
         return self.data["servers"]
 
-    @base.task(requires=[tenant.create])
+    @task(requires=[tenant.create])
     def create(self):
         self.data = self.env.cloud.nova.networks.create(
             label=self.data["label"],
@@ -345,13 +404,13 @@ class Network(base.Resource):
             project_id=self.tenant["id"],
         ).to_dict()
 
-    @base.task(requires=[servers.each().delete])
+    @task(requires=[servers.each().delete])
     def delete(self):
         self.env.cloud.nova.networks.disassociate(self.data["id"])
         self.env.cloud.nova.networks.delete(self.data["id"])
 
 
-class CleanupWorkload(base.Resource):
+class CleanupWorkload(EventResource):
     @base.Collection(Tenant)
     def tenants(self):
         tenants = self.env.cloud.keystone.tenants.list()
@@ -430,7 +489,7 @@ class CleanupWorkload(base.Resource):
     ])
 
 
-class SetupWorkload(base.Resource):
+class SetupWorkload(EventResource):
     @base.Collection(Tenant)
     def tenants(self):
         tenants = self.data["workloads"].get("tenants")
@@ -585,7 +644,7 @@ class SetupWorkload(base.Resource):
     ])
 
 
-Environment = collections.namedtuple("Environment", ["cloud"])
+Environment = collections.namedtuple("Environment", ["cloud", "cloud_name"])
 
 if __name__ == "__main__":
     import logging
@@ -597,7 +656,7 @@ if __name__ == "__main__":
     config = api.get_parser().parse_args().config
     source_config = config["CLOUDS"]["source"]
     cloud = p_cloud.Cloud.from_dict("src", source_config["endpoint"], None)
-    env = Environment(cloud)
+    env = Environment(cloud, "src")
     runner = base.TaskflowRunner(env)
     cleanup_workload = runner.get_resource(CleanupWorkload, {"id": "src"})
     runner.add(cleanup_workload.delete)
