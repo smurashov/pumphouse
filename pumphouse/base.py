@@ -27,8 +27,8 @@ class Service(object):
 
     def __init__(self, config, target, cloud_driver, identity_driver):
         self.identity_config = config.pop("identity")
-        self.populate_config = config.pop("populate", {})
-        self.workloads_config = config.pop("workloads", {})
+        self.populate_config = config.pop("populate", None)
+        self.workloads_config = config.pop("workloads", None)
         self.cloud_urls = config.pop("urls", None)
         self.cloud_config = config
         self.target = target
@@ -58,14 +58,21 @@ class Service(object):
             runner.add(cleanup_workload.delete)
             runner.run()
 
-            runner = base.TaskflowRunner(env)
-            setup_workload = runner.get_resource(reset.SetupWorkload, {
-                "id": "src",
-                "populate": self.populate_config,
-                "workloads": self.workloads_config,
-            })
-            runner.add(setup_workload.create)
-            runner.run()
+            populate = self.populate_config
+            workloads = self.workloads_config
+            if populate is not None or workloads is not None:
+                if populate is None:
+                    populate = {}
+                if workloads is None:
+                    workloads = {}
+                runner = base.TaskflowRunner(env)
+                setup_workload = runner.get_resource(reset.SetupWorkload, {
+                    "id": "src",
+                    "populate": populate,
+                    "workloads": workloads,
+                })
+                runner.add(setup_workload.create)
+                runner.run()
         except Exception:
             LOG.exception("Unexpected exception during cloud reset")
 
