@@ -93,10 +93,10 @@ class EventResource(base.Resource):
             "data": self.event_data(),
         }
         if name == "create":
-            events.emit(name, event)
+            events.emit(name, event, namespace="/events")
         elif name == "delete":
             event["data"] = None
-            events.emit(name, event)
+            events.emit(name, event, namespace="/events")
 
 
 class Tenant(EventResource):
