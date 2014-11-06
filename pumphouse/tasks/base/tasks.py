@@ -16,10 +16,15 @@ __all__ = ['UnboundTask', 'Task', 'task']
 
 
 class UnboundTask(object):
+    wrapper = None
+
     def __init__(self, fn=None, name=None,
                  requires=[], after=[], before=[]):
         self._resource_task = {}
-        self.fn = fn
+        if fn is not None and self.wrapper is not None:
+            self.fn = self.wrapper(fn)
+        else:
+            self.fn = fn
         if name is None and fn is not None:
             self.name = fn.__name__
         else:
@@ -30,7 +35,10 @@ class UnboundTask(object):
 
     def __call__(self, fn):
         assert self.fn is None and self.name is None
-        self.fn = fn
+        if self.wrapper is not None:
+            self.fn = self.wrapper(fn)
+        else:
+            self.fn = fn
         self.name = fn.__name__
         return self
 
