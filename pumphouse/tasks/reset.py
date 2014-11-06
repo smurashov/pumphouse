@@ -77,6 +77,9 @@ class EventResource(base.Resource):
             return base.Resource.__metaclass__.__new__(mcs, name, bases,
                                                        cls_vars)
 
+    def event_id(self):
+        return self.data["id"]
+
     def event_data(self):
         return self.data
 
@@ -85,7 +88,7 @@ class EventResource(base.Resource):
 
     def post_event(self, name):
         event = {
-            "id": self.get_id(),
+            "id": self.event_id(),
             "type": self.events_type,
             "cloud": self.env.cloud.name,
             "action": None,
@@ -97,6 +100,8 @@ class EventResource(base.Resource):
         elif name == "delete":
             event["data"] = None
             events.emit(name, event, namespace="/events")
+        else:
+            events.emit("update", event, namespace="/events")
 
 
 class Tenant(EventResource):
@@ -227,6 +232,12 @@ class SecurityGroup(EventResource):
 
 
 class CachedImage(EventResource):
+    def pre_event(self, name):
+        pass
+
+    def post_event(self, name):
+        pass
+
     @classmethod
     def get_id_for(cls, data):
         return data["url"]
@@ -291,6 +302,9 @@ class Image(EventResource):
 
 class FloatingIP(EventResource):
     events_type = "floating_ip"
+
+    def event_id(self):
+        return self.data["address"]
 
     @classmethod
     def get_id_for(self, data):
@@ -368,12 +382,18 @@ class Server(EventResource):
         else:
             fixed_ip = None
         if fixed_ip:
+            # FIXME(yorik-sar): Move this to FloatingIP.associate or smth
             for floating_ip in self.floating_ips:
                 self.env.cloud.nova.servers.add_floating_ip(
                     server["id"],
                     floating_ip["address"],
                     fixed_ip,
                 )
+                obj = FloatingIP(runner=self.runner, data={
+                    "address": floating_ip["address"],
+                    "server_id": server["id"],
+                })
+                obj.post_event("associate")
 
     @task(before=[tenant.delete],
           requires=[floating_ips.each().disassociate])
