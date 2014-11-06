@@ -344,7 +344,7 @@ class Server(EventResource):
             yield floating_ip
 
     @task(requires=[image.upload, tenant.create, flavor.create,
-                         user.create, floating_ips.each().create])
+                    user.create, floating_ips.each().create])
     def create(self):
         cloud = self.env.cloud.restrict(
             username=self.user["name"],
@@ -376,7 +376,7 @@ class Server(EventResource):
                 )
 
     @task(before=[tenant.delete],
-               requires=[floating_ips.each().disassociate])
+          requires=[floating_ips.each().disassociate])
     def delete(self):
         self.env.cloud.nova.servers.delete(self.data["id"])
         utils.wait_for(self.data["id"], self.env.cloud.nova.servers.get,
