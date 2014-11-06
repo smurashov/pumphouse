@@ -114,7 +114,7 @@ class Tenant(EventResource):
             )
         )
         our_user_id = self.env.cloud.keystone.auth_ref.user_id
-        all_roles = cloud.keystone.roles.list()
+        all_roles = self.env.cloud.keystone.roles.list()
         admin_role = [r for r in all_roles if r.name == "admin"][0]
         self.env.cloud.keystone.tenants.add_user(
             tenant.id,
@@ -173,7 +173,7 @@ class Flavor(EventResource):
 
     @task
     def create(self):
-        self.data = cloud.nova.flavors.create(
+        self.data = self.env.cloud.nova.flavors.create(
             self.data["name"],
             self.data["ram"],
             self.data["vcpu"],

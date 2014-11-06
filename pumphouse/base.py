@@ -14,7 +14,8 @@
 
 import logging
 
-from . import management
+from pumphouse.tasks import base
+from pumphouse.tasks import reset
 
 
 LOG = logging.getLogger(__name__)
@@ -26,8 +27,8 @@ class Service(object):
 
     def __init__(self, config, target, cloud_driver, identity_driver):
         self.identity_config = config.pop("identity")
-        self.populate_config = config.pop("populate", None)
-        self.workloads_config = config.pop("workloads", None)
+        self.populate_config = config.pop("populate", {})
+        self.workloads_config = config.pop("workloads", {})
         self.cloud_urls = config.pop("urls", None)
         self.cloud_config = config
         self.target = target
@@ -49,17 +50,22 @@ class Service(object):
 
     def reset(self, events, cloud):
         try:
-            management.cleanup(events, cloud, self.target)
-            kwargs = {}
-            if isinstance(self.workloads_config, dict):
-                kwargs['workloads'] = self.workloads_config
-            if isinstance(self.populate_config, dict):
-                kwargs['num_tenants'] = self.populate_config.get(
-                    "num_tenants", self.default_num_tenants)
-                kwargs['num_servers'] = self.populate_config.get(
-                    "num_servers", self.default_num_servers)
-            if kwargs:
-                management.setup(events, cloud, self.target, **kwargs)
+            env = reset.Environment(cloud)
+
+            runner = base.TaskflowRunner(env)
+            cleanup_workload = runner.get_resource(reset.CleanupWorkload,
+                                                   {"id": cloud.name})
+            runner.add(cleanup_workload.delete)
+            runner.run()
+
+            runner = base.TaskflowRunner(env)
+            setup_workload = runner.get_resource(reset.SetupWorkload, {
+                "id": "src",
+                "populate": self.populate_config,
+                "workloads": self.workloads_config,
+            })
+            runner.add(setup_workload.create)
+            runner.run()
         except Exception:
             LOG.exception("Unexpected exception during cloud reset")
 
