@@ -11,3 +11,4 @@ Flask-SocketIO==0.3.8
 taskflow==0.3.21
 six==1.7.3
 netaddr
+python-neutronclient

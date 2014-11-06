@@ -3,7 +3,7 @@ import unittest
 from mock import Mock, patch, call
 from pumphouse import exceptions
 from pumphouse import task
-from pumphouse.tasks import floating_ip
+from pumphouse.tasks.network.nova import floating_ip
 
 
 class TestFloatingIP(unittest.TestCase):

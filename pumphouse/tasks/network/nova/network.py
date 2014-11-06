@@ -15,11 +15,11 @@
 import logging
 
 import netaddr
+from taskflow.patterns import graph_flow
 
 from pumphouse import exceptions
 from pumphouse import task
-from pumphouse.tasks import floating_ip as fip_tasks
-from taskflow.patterns import graph_flow
+from . import floating_ip as fip_tasks
 
 LOG = logging.getLogger(__name__)
 
