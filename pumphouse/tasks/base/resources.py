@@ -50,6 +50,7 @@ class Resource(object):
         self.runner = runner
         self.bound = data is not None
         self.data = data
+        self.id_ = None
         self.data_fn = None
 
     def set_data_fn(self, data_fn):
@@ -95,7 +96,9 @@ class Resource(object):
 
     def get_id(self):
         assert self.bound
-        return self.get_id_for(self.data)
+        if self.id_ is None:
+            self.id_ = self.get_id_for(self.data)
+        return self.id_
 
     def __get__(self, instance, owner):
         if instance is not None:
