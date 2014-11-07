@@ -20,6 +20,7 @@ from novaclient.v1_1 import client as nova_client
 from keystoneclient.v2_0 import client as keystone_client
 from glanceclient import client as glance
 from cinderclient import client as cinder
+from neutronclient.neutron import client as neutron_client
 
 
 LOG = logging.getLogger(__name__)
@@ -132,12 +133,14 @@ class Cloud(object):
                                     self.namespace.password,
                                     self.namespace.tenant_name,
                                     self.namespace.auth_url)
+        self.neutron = neutron_client.Client("2.0", **self.namespace.to_dict())
 
     def ping(self):
         try:
             self.keystone.users.list(limit=1)
             self.nova.servers.list(limit=1)
             iter(self.glance.images.list(limit=1)).next()
+            self.neutron.list_networks(limit=1)
         except Exception:
             LOG.exception("The client check is failed for cloud %r", self)
             return False
