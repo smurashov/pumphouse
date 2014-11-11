@@ -31,10 +31,19 @@ function API(endpoint) {
             });
     };
 
-    this.evacuateHost = function(host_name, callback) {
+    this.evacuateHost = function(host_id, callback) {
         // Initiates host evacuation
         return this._request
-            .post(this._endpoint + '/hosts/' + host_name)
+            .post(this._endpoint + '/hosts/' + host_id)
+            .end(function(err, res) {
+                (callback || this._no_callback)(err, res);
+            });
+    };
+
+    this.reassignHost = function(host_id, callback) {
+        // Initiates host evacuation
+        return this._request
+            .delete(this._endpoint + '/hosts/' + host_id)
             .end(function(err, res) {
                 (callback || this._no_callback)(err, res);
             });

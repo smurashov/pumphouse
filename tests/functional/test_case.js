@@ -33,9 +33,9 @@ TestCase.prototype.next = function() {
     if (this.index < this.steps.length) {
         var s = this.steps[this.index++], that = this;
         console.log(s.title);
+        console.log(new Array(80).join('-'));
         s.func();
     } else this.completed = true;
-    return true;
 };
 
 TestCase.prototype.fail = function(message) {
@@ -51,7 +51,8 @@ function TestStep(title, f) {
 };
 
 TestStep.prototype.next = function() {
-    this.test_case.next();
+    setTimeout(this.test_case.next.bind(this.test_case), 10);
+    return true;
 };
 
 TestStep.prototype.fail = function(msg) {

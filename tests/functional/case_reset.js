@@ -11,7 +11,8 @@ ResetTestCase.addStep('Calling API to reset', function() {
 
 ResetTestCase.addStep('Fetching reset completion events for both clouds', function() {
     var completed_for = {};
-    this.test_case.events.on('reset completed', function(m) {
+    this.test_case.events.on('reset completed').execute(function(m) {
+        console.log(m);
         completed_for[m.cloud] = true;
         if (completed_for['source'] && completed_for['destination']) {
             console.log('Reset completed');

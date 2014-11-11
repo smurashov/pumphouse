@@ -2,11 +2,15 @@ var Config = require('./config');
 var Listener = require('./events');
 var API = require('./api');
 
-var events = new Listener(Config.endpoint + '/events').bindHandlers();
+var events = new Listener(Config.endpoint + '/events');
 var pumphouse = new API(Config.endpoint);
 
-
-var cases = ['reset', 'migrate', 'evaculate'], limit = 120, i = 0, completed = true, c, timer;
+var cases = ['reset', 'evaculate'],
+    limit = 120,
+    i = 0,
+    completed = true,
+    c,
+    timer;
 
 // Async tests runner
 setInterval(function() {
