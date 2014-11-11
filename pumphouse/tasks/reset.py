@@ -244,7 +244,7 @@ class CachedImage(EventResource):
 
     @task
     def cache(self):
-        f = tempfile.TemporaryFile()
+        f = tempfile.NamedTemporaryFile(delete=True)
         img = urllib.urlopen(self.data["url"])
         # Based on urllib.URLOpener.retrieve
         try:
@@ -267,6 +267,7 @@ class CachedImage(EventResource):
                 "retrieval incomplete: got only %i out of %i bytes" % (
                     read, size), (None, headers))
 
+        f.flush()
         self.data = {"url": self.data["url"], "file": f}
 
 
@@ -286,12 +287,8 @@ class Image(EventResource):
     @task(requires=[create])
     def upload(self):
         # upload starts here
-        clone_fd = os.dup(self.cached_image["file"].fileno())
-        try:
-            f = os.fdopen(clone_fd)
+        with open(self.cached_image["file"].name, 'rb') as f:
             self.env.cloud.glance.images.upload(self.data["id"], f)
-        finally:
-            os.close(clone_fd)
         image = self.env.cloud.glance.images.get(self.data["id"])
         self.data = dict(image)
 
