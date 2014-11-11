@@ -82,7 +82,7 @@ def cleanup(events, cloud, target):
                        stop_excs=(nova_excs.NotFound,))
         LOG.info("Deleted server: %s", server._info)
         hostname = getattr(server, "OS-EXT-SRV-ATTR:hypervisor_hostname")
-        events.emit("server delete", {
+        events.emit("server terminate", {
             "cloud": target,
             "id": server.id,
             "host_name": hostname
