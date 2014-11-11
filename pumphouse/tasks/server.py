@@ -205,11 +205,11 @@ def reprovision_server(context, server, server_nics):
 @provision_server.add("image")
 def rebuild_by_image(context, server):
     image_id = server.image["id"]
-    image_retrieve = "image-{}-retrieve".format(image_id)
+    image_binding = "image-{}".format(image_id)
     image_ensure = "image-{}-ensure".format(image_id)
 
     pre_suspend = []
-    if image_retrieve not in context.store:
+    if image_binding not in context.store:
         image_flow = image_tasks.migrate_image(context, image_id)
         pre_suspend.append(image_flow)
 
