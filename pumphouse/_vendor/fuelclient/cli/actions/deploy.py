@@ -37,7 +37,7 @@ class DeployChangesAction(Action):
         """To deploy all applied changes to some environment:
             fuel --env 1 deploy-changes
         """
-        from fuelclient.objects.environment import Environment
+        from ...objects.environment import Environment
         env = Environment(params.env)
         deploy_task = env.deploy_changes()
         self.serializer.print_to_output(

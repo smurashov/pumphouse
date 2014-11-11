@@ -59,7 +59,9 @@ def replace_import(package, module):
         f.seek(0)
         f.truncate()
         for line in lines:
-            if line.startswith("import") or line.startswith("from"):
+            stripped_line = line.strip()
+            if (stripped_line.startswith("import") or
+                    stripped_line.startswith("from")):
                 line = relative(line)
             f.write(line)
 

@@ -88,7 +88,7 @@ class Environment(BaseObject):
         )
 
     def get_all_nodes(self):
-        from fuelclient.objects.node import Node
+        from .node import Node
         return sorted(map(
             Node.init_with_data,
             self.connection.get_request(

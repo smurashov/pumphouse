@@ -51,7 +51,7 @@ class Task(BaseObject):
 class DeployTask(Task):
 
     def __init__(self, obj_id, env_id):
-        from fuelclient.objects.environment import Environment
+        from .environment import Environment
         super(DeployTask, self).__init__(obj_id)
         self.env = Environment(env_id)
         self.nodes = self.env.get_all_nodes()
