@@ -384,8 +384,7 @@ def setup(config, events, cloud, target,
     floating_ips = workloads.get(
         'floating_ips', list(generate_floating_ips_list(
             num_tenants * sum([len(t["servers"]) for t in tenants]))))
-    generate_networks_list = network_generator.select(
-        config.get("network_manager"))
+    generate_networks_list = network_generator.select_from_config(config)
     networks = workloads.get('networks',
                              generate_networks_list(num_tenants))
     for image_dict in images:
@@ -411,7 +410,7 @@ def setup(config, events, cloud, target,
             "cloud": target
         }, namespace="/events")
 
-    setup_network = network_manager.select(config.get("network_manager"))
+    setup_network = network_manager.select_from_config(config)
     setup_network(events, cloud, networks)
 
     for pool in floating_ips:

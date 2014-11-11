@@ -59,7 +59,8 @@ class Service(object):
                 kwargs['num_servers'] = self.populate_config.get(
                     "num_servers", self.default_num_servers)
             if kwargs:
-                management.setup(events, cloud, self.target, **kwargs)
+                management.setup(self.cloud_config.get("PLUGINS", {}), events,
+                                 cloud, self.target, **kwargs)
         except Exception:
             LOG.exception("Unexpected exception during cloud reset")
 
