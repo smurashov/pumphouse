@@ -26,6 +26,7 @@ TestCase.prototype.run = function(api, events) {
     this.index = 0;
     this.result = true;
     console.log('Running test-case: ', this.title);
+    console.log(new Array(80).join('='));
     this.next();
 };
 

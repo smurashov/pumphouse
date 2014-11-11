@@ -9,13 +9,15 @@ EvacuateTestCase.addStep('Calling API to fetch resources', function() {
         if (err) this.fail('Resources fetching error');
 
         this.test_case.context.state = new Cloud(res.body);
-        this.next();
+        return this.next();
     }.bind(this))
 });
 
 EvacuateTestCase.addStep('Looking for preconfigured host in source cloud', function() {
-    var context = this.test_case.context, b = context.state;
-    console.log('Got the response', b.toString());
+    var context = this.test_case.context,
+        b = context.state;
+
+    console.log('Got clouds resources', b.toString());
 
     // Looking for predefined tenant in the source cloud
     var h = b.get(Config.host);
@@ -29,25 +31,34 @@ EvacuateTestCase.addStep('Looking for preconfigured host in source cloud', funct
 
 EvacuateTestCase.addStep('Initiate host evacuation', function() {
     var host = this.test_case.context.host;
+
     this.test_case.api.evacuateHost(host.id, function(err, res) {
         if (err) this.fail('Host ' + host.id + ' evacuation initialization failed');
-        this.next();
+
+        return this.next();
     }.bind(this))
 });
 
 EvacuateTestCase.addStep('Listening for host evacuation start event', function() {
     var host = this.test_case.context.host;
-    this.test_case.events.on('update').of(Config.host).execute(function(m) {
-        if (m.action == 'evacuation') {
-            console.log('Host ' + host.name + ' evacuation started');
-            return this.next();
-        }
-        return false;
-    }.bind(this))
+
+    this.test_case.events
+        .on('update')
+        .of(Config.host)
+        .execute(
+            function(m) {
+                if (m.action == 'evacuation') {
+                    console.log('Host ' + host.id + ' evacuation started');
+                    return this.next();
+                }
+                return false;
+            }.bind(this)
+        )
 });
 
 EvacuateTestCase.addStep('Listening for host evacuation finish event', function() {
     var host = this.test_case.context.host;
+
     this.test_case.events.on('update').of(Config.host).execute(function(m) {
         if (m.action == '') {
             console.log('Host ' + host.name + ' evacuation completed');
@@ -59,7 +70,7 @@ EvacuateTestCase.addStep('Listening for host evacuation finish event', function(
 
 EvacuateTestCase.addStep('Saving previous cloud configuration', function() {
     this.test_case.context.initial_state = this.test_case.context.state;
-    this.next();
+    return this.next();
 });
 
 EvacuateTestCase.repeatStep(0);
@@ -67,13 +78,12 @@ EvacuateTestCase.repeatStep(0);
 EvacuateTestCase.addStep('Assuring host is clean and all servers live migrated from it', function() {
     var context = this.test_case.context,
         host = context.host,
-        old = context.initial_state.getAll({'type': 'server'}),
+        old = context.initial_state.getAll({'type': 'server', 'data.host_id': host.id}),
         now = context.state
 
     // Making sure all servers evacuated from host still alive
     for (var i in old) {
-        var s = old[i],
-            n = now.get(s);
+        var s = old[i], n = now.get(s);
         console.log(' - Server ' + s.data.name + ': ' + s.data.host_id + ' -> ' + n.data.host_id);
         if (!n) {
             this.fail('Unable to locate server ' + s.name + ' (' + s.id + ') existed before evacuation');
@@ -81,7 +91,7 @@ EvacuateTestCase.addStep('Assuring host is clean and all servers live migrated f
             this.fail('Host still contains server: ' + n.data.name + ' (' + n.id + ')');
         }
     }
-    this.next();
+    return this.next();
 });
 
-exports.o = EvacuateTestCase;
+exports.testcase = EvacuateTestCase;

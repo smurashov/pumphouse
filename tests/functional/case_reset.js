@@ -22,4 +22,4 @@ ResetTestCase.addStep('Fetching reset completion events for both clouds', functi
     }.bind(this))
 });
 
-exports.o = ResetTestCase;
+exports.testcase = ResetTestCase;
