@@ -282,15 +282,17 @@ def reassign_host(host_id):
             LOG.exception("Error is occured during reassigning host %r",
                           host_id)
             status = "error"
-            new_hostname = ""
+            new_host_id = ""
         else:
             status = ""
             hostname_attr = "node-assigned-hosetname-{}".format(host_id)
-            new_hostname = result[hostname_attr]
+            new_host_id = result[hostname_attr]
 
         events.emit("host reassigned", {
             "id": host_id,
-            "host_name": new_hostname,
+            "name": new_host_id,
+            "new_id": new_host_id,
+            "cloud": dst.name,
             "status": status,
         }, namespace="/events")
     gevent.spawn(reassign)
