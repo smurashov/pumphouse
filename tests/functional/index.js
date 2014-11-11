@@ -5,8 +5,7 @@ var API = require('./api');
 var events = new Listener(Config.endpoint + '/events');
 var pumphouse = new API(Config.endpoint);
 
-var cases = ['reset', 'evaculate'],
-    limit = 120,
+var cases = ['reset', 'evaculate', 'migrate'],
     i = 0,
     completed = true,
     c,
@@ -21,10 +20,10 @@ setInterval(function() {
             process.exit(code=0);
         }
         c = require('./case_' + cases[i++]);
-        c.o.run(pumphouse, events);
+        c.testcase.run(pumphouse, events);
     }
-    completed = c.o.completed;
-    if (cycles++ > limit) {
+    completed = c.testcase.completed;
+    if (cycles++ > Config.timeout) {
         console.error('Timed out!');
         process.exit(code=1);
     }
