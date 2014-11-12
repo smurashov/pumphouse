@@ -159,11 +159,11 @@ def create_subnet(client, **subnet_params):
         raise
 
 
-def create_network(client, network_name):
+def create_network(client, network_data):
     try:
         # TODO (sryabin) stub create_network
         return client.create_network({
-            'network': network_name
+            'network': network_data
         })
     except Exception as e:
         LOG.exception("Error in list subnets: %s" % e.message)
