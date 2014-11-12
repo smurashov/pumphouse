@@ -124,7 +124,7 @@ class Resource(object):
 
 
 class Collection(Resource):
-    _colletion_tasks = {}
+    _collection_tasks = {}
 
     def __init__(self, base_cls, **kwargs):
         super(Collection, self).__init__(**kwargs)
@@ -140,11 +140,11 @@ class Collection(Resource):
     def get_unbound_task(self, name):
         key = (self.base_cls, name)
         try:
-            return self._colletion_tasks[key]
+            return self._collection_tasks[key]
         except KeyError:
             assert name in self.base_cls._tasks
             task = CollectionUnboundTask(getattr(self.base_cls, name))
-            self._colletion_tasks[key] = task
+            self._collection_tasks[key] = task
             return task
 
 
