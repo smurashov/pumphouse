@@ -84,8 +84,6 @@ class TestRetrieveSecGroup(SecGroupTestCase):
         secgroup_info = retrieve_secgroup.execute(self.test_secgroup_id,
                                                   self.tenant_info,
                                                   self.user_info)
-        self.cloud.restrict.assert_called_once_with(
-            tenant_name=self.tenant_info["name"])
         self.cloud.nova.security_groups.get.assert_called_once_with(
             self.test_secgroup_id)
         self.assertEqual("123", secgroup_info["id"])
