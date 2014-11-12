@@ -81,6 +81,7 @@ class TestService(TestBase):
                                              self.cloud,
                                              self.service.target)
         mock_setup.assert_called_once_with(
+            {},
             self.events,
             self.cloud,
             self.service.target,
@@ -98,7 +99,7 @@ class TestService(TestBase):
                                              self.cloud,
                                              self.service.target)
         mock_setup.assert_called_once_with(
-            self.events, self.cloud, self.service.target,
+            {}, self.events, self.cloud, self.service.target,
             num_tenants=self.config["populate"]["num_tenants"],
             num_servers=self.config["populate"]["num_servers"])
 
@@ -111,7 +112,8 @@ class TestService(TestBase):
 
         # Assuring that if there are no num_servers and num_tenants present
         # in populate_config default values are used
-        mock_setup.assert_called_once_with(self.events,
+        mock_setup.assert_called_once_with({},
+                                           self.events,
                                            self.cloud,
                                            self.service.target,
                                            num_tenants=2,
