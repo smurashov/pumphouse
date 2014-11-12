@@ -76,8 +76,9 @@ class EnsureImage(task.BaseCloudsTask):
             self.created_event(image)
 
             data = self.src_cloud.glance.images.data(image_info["id"])
-            img_data = task_utils.FileProxy(data, LogReporter((image_info,
-                                                               image)))
+            img_data = task_utils.FileProxy(data, image_info["size"],
+                                            LogReporter((image_info,
+                                                         image)))
             dst_cloud.glance.images.upload(image["id"], img_data)
             image = dst_cloud.glance.images.get(image["id"])
             self.uploaded_event(image)

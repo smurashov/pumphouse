@@ -9,7 +9,7 @@ class TestBase(unittest.TestCase):
         self.identity = "dummy_id"
         self.identity2 = "dummy_id2"
 
-        self.cloud_config = {
+        self.cloud_endpoint = {
             "auth_url": "auth_url"
         }
         self.config = {
@@ -20,7 +20,7 @@ class TestBase(unittest.TestCase):
             },
             "workloads": {"c": "abc123"},
             "urls": ["a", "b", "c"],
-            "endpoint": self.cloud_config
+            "endpoint": self.cloud_endpoint,
         }
         self.target = "fakecloud"
         self.driver = Mock(return_value=self.identity)
@@ -50,7 +50,7 @@ class TestService(TestBase):
                          self.config["workloads"])
         self.assertEqual(self.service.cloud_urls, self.config["urls"])
         self.assertEqual(self.service.cloud_config,
-                         {"endpoint": self.cloud_config})
+                         {"endpoint": self.cloud_endpoint})
         self.assertEqual(self.service.target, self.target)
         self.assertEqual(self.service.cloud_driver, self.cloud_driver)
         self.assertEqual(self.service.identity_driver, self.identity_driver)
@@ -63,14 +63,12 @@ class TestService(TestBase):
         self.service.make(identity=None)
         self.identity_driver.assert_called_once_with(a=self.identity)
         self.identity_driver.from_dict.assert_called_once_with(
-            name=self.target, identity=self.identity,
-            endpoint=self.cloud_config)
+            self.target, self.identity, {"endpoint": self.cloud_endpoint})
 
     def test_make(self):
         self.service.make(identity=self.identity2)
         self.identity_driver.from_dict.assert_called_once_with(
-            name=self.target, identity=self.identity2,
-            endpoint=self.cloud_config)
+            self.target, self.identity2, {"endpoint": self.cloud_endpoint})
 
     @patch("pumphouse.management.cleanup")
     @patch("pumphouse.management.setup")
@@ -81,6 +79,7 @@ class TestService(TestBase):
                                              self.cloud,
                                              self.service.target)
         mock_setup.assert_called_once_with(
+            {},
             self.events,
             self.cloud,
             self.service.target,
@@ -98,7 +97,7 @@ class TestService(TestBase):
                                              self.cloud,
                                              self.service.target)
         mock_setup.assert_called_once_with(
-            self.events, self.cloud, self.service.target,
+            {}, self.events, self.cloud, self.service.target,
             num_tenants=self.config["populate"]["num_tenants"],
             num_servers=self.config["populate"]["num_servers"])
 
@@ -111,7 +110,8 @@ class TestService(TestBase):
 
         # Assuring that if there are no num_servers and num_tenants present
         # in populate_config default values are used
-        mock_setup.assert_called_once_with(self.events,
+        mock_setup.assert_called_once_with({},
+                                           self.events,
                                            self.cloud,
                                            self.service.target,
                                            num_tenants=2,

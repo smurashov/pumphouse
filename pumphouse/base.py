@@ -37,9 +37,8 @@ class Service(object):
     def make(self, identity=None):
         if identity is None:
             identity = self.identity_driver(**self.identity_config)
-        cloud = self.cloud_driver.from_dict(name=self.target,
-                                            identity=identity,
-                                            **self.cloud_config)
+        cloud = self.cloud_driver.from_dict(self.target, identity,
+                                            self.cloud_config)
         LOG.info("Cloud client initialized for endpoint: %s",
                  self.cloud_config["endpoint"]["auth_url"])
         return cloud
@@ -59,7 +58,8 @@ class Service(object):
                 kwargs['num_servers'] = self.populate_config.get(
                     "num_servers", self.default_num_servers)
             if kwargs:
-                management.setup(events, cloud, self.target, **kwargs)
+                management.setup(self.cloud_config.get("PLUGINS", {}), events,
+                                 cloud, self.target, **kwargs)
         except Exception:
             LOG.exception("Unexpected exception during cloud reset")
 

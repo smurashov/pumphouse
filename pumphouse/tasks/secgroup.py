@@ -27,8 +27,7 @@ LOG = logging.getLogger(__name__)
 class RetrieveSecGroup(task.BaseCloudTask):
     """Retrieve security group data from cloud by ID"""
     def execute(self, secgroup_id, tenant_info, user_info):
-        cloud = self.cloud.restrict(tenant_name=tenant_info["name"])
-        secgroup = cloud.nova.security_groups.get(secgroup_id)
+        secgroup = self.cloud.nova.security_groups.get(secgroup_id)
         return secgroup.to_dict()
 
 

@@ -59,14 +59,10 @@ class UploadReporter(object):
 
 
 class FileProxy(object):
-    def __init__(self, data, reporter):
-        # NOTE(akscram): The glance.images.data returns
-        #                ResponseBodyIterator that wraps http response
-        #                and provides an iterable object.
-        self.resp = data._resp
+    def __init__(self, data, size, reporter):
+        self.resp = data
         self.reporter = reporter
-        data_size = int(data._resp.getheader("content-length", 0))
-        self.reporter.set_size(data_size)
+        self.reporter.set_size(size)
 
     def close(self):
         self.resp.close()
@@ -75,7 +71,7 @@ class FileProxy(object):
         return self.resp.isclosed()
 
     def read(self, amt=None):
-        data = self.resp.read(amt)
+        data = self.resp.next()
         if data:
             self.reporter.update(len(data))
         return data
