@@ -35,6 +35,7 @@ class TestBase(unittest.TestCase):
 
         self.service = base.Service(
             self.config.copy(),
+            {},  # plugins
             self.target,
             self.cloud_driver,
             self.identity_driver

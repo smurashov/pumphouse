@@ -353,7 +353,7 @@ def setup_server_floating_ip(cloud, server):
         return server, floating_ip
 
 
-def setup(config, events, cloud, target,
+def setup(plugins, events, cloud, target,
           num_tenants=0, num_servers=0, workloads={}):
 
     """Prepares test resources in the source cloud
@@ -384,7 +384,7 @@ def setup(config, events, cloud, target,
     floating_ips = workloads.get(
         'floating_ips', list(generate_floating_ips_list(
             num_tenants * sum([len(t["servers"]) for t in tenants]))))
-    generate_networks_list = network_generator.select_from_config(config)
+    generate_networks_list = network_generator.select_from_config(plugins)
     networks = workloads.get('networks',
                              generate_networks_list(num_tenants))
     for image_dict in images:
@@ -410,7 +410,7 @@ def setup(config, events, cloud, target,
             "cloud": target
         }, namespace="/events")
 
-    setup_network = network_manager.select_from_config(config)
+    setup_network = network_manager.select_from_config(plugins)
     setup_network(events, cloud, networks)
 
     for pool in floating_ips:

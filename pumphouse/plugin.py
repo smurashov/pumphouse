@@ -98,6 +98,8 @@ class Plugin(object):
         return self.implementations[name]
 
     def select_from_config(self, config, default=None):
+        if default is None:
+            default = self.default
         switch = config.get(self.target, default)
         return self.select(switch)
 
