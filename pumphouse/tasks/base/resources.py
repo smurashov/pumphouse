@@ -88,6 +88,10 @@ class Resource(object):
         return self.runner
 
     @classmethod
+    def get_id_for_runner(cls, data, runner):
+        return cls.get_id_for(data)
+
+    @classmethod
     def get_id_for(cls, data):
         try:
             return data["id"]
@@ -97,7 +101,7 @@ class Resource(object):
     def get_id(self):
         assert self.bound
         if self.id_ is None:
-            self.id_ = self.get_id_for(self.data)
+            self.id_ = self.get_id_for_runner(self.data, self.get_runner())
         return self.id_
 
     def __get__(self, instance, owner):
@@ -133,8 +137,10 @@ class Collection(Resource):
     def each(self):
         return CollectionProxy(self)
 
-    def get_id_for(self, data):
-        elements = frozenset(self.base_cls.get_id_for(el) for el in data)
+    def get_id_for_runner(self, data, runner):
+        elements = frozenset(
+            self.base_cls.get_id_for_runner(el, runner) for el in data,
+        )
         return (self.base_cls, elements)
 
     def get_unbound_task(self, name):
@@ -163,6 +169,7 @@ class CollectionUnboundTask(tasks.UnboundTask):
     def __init__(self, task):
         super(CollectionUnboundTask, self).__init__(
             task.fn,
+            name=task.name,
             requires=task.requires,
         )
         self.base_task = task

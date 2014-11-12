@@ -671,7 +671,7 @@ class SetupWorkload(EventResource):
     ])
 
 
-Environment = collections.namedtuple("Environment", ["cloud"])
+Environment = collections.namedtuple("Environment", ["cloud", "plugins"])
 
 if __name__ == "__main__":
     import logging

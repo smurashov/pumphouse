@@ -30,7 +30,7 @@ class Runner(object):
         self.env = env
 
     def get_resource(self, resource, data):
-        id_ = resource.get_id_for(data)
+        id_ = resource.get_id_for_runner(data, self)
         if isinstance(resource, resources.Collection):
             base_cls = resource.base_cls
             res_type = functools.partial(resources.Collection,
