@@ -5,7 +5,7 @@ var API = require('./api');
 var events = new Listener(Config.endpoint + '/events');
 var pumphouse = new API(Config.endpoint);
 
-var cases = ['reset', 'evaculate', 'migrate'],
+var cases = Config.cases,
     i = 0,
     completed = true,
     c,

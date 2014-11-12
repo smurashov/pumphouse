@@ -46,8 +46,6 @@ HandlersManager.prototype.execute = function (f) {
             this.store[this.event][this.entity] = [];
         };
         this.store[this.event][this.entity].push(f);
-
-        //console.log(this.store);
         return true;
     } else {
         return false;
@@ -61,15 +59,15 @@ HandlersManager.prototype.handle = function (event_name, data) {
             entity_event_handlers = event_handlers[key] || [],
             i = entity_event_handlers.length - 1;
 
-        //console.log(event_handlers, key, entity_event_handlers);
-
         for (; i >= 0; i--) {
-            console.log('Handling', event_name, key);
+            console.log('Handling', key, event_name);
             if (entity_event_handlers[i](data) && key) {
                 console.log('Cleaning', event_name, 'handler for', key);
                 entity_event_handlers.splice(i, 1);
             }
-        }
+        };
+        // For all entities common handler should also be executed
+        if (key && event_handlers[null] && event_handlers[null][0]) event_handlers[null][0](data);
     }
 };
 
@@ -89,7 +87,7 @@ function EventsListener(path) {
         'update',
         'delete',
 
-        'reset started',
+        'reset start',
         'reset completed'
     ].map(function(name) {
         this.socket.on(name, this.handlerFactory(name))
@@ -107,8 +105,8 @@ EventsListener.prototype.disconnect = function() {
 
 EventsListener.prototype.handlerFactory = function(event_name) {
     return function(data) {
-        this.handlers.handle(event_name, data);
         console.log('Event "' + event_name + '": ' + JSON.stringify(data));
+        this.handlers.handle(event_name, data);
     }.bind(this);
 };
 

@@ -43,7 +43,7 @@ function API(endpoint) {
     this.reassignHost = function(host_id, callback) {
         // Initiates host evacuation
         return this._request
-            .delete(this._endpoint + '/hosts/' + host_id)
+            .del(this._endpoint + '/hosts/' + host_id)
             .end(function(err, res) {
                 (callback || this._no_callback)(err, res);
             });

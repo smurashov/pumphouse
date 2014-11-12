@@ -2,7 +2,7 @@ var TestCase = require('./test_case');
 var Config = require('./config');
 var Cloud = require('./cloud');
 
-var EvacuateTestCase = new TestCase('Tenant migration');
+var EvacuateTestCase = new TestCase('Host evacuation');
 
 EvacuateTestCase.addStep('Calling API to fetch resources', function() {
     this.test_case.api.resources(function(err, res) {
