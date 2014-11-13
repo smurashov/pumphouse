@@ -158,6 +158,17 @@ def create_subnet(client, **subnet_params):
         LOG.exception("Error in list subnets: %s" % e.message)
         raise
 
+def del_network(client, network_filter):
+    try:
+        for network in get_networks_by(network_filter):
+            LOG.debug("Delete network '%s' match by '%s' filter" %
+                      (network['id'], str(subnet_filter)))
+            client.delete_network(network['id'])
+    except Exception as e:
+        LOG.exception("Error in delete network: %s" % e.message)
+        raise
+
+
 
 def create_network(client, network_data):
     try:
