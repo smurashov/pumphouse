@@ -206,7 +206,8 @@ class TestReprovisionServer(TestServer):
 
 class TestRestoreFloatingIPs(TestServer):
 
-    @patch("pumphouse.tasks.floating_ip.associate_floating_ip_server")
+    @patch("pumphouse.tasks.network.nova.floating_ip."
+           "associate_floating_ip_server")
     @patch("taskflow.patterns.unordered_flow.Flow")
     def test_restore_floating_ips(self, flow_mock,
                                   associate_fip_mock):

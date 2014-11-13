@@ -39,9 +39,8 @@ def migrate_server(context, server_id):
         context, server.to_dict())
     resources.append(identity_flow)
     tenant = context.src_cloud.keystone.tenants.get(server.tenant_id)
-    restrict_src = context.src_cloud.restrict(tenant_name=tenant.name)
-    for name in [sg["name"] for sg in server.security_groups]:
-        secgroup = restrict_src.nova.security_groups.find(name=name)
+    server_secgroups = server.list_security_group()
+    for secgroup in server_secgroups:
         secgroup_retrieve = "secgroup-{}-retrieve".format(secgroup.id)
         if secgroup_retrieve not in context.store:
             secgroup_flow = secgroup_tasks.migrate_secgroup(

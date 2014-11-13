@@ -37,9 +37,11 @@ class Fuel(object):
     '''
 
     def __init__(self, endpoint, env_id):
-        os.environ['LISTEN_ADDRESS'] = endpoint
-        from fuelclient.objects.environment import Environment
-        self.env = Environment(env_id)
+        os.environ["SERVER_ADDRESS"] = endpoint
+        # NOTE(akscram): fuelclient.client initializes the singleton
+        #                client during the module import.
+        from pumphouse._vendor.fuelclient.objects import environment
+        self.env = environment.Environment(env_id)
 
     def assign_role(self, node, role='compute'):
 
@@ -65,7 +67,9 @@ class Fuel(object):
             LOG.warn("Node already added: %s", node.data)
 
     def wait_for_node(self, status='discover', node_id=0, timeout=300):
-        from fuelclient.objects.node import Node
+        # NOTE(akscram): fuelclient.client initializes the singleton
+        #                client during the module import.
+        from pumphouse._vendor.fuelclient.objects.node import Node
         node = Node(node_id)
         start_time = time.clock()
         while time.clock() < (start_time + timeout):
