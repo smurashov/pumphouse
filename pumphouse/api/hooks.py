@@ -85,7 +85,9 @@ class Cloud(object):
                  config["CLOUD_SERVICE"])
         cloud_config = config["CLOUDS"][self.target].copy()
         cloud_service = utils.load_class(config["CLOUD_SERVICE"])
+        plugins = config.get("PLUGINS", {})
         service = cloud_service(cloud_config,
+                                plugins,
                                 self.target,
                                 cloud_driver,
                                 identity_driver)
@@ -105,6 +107,13 @@ class Cloud(object):
             clouds = self.get_extension(ctx.app)
             _, client = clouds.connect(self.target)
             return client
+
+    def config(self):
+        ctx = flask._app_ctx_stack.top
+        if ctx is not None:
+            clouds = self.get_extension(ctx.app)
+            service, _ = clouds.connect(self.target)
+            return service.cloud_config
 
     @property
     def cloud_urls(self):

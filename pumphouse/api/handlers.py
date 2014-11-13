@@ -15,17 +15,19 @@
 import datetime
 import functools
 import gevent
+import os
 import logging
 
 import flask
 
-from . import evacuation
 from . import hooks
 
 from pumphouse import context
 from pumphouse import events
 from pumphouse import flows
+from pumphouse.tasks import evacuation
 from pumphouse.tasks import resources as resource_tasks
+from pumphouse.tasks import node as node_tasks
 
 
 LOG = logging.getLogger(__name__)
@@ -105,8 +107,8 @@ def cloud_resources(client):
             "image_id": server.image["id"],
             # TODO(akscram): Mapping of real hardware servers to
             #                hypervisors should be here.
-            "host_name": getattr(server,
-                                 "OS-EXT-SRV-ATTR:hypervisor_hostname"),
+            "host_id": getattr(server,
+                               "OS-EXT-SRV-ATTR:hypervisor_hostname"),
         } for server in cloud.nova.servers.list(search_opts={"all_tenants": 1})
         ],
         "volumes": [{
@@ -131,6 +133,7 @@ def cloud_resources(client):
         } for floating_ip in cloud.nova.floating_ips_bulk.list()
         ],
         "hosts": [{
+            "id": hyperv.service["host"],
             "name": hyperv.service["host"],
             "status": get_host_status(hyperv.service["host"]),
         } for hyperv in cloud.nova.hypervisors.list()
@@ -220,14 +223,89 @@ def migrate_tenant(tenant_id):
     return flask.make_response()
 
 
-@pump.route("/hosts/<host_name>", methods=["POST"])
+@pump.route("/hosts/<host_id>", methods=["POST"])
 @crossdomain()
-def evacuate_host(host_name):
+def evacuate_host(host_id):
     @flask.copy_current_request_context
     def evacuate():
-        source = hooks.source.connect()
-        evacuation.evacuate_servers(events, source, host_name)
+        config = flask.current_app.config.get("PLUGINS") or {}
+        src = hooks.source.connect()
+        dst = hooks.destination.connect()
+        ctx = context.Context(config, src, dst)
+        events.emit("host evacuate", {
+            "id": host_id,
+        }, namespace="/events")
+
+        try:
+            flow = evacuation.evacuate_servers(ctx, host_id)
+            LOG.debug("Evacuation flow: %s", flow)
+            result = flows.run_flow(flow, ctx.store)
+            LOG.debug("Result of evacuation: %s", result)
+        except Exception:
+            LOG.exception("Error is occured during evacuating host %r",
+                          host_id)
+            status = "error"
+        else:
+            status = ""
+
+        events.emit("host evacuated", {
+            "id": host_id,
+            "status": status,
+        }, namespace="/events")
     gevent.spawn(evacuate)
+    return flask.make_response()
+
+
+@pump.route("/hosts/<host_id>", methods=["DELETE"])
+@crossdomain()
+def reassign_host(host_id):
+    @flask.copy_current_request_context
+    def reassign():
+        # NOTE(akscram): Initialization of fuelclient.
+        fuel_config = flask.current_app.config["CLOUDS"]["fuel"]["endpoint"]
+        os.environ["SERVER_ADDRESS"] = fuel_config["host"]
+        os.environ["LISTEN_PORT"] = str(fuel_config["port"])
+        os.environ["KEYSTONE_USER"] = fuel_config["username"]
+        os.environ["KEYSTONE_PASS"] = fuel_config["password"]
+
+        src_config = hooks.source.config()
+        dst_config = hooks.destination.config()
+        config = {
+            "source": src_config["environment"],
+            "destination": dst_config["environment"],
+        }
+
+        events.emit("host reassign", {
+            "id": host_id,
+        }, namespace="/events")
+
+        try:
+            src = hooks.source.connect()
+            dst = hooks.destination.connect()
+            ctx = context.Context(config, src, dst)
+
+            flow = node_tasks.reassign_node(ctx, host_id)
+            LOG.debug("Reassigning flow: %s", flow)
+            result = flows.run_flow(flow, ctx.store)
+            LOG.debug("Result of migration: %s", result)
+        except Exception:
+            LOG.exception("Error is occured during reassigning host %r",
+                          host_id)
+            status = "error"
+            new_host_id = ""
+        else:
+            status = ""
+            hostname_attr = "node-assigned-hosetname-{}".format(host_id)
+            new_host_id = result[hostname_attr]
+
+        events.emit("host reassigned", {
+            "id": host_id,
+            "name": new_host_id,
+            "new_id": new_host_id,
+            "cloud": dst.name,
+            "status": status,
+        }, namespace="/events")
+    gevent.spawn(reassign)
     return flask.make_response()
 
 

@@ -152,7 +152,8 @@ class Cloud(object):
         return self.__class__(self.name, namespace, self.identity)
 
     @classmethod
-    def from_dict(cls, name, endpoint, identity):
+    def from_dict(cls, name, identity, config):
+        endpoint = config["endpoint"]
         namespace = Namespace(
             username=endpoint["username"],
             password=endpoint["password"],

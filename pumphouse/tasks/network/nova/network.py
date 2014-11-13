@@ -50,7 +50,8 @@ class EnsureNetwork(task.BaseCloudTask):
     def verify(self, network, network_info):
         network_label = network["label"]
         for k, v in network.items():
-            if k.endswith('_at') or k in ('id', 'host', 'vpn_public_address'):
+            if (k.endswith('_at') or k.startswith('vpn_public_') or
+                    k in ('id', 'host', 'project_id')):
                 continue  # Skip timestamps and cloud-specific fields
             if v != network_info[k]:
                 raise exceptions.Conflict("Network %s has different field %s" %
