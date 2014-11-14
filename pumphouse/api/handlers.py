@@ -107,6 +107,21 @@ def cloud_resources(cloud):
                                    "OS-EXT-SRV-ATTR:hypervisor_hostname"),
             },
         }
+    for volume in cloud.cinder.volumes.list(search_opts={"all_tenants": 1}):
+        attachments = [attachment["server_id"]
+                       for attachment in volume.attachments]
+        yield {
+            "id": volume.id,
+            "cloud": cloud.name,
+            "type": "volume",
+            {
+                "id": volume.id,
+                "status": volume.status.lower(),
+                "display_name": volume.display_name,
+                "tenant_id": getattr(volume, "os-vol-tenant-attr:tenant_id"),
+                "attachment_server_ids": attachments,
+            },
+        }
     for image in cloud.glance.images.list():
         yield {
             "id": image["id"],
