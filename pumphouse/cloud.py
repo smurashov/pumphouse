@@ -19,6 +19,7 @@ import sqlalchemy as sqla
 from novaclient.v1_1 import client as nova_client
 from keystoneclient.v2_0 import client as keystone_client
 from glanceclient import client as glance
+from cinderclient import client as cinder
 from neutronclient.neutron import client as neutron_client
 
 
@@ -127,6 +128,11 @@ class Cloud(object):
         self.glance = glance.Client("2",
                                     endpoint=g_endpoint["publicURL"],
                                     token=self.keystone.auth_token)
+        self.cinder = cinder.Client("1",
+                                    self.namespace.username,
+                                    self.namespace.password,
+                                    self.namespace.tenant_name,
+                                    self.namespace.auth_url)
         self.neutron = neutron_client.Client("2.0", **self.namespace.to_dict())
 
     def ping(self):
