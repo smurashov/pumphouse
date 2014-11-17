@@ -1,21 +1,26 @@
 Pumphouse
 =========
 
-The goal of this project is to provide a tool for migrating workloads (i.e.
-tenants and their resources) from arbitrary OpenStack cloud to Mirantis
-OpenStack cloud. Source cloud must comply to certain limitations (see below).
-Miranits OpenStack cloud should be installed next to existing cloud, using Fuel
-automated deployment framework.
+Pumphouse provides a tool for forklift upgrade of OpenStack clouds. This type of
+upgrade combines migration of workloads (i.e. tenants and their resources) with
+management of bare-metal hosts. It allows to update cloud on the same set of
+hardware.
+
+Migration of resources allows to release hosts from original cloud. Those hosts
+could be upgraded then to latest version of OpenStack. Pumphouse uses Fuel,
+open-source deployment automation engine, to install the platform component onto
+hosts.
 
 ## Requirements and constraints
 
-- Source OpenStack releases supported:
-  - Grizzly (2013.1)
+Following OpenStack releases can be upgraded with Pumphouse:
   - Havana (2013.2)
   - Icehouse (2014.1)
-- Source OpenStack has `nova-network` for networking manager
-- Network schema is FlatDHCP
-- Every physical node must have at least 2 NICs:
+  - Juno (2014.2)
+Following network managers are suitable for upgrade:
+  - `nova-network` in FlatDHCP and VLAN modes
+  - `neutron` in OVS+GRE mode
+Every hypervisor host in original cloud must have at least 2 NICs for:
   - Admin/PXE boot network
   - Management/Public/Private networks
 
@@ -134,11 +139,12 @@ $ pumphouse config.yaml migrate <resource_class> --ids <ID> [<ID> ...]
 
 `<resource_class>` could be one of the following:
 
-* `images` - replicate images from source to destination cloud
+* `images` - replicate images from source to destination cloud.
 * `identity` - replicate complete identity structure (including projects, users
-  and roles with assignment) of the source cloud in the destination cloud
+  and roles with assignment) of the source cloud in the destination cloud.
 * `resources` - migrate all resources that belong to the tenant/project
   identified by its ID in source cloud and all resources they depend on.
+* `volumes` - migrate all volumes with specified IDs.
 
 You can obtain <ID>s of resources you want to migrate by using standard
 OpenStack clients or Horizon dashboard UI.
