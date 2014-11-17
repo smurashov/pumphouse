@@ -91,8 +91,12 @@ class Resource(object):
     def get_id_for_runner(cls, data, runner):
         return cls.get_id_for(data)
 
+    data_id_key = None
+
     @classmethod
     def get_id_for(cls, data):
+        if cls.data_id_key:
+            return data[cls.data_id_key]
         try:
             return data["id"]
         except KeyError:

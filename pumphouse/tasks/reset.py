@@ -105,9 +105,7 @@ class EventResource(base.Resource):
 
 
 class Tenant(EventResource):
-    @classmethod
-    def get_id_for(cls, data):
-        return data["name"]
+    data_id_key = "name"
 
     @task
     def create(self):
@@ -134,9 +132,7 @@ class Tenant(EventResource):
 
 
 class Role(EventResource):
-    @classmethod
-    def get_id_for(cls, data):
-        return data["name"]
+    data_id_key = "name"
 
     @task
     def create(self):
@@ -150,9 +146,7 @@ class Role(EventResource):
 
 
 class User(EventResource):
-    @classmethod
-    def get_id_for(cls, data):
-        return data["name"]
+    data_id_key = "name"
 
     @Tenant()
     def tenant(self):
@@ -172,9 +166,7 @@ class User(EventResource):
 
 
 class Flavor(EventResource):
-    @classmethod
-    def get_id_for(cls, data):
-        return data["name"]
+    data_id_key = "name"
 
     @task
     def create(self):
@@ -232,15 +224,13 @@ class SecurityGroup(EventResource):
 
 
 class CachedImage(EventResource):
+    data_id_key = "url"
+
     def pre_event(self, name):
         pass
 
     def post_event(self, name):
         pass
-
-    @classmethod
-    def get_id_for(cls, data):
-        return data["url"]
 
     @task
     def cache(self):
@@ -304,6 +294,7 @@ class FloatingIP(base.Plugin):
 
 @FloatingIP.register("nova")
 class NovaFloatingIP(EventResource):
+    data_id_key = "address"
     events_type = "floating_ip"
 
     def event_id(self):
@@ -313,10 +304,6 @@ class NovaFloatingIP(EventResource):
         data = self.data.copy()
         data["name"] = data["address"]
         return data
-
-    @classmethod
-    def get_id_for(self, data):
-        return data["address"]
 
     @task
     def create(self):
@@ -423,9 +410,7 @@ class Network(base.Plugin):
 
 @Network.register("nova")
 class NovaNetwork(EventResource):
-    @classmethod
-    def get_id_for(cls, data):
-        return data["label"]
+    data_id_key = "label"
 
     @Tenant()
     def tenant(self):
