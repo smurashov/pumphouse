@@ -116,6 +116,7 @@ def cloud_resources(client):
             "status": volume.status.lower(),
             "display_name": volume.display_name,
             "tenant_id": getattr(volume, "os-vol-tenant-attr:tenant_id"),
+            "host_id": getattr(volume, "os-vol-host-attr:host"),
             "attachment_server_ids": [attachment["server_id"] for attachment in
                                       volume.attachments]
         } for volume in cloud.cinder.volumes.list(
