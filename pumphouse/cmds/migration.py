@@ -56,11 +56,9 @@ def get_parser():
                         action="store_true",
                         help="Work with FakeCloud back-end instead real "
                              "back-end from config.yaml")
-
     parser.add_argument("--dump",
                         nargs="?",
                         const="flow.dot",
-                        action="store_true",
                         help="Dump flow without execution")
 
     subparsers = parser.add_subparsers()
