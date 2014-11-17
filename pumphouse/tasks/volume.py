@@ -19,6 +19,7 @@ from taskflow.patterns import graph_flow
 from pumphouse import task
 from pumphouse import events
 from pumphouse import utils
+from pumphouse import exceptions
 from pumphouse.tasks import image as image_tasks
 
 
@@ -37,17 +38,19 @@ class UploadVolume(task.BaseCloudTask):
         try:
             resp, upload_info = self.cloud.cinder.volumes.upload_to_glance(
                 volume_id)
-        except Exception:
-            raise
-        if resp.ok:
-            image_id = upload_info["os-volume_upload_image"]["image_id"]
+        except Exception as exc:
+            LOG.exception("Upload failed: %s", exc.message)
+            raise exc
+        image_id = upload_info["os-volume_upload_image"]["image_id"]
+        try:
             image = self.cloud.glance.images.get(image_id)
-            image = utils.wait_for(image.id,
-                                   self.cloud.glance.images.get,
-                                   value="active")
-            self.upload_to_glance_event(image.to_dict())
-        else:
-            raise Exception(resp.reason)
+        except exceptions.glance_excs.NotFound:
+            LOG.exception("Image not found: %s", image_id)
+            raise exceptions.NotFound()
+        image = utils.wait_for(image.id,
+                               self.cloud.glance.images.get,
+                               value="active")
+        self.upload_to_glance_event(image.to_dict())
         return image.id
 
     def upload_to_glance_event(self, image_info):
@@ -70,12 +73,13 @@ class CreateVolumeFromImage(task.BaseCloudTask):
                 display_description=volume_info["display_description"],
                 volume_type=volume_info["volume_type"],
                 imageRef=image_id)
-        except Exception:
-            raise
+        except Exception as exc:
+            LOG.exception("Cannot create: %s", volume_info)
+            raise exc
         else:
             volume = utils.wait_for(volume.id,
                                     self.cloud.cinder.volumes.get,
-                                    value="active")
+                                    value="available")
             self.create_volume_event(volume._info)
         return volume._info
 
