@@ -98,7 +98,7 @@ def cloud_resources(cloud):
             "data": {
                 "id": server.id,
                 "name": server.name,
-                "status": server.status.lower(),
+                "status": server.status,
                 "tenant_id": server.tenant_id,
                 "image_id": server.image["id"],
                 # TODO(akscram): Mapping of real hardware servers to
