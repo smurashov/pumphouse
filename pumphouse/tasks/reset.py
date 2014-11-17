@@ -297,7 +297,13 @@ class Image(EventResource):
         self.env.cloud.glance.images.delete(self.data["id"])
 
 
-class FloatingIP(EventResource):
+class FloatingIP(base.Plugin):
+    plugin_key = "network"
+    default = "nova"
+
+
+@FloatingIP.register("nova")
+class NovaFloatingIP(EventResource):
     events_type = "floating_ip"
 
     def event_id(self):
@@ -410,7 +416,13 @@ class Server(EventResource):
                        stop_excs=(nova_excs.NotFound,))
 
 
-class Network(EventResource):
+class Network(base.Plugin):
+    plugin_key = "network"
+    default = "nova"
+
+
+@Network.register("nova")
+class NovaNetwork(EventResource):
     @classmethod
     def get_id_for(cls, data):
         return data["label"]
