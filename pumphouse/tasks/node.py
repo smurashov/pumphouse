@@ -184,13 +184,13 @@ class WaitUnassignedNode(task.Task):
     def execute(self, node_info, **requires):
         condition_check = lambda x: x is not None
         unassigned_node_info = utils.wait_for(node_info,
-                                              self.retirieve_unassigned,
+                                              self.retrieve_unassigned,
                                               attribute_getter=condition_check,
                                               value=True,
                                               timeout=360)
         return unassigned_node_info
 
-    def retirieve_unassigned(self, node_info):
+    def retrieve_unassigned(self, node_info):
         def extract_macs(info):
             macs = set(i["mac"] for i in info["meta"]["interfaces"])
             return macs
