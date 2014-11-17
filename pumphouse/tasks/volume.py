@@ -101,7 +101,9 @@ def migrate_detached_volume(context, volume):
     volume_retrieve = "{}-retrieve".format(volume_binding)
     volume_upload = "{}-upload".format(volume_binding)
     image_ensure = "{}-image-ensure".format(volume_binding)
-    user_ensure = "user-{}-ensure".format(volume.user_id)
+    user_id = "none"
+    user_ensure = "user-{}-ensure".format(user_id)
+    context.store[user_ensure] = None
     volume_ensure = "{}-ensure".format(volume_binding)
 
     flow = graph_flow.Flow("migrate-{}".format(volume_binding))
