@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import functools
+import logging
 
 import taskflow.engines
 from taskflow.patterns import graph_flow
@@ -21,6 +22,8 @@ import taskflow.task
 from . import resources
 
 __all__ = ['Runner', 'TaskflowRunner']
+
+LOG = logging.getLogger(__name__)
 
 
 class Runner(object):
@@ -63,8 +66,10 @@ class TaskFlowTask(taskflow.task.Task):
         self.task = task
 
     def execute(self, **dependencies):
+        LOG.debug("Starting task %s of %s", self.task.name, self.task.resource)
         if self.task.fn is not None:
             self.task.fn(self.task.resource)
+        LOG.debug("Finished task %s of %s", self.task.name, self.task.resource)
 
 
 def _make_str_id(id_):
