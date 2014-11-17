@@ -21,6 +21,8 @@ import yaml
 import re
 from collections import defaultdict
 
+from requests import exceptions as req_excs
+
 from . import exceptions
 
 
@@ -49,6 +51,10 @@ status_attr = operator.attrgetter("status")
 def wait_for(resource, update_resource,
              attribute_getter=status_attr, value=None, error_value=None,
              timeout=60, check_interval=1, expect_excs=None, stop_excs=None):
+    if expect_excs:
+        expect_excs = tuple(expect_excs) + (req_excs.ConnectionError,)
+    else:
+        expect_excs = (req_excs.ConnectionError,)
     if stop_excs is None:
         if value is None:
             value = "ACTIVE"
