@@ -247,8 +247,11 @@ def evacuate_host(host_id):
         src = hooks.source.connect()
         dst = hooks.destination.connect()
         ctx = context.Context(config, src, dst)
-        events.emit("host evacuate", {
+        events.emit("update", {
             "id": host_id,
+            "type": "host",
+            "cloud": src.name,
+            "action": "evacuation",
         }, namespace="/events")
 
         try:
@@ -259,13 +262,12 @@ def evacuate_host(host_id):
         except Exception:
             LOG.exception("Error is occured during evacuating host %r",
                           host_id)
-            status = "error"
-        else:
-            status = ""
 
-        events.emit("host evacuated", {
+        events.emit("update", {
             "id": host_id,
-            "status": status,
+            "type": "host",
+            "cloud": src.name,
+            "action": "",
         }, namespace="/events")
     gevent.spawn(evacuate)
     return flask.make_response()

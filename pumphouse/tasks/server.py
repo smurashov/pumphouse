@@ -53,39 +53,42 @@ class EvacuateServer(task.BaseCloudTask):
                                              self.block_migration,
                                              self.disk_over_commit)
         server = utils.wait_for(server_id, self.cloud.nova.servers.get)
-        server = server.to_dict()
-        self.evacuation_end_event(server)
-        return server
+        migrated_server_info = server.to_dict()
+        self.evacuation_end_event(migrated_server_info)
+        return migrated_server_info
 
     def evacuation_start_event(self, server):
-        server_id = server["id"]
-        try:
-            hostname = server[HYPERVISOR_HOSTNAME_ATTR]
-        except KeyError:
-            LOG.warning("Could not get %r attribute from server %r: %s",
-                        HYPERVISOR_HOSTNAME_ATTR, server_id)
-        else:
-            LOG.info("Perform evacuation of server %r from %r host",
-                     server_id, hostname)
-            events.emit("server live migration", {
-                "id": server_id,
-                "cloud": self.cloud.name,
-            }, namespace="/events")
+        if HYPERVISOR_HOSTNAME_ATTR not in server:
+            LOG.warning("Could not get %r attribute from server %r",
+                        HYPERVISOR_HOSTNAME_ATTR, server)
+            return
+        hostname = server[HYPERVISOR_HOSTNAME_ATTR]
+        LOG.info("Perform evacuation of server %r from %r host",
+                 server["id"], hostname)
+        events.emit("update", {
+            "id": server["id"],
+            "type": "server",
+            "cloud": self.cloud.name,
+            "action": "live migration",
+        }, namespace="/events")
 
     def evacuation_end_event(self, server):
-        server_id = server["id"]
-        try:
-            hostname = server[HYPERVISOR_HOSTNAME_ATTR]
-        except KeyError:
-            LOG.warning("Could not get %r attribute from server %r: %s",
-                        HYPERVISOR_HOSTNAME_ATTR, server_id)
-        else:
-            LOG.info("Server %r evacuated to host %r", server_id, hostname)
-            events.emit("server live migrated", {
-                "id": server_id,
-                "host_id": hostname,
-                "cloud": self.cloud.name,
-            }, namespace="/events")
+        if HYPERVISOR_HOSTNAME_ATTR not in server:
+            LOG.warning("Could not get %r attribute from server %r",
+                        HYPERVISOR_HOSTNAME_ATTR, server)
+            return
+        hostname = server[HYPERVISOR_HOSTNAME_ATTR]
+        LOG.info("Server %r evacuated to host %r", server["id"], hostname)
+        events.emit("update", {
+            "id": server["id"],
+            "type": "server",
+            "cloud": self.cloud.name,
+            "action": "",
+            "data": dict(server,
+                         status=server["status"].lower(),
+                         image_id=server["image"]["id"],
+                         host_id=hostname),
+        }, namespace="/events")
 
 
 class ServerStartMigrationEvent(task.BaseCloudTask):
