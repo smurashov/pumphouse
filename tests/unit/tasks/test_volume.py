@@ -18,6 +18,8 @@ from mock import Mock
 from pumphouse import task
 from pumphouse.tasks import volume
 
+from pumphouse import exceptions
+
 
 class TestVolume(unittest.TestCase):
     def setUp(self):
@@ -26,7 +28,7 @@ class TestVolume(unittest.TestCase):
         self.volume_info = {
             "id": self.test_volume_id,
             "size": 1,
-            "state": "available",
+            "status": "available",
             "display_name": "testvol1",
             "display_description": None,
             "volume_type": "test_lvm",
@@ -48,6 +50,7 @@ class TestVolume(unittest.TestCase):
 
         self.volume = Mock()
         self.volume.id = self.test_volume_id
+        self.volume.status = "available"
         self.volume._info = self.volume_info
 
         self.image = Mock()
@@ -93,9 +96,57 @@ class TestUploadVolume(TestVolume):
     def test_execute(self):
         upload_volume = volume.UploadVolume(self.cloud)
         self.assertIsInstance(upload_volume, task.BaseCloudTask)
+        upload_volume.upload_to_glance_event = Mock()
 
         image_id = upload_volume.execute(self.volume_info)
         self.cloud.cinder.volumes.upload_to_glance.assert_called_once_with(
             self.test_volume_id)
         self.assertEqual(len(self.cloud.glance.images.get.call_args), 2)
         self.assertEqual(self.test_image_id, image_id)
+        upload_volume.upload_to_glance_event.assert_called_once_with(
+            self.image_info)
+
+    def test_execute_bad_request(self):
+        upload_volume = volume.UploadVolume(self.cloud)
+        self.cloud.cinder.volumes.upload_to_glance.side_effect = \
+            exceptions.cinder_excs.BadRequest("400 Bad Request")
+
+        with self.assertRaises(exceptions.cinder_excs.BadRequest):
+            upload_volume.execute(self.volume_info)
+
+    def test_execute_image_not_found(self):
+        upload_volume = volume.UploadVolume(self.cloud)
+        self.cloud.glance.images.get.side_effect = \
+            exceptions.glance_excs.NotFound("404 Not Found")
+
+        with self.assertRaises(exceptions.NotFound):
+            upload_volume.execute(self.volume_info)
+
+
+class TestCreateVolumeFromImage(TestVolume):
+    def test_execute(self):
+        create_volume = volume.CreateVolumeFromImage(self.cloud)
+        self.assertIsInstance(create_volume, task.BaseCloudTask)
+        create_volume.create_volume_event = Mock()
+        create_volume_dict = {
+            "display_name": self.volume_info["display_name"],
+            "display_description": self.volume_info["display_description"],
+            "volume_type": self.volume_info["volume_type"],
+            "imageRef": self.test_image_id,
+        }
+
+        volume_info = create_volume.execute(self.volume_info,
+                                            self.image_info)
+        self.cloud.cinder.volumes.create.assert_called_once_with(
+            self.volume_info["size"], **create_volume_dict)
+        self.assertEqual(len(self.cloud.cinder.volumes.get.call_args), 2)
+        self.assertEqual(self.volume_info, volume_info)
+
+    def test_execute_bad_request(self):
+        create_volume = volume.CreateVolumeFromImage(self.cloud)
+        self.cloud.cinder.volumes.create.side_effect = \
+            exceptions.cinder_excs.BadRequest("400 Bad Request")
+
+        with self.assertRaises(exceptions.cinder_excs.BadRequest):
+            create_volume.execute(self.volume_info,
+                                  self.image_info)
