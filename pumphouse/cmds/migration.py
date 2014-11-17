@@ -24,6 +24,7 @@ from pumphouse import context
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import identity as identity_tasks
 from pumphouse.tasks import resources as resources_tasks
+from pumphouse.tasks import volume as volume_tasks
 
 from taskflow.patterns import graph_flow
 
@@ -133,6 +134,16 @@ def get_parser():
     evacuate_parser.add_argument("host",
                                  help="The source host of the evacuation")
     return parser
+
+
+def migrate_volumes(ctx, flow, ids):
+    volumes = ctx.src_cloud.cinder.volumes.list(search_opts={'all_tenants': 1})
+    for volume in volumes:
+        if volume.id in ids:
+            volume_flow = volume_tasks.migrate_detached_volume(
+                ctx, volume)
+            flow.add(volume_flow)
+    return flow
 
 
 def migrate_images(ctx, flow, ids):
@@ -267,6 +278,7 @@ RESOURCES_MIGRATIONS = collections.OrderedDict([
     ("images", migrate_images),
     ("identity", migrate_identity),
     ("resources", migrate_resources),
+    ("volumes", migrate_volumes),
 ])
 
 
