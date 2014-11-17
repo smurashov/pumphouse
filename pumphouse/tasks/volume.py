@@ -18,8 +18,8 @@ from taskflow.patterns import graph_flow
 
 from pumphouse import task
 from pumphouse import events
-from pumphouse import exceptions
 from pumphouse import utils
+from pumphouse.tasks import image as image_tasks
 
 
 LOG = logging.getLogger(__name__)
@@ -32,7 +32,8 @@ class RetrieveVolume(task.BaseCloudTask):
 
 
 class UploadVolume(task.BaseCloudTask):
-    def execute(self, volume_id):
+    def execute(self, volume_info):
+        volume_id = volume_info["id"]
         try:
             resp, upload_info = self.cloud.cinder.volumes.upload_to_glance(
                 volume_id)
@@ -47,7 +48,7 @@ class UploadVolume(task.BaseCloudTask):
             self.upload_to_glance_event(image.to_dict())
         else:
             raise Exception(resp.reason)
-        return image.to_dict()
+        return image.id
 
     def upload_to_glance_event(self, image_info):
         LOG.info("Created: %s", image_info)
@@ -89,3 +90,34 @@ class CreateVolumeFromImage(task.BaseCloudTask):
             "host_id": volume_info["os-vol-host-attr:host"],
             "attachment_server_ids": [],
         }, namespace="/events")
+
+
+def migrate_detached_volume(context, volume):
+    volume_binding = "volume-{}".format(volume.id)
+    volume_retrieve = "{}-retrieve".format(volume_binding)
+    volume_upload = "{}-upload".format(volume_binding)
+    image_ensure = "{}-image-ensure".format(volume_binding)
+    user_ensure = "user-{}-ensure".format(volume.user_id)
+    volume_ensure = "{}-ensure".format(volume_binding)
+
+    flow = graph_flow.Flow("migrate-{}".format(volume_binding))
+    flow.add(RetrieveVolume(context.src_cloud,
+                            name=volume_binding,
+                            provides=volume_binding,
+                            rebind=[volume_retrieve]))
+    flow.add(UploadVolume(context.src_cloud,
+                          name=volume_upload,
+                          provides=volume_upload,
+                          rebind=[volume_binding]))
+    flow.add(image_tasks.EnsureSingleImage(context.src_cloud,
+                                           context.dst_cloud,
+                                           name=image_ensure,
+                                           provides=image_ensure,
+                                           rebind=[volume_upload,
+                                                   user_ensure]))
+    flow.add(CreateVolumeFromImage(context.dst_cloud,
+                                   name=volume_ensure,
+                                   provides=volume_ensure,
+                                   rebind=[volume_binding,
+                                           image_ensure]))
+    return flow
