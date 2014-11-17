@@ -181,3 +181,11 @@ Set `$SERVER_NAME` to `address:port` of the server you're installing on. Default
 to `127.0.0.1:5000`.
 Set `$UI_URL` to the working Git repo URL where user interface is being
 developed.
+
+## Docker
+
+A prebuilt docker image from the included `Dockerfile` is available
+
+```sh
+docker pull xarses/pumphouse
+```
