@@ -172,6 +172,11 @@ class Flavor(EventResource):
 
     @task
     def create(self):
+        swap=self.data.get("swap")
+        if swap == '':
+            swap = None
+        else:
+            swap = int(swap)
         self.data = self.env.cloud.nova.flavors.create(
             self.data["name"],
             self.data["ram"],
@@ -180,7 +185,7 @@ class Flavor(EventResource):
             **make_kwargs(
                 flavorid=self.data.get("id"),
                 ephemeral=self.data.get("ephemeral"),
-                swap=self.data.get("swap"),
+                swap=swap,
                 rxtx_factor=self.data.get("rxtx_factor"),
                 is_public=self.data.get("is_public"),
             )
