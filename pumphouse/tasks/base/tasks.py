@@ -50,11 +50,13 @@ class UnboundTask(object):
         else:
             return self.get_for_resource(instance)
 
-    def get_for_resource(self, resource):
+    def get_for_resource(self, resource, realize=True):
         assert resource.bound
         try:
             return self._resource_task[resource]
         except KeyError:
+            if not realize:
+                return None
             task = self.realize_with(resource)
             self._resource_task[resource] = task
             return task
@@ -64,19 +66,10 @@ class UnboundTask(object):
         requires = []
         for task in self.requires:
             requires.append(task.get_for_resource(resource))
-        after = []
-        for task in self.after:
-            after.append(task.get_for_resource(resource))
-        before = []
-        for task in self.before:
-            before.append(task.get_for_resource(resource))
-        res = Task(self.fn, self.name, resource,
-                   requires=requires, after=after, before=before)
-        for task in before:
-            task.add_after(res)
-        for task in after:
-            task.add_before(res)
-        return res
+        after = [(task, resource) for task in self.after]
+        before = [(task, resource) for task in self.before]
+        return Task(self.fn, self.name, resource,
+                    requires=requires, after=after, before=before)
 
 
 class BoundTask(object):
@@ -84,9 +77,9 @@ class BoundTask(object):
         self.resource = resource
         self.task = unbound_task
 
-    def get_for_resource(self, resource):
+    def get_for_resource(self, resource, realize=True):
         bound_res = self.resource.get_bound_subres(resource)
-        return self.task.get_for_resource(bound_res)
+        return self.task.get_for_resource(bound_res, realize=realize)
 
     def __repr__(self):
         return '<{} {} {}>'.format(
@@ -101,13 +94,6 @@ class Task(object):
         self.requires = frozenset(requires)
         self.after = set(after)
         self.before = set(before)
-
-    def add_before(self, task):
-        self.before.add(task)
-
-    def add_after(self, task):
-        if task not in self.requires:
-            self.after.add(task)
 
     def get_tasks(self):
         for task in self.requires:

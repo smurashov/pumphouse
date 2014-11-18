@@ -88,19 +88,32 @@ class TaskflowRunner(Runner):
         id_ = _make_str_id(task.resource.get_id())
         return "_".join((type(task.resource).__name__, id_, task.name))
 
-    def convert_task(self, task):
+    def convert_task(self, task, after):
         name = self.get_task_name(task)
         flow_task = TaskFlowTask(
             task,
             name=name,
             provides=name,
             rebind=[self.get_task_name(req_task)
-                    for req_task in (task.requires | task.after & self.tasks)],
+                    for req_task in (task.requires | set(after))],
         )
         return flow_task
 
-    def run(self):
+    def create_flow(self):
         flow = graph_flow.Flow("main flow")
+        afters = {}
         for task in self.tasks:
-            flow.add(self.convert_task(task))
-        taskflow.engines.run(flow, engine_conf='parallel')
+            for pretask, resource in task.after:
+                real_task = pretask.get_for_resource(resource, realize=False)
+                if real_task:
+                    afters.setdefault(task, []).append(real_task)
+            for posttask, resource in task.before:
+                real_task = posttask.get_for_resource(resource, realize=False)
+                if real_task:
+                    afters.setdefault(real_task, []).append(task)
+        for task in self.tasks:
+            flow.add(self.convert_task(task, afters.get(task, [])))
+        return flow
+
+    def run(self):
+        taskflow.engines.run(self.create_flow(), engine_conf='parallel')
