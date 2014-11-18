@@ -71,6 +71,10 @@ class UnboundTask(object):
         return Task(self.fn, self.name, resource,
                     requires=requires, after=after, before=before)
 
+    def __repr__(self):
+        return '<{} {}>'.format(
+            type(self).__name__, self.name)
+
 
 class BoundTask(object):
     def __init__(self, resource, unbound_task):
