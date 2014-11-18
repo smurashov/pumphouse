@@ -2,12 +2,16 @@ Usage Scenario
 ==============
 
 Pumphouse application is intended to be used by cloud operators or service
-engineers to perform rolling upgrade of existing OpenStack-based cloud to
-the Mirantis OpenStack. Rolling upgrade means that the new OpenStack
-installation works on the same set of hardware as original cloud. Workloads and
-resources are gradually moved from the existing cloud to Mirantis OpenStack.
-Every physical hypervisor node of the existing cloud eventually gets added to
-Miratnis OpenStack and re-installed as it`s Compute node.
+engineers to perform forklift upgrade of OpenStack-based cloud. This type of
+upgrade assumes that the new OpenStack installation works on the same set of
+hardware as original cloud. Workloads and resources are moved one by one from
+the original cloud to upgrade target cloud. Every physical hypervisor node of
+the existing cloud eventually gets added to upgraded cluster and re-installed as
+it`s Compute node.
+
+Pumphouse assumes that upgrade target cloud is managed by Fuel deployment
+engine. For original cloud, both Fuel API and IPMI management modes are
+supported.
 
 ## Install pumphouse
 
@@ -19,30 +23,26 @@ $ pip install pumphouse
 
 ## Acquire initial nodes
 
-Optionally, pumphouse might allow to clean up nodes for Fuel deployment in the
-existing cloud. This requires following steps:
+Optionally, Pumphouse might allow to prepare nodes for deployment of initial
+Upgrade Target cloud. This preparation includes following steps:
 
-- install pumphouse package onto a node that has access to following networks:
+- install `pumphouse` package onto a node that has access to following networks:
   *public/management API network* of Source cloud; *IPMI management network* of
   Source cloud.
-- use pumphouse to move virtual instances from certain nodes in existing cloud
+- use Pumphouse to move virtual instances from certain nodes in existing cloud
   (via evacuate or live migrate or rebuild)
 - move released bare metal nodes to isolated L2 network (VLAN) which will serve
   as Admin network for Fuel deployment framework
 
-## Install Fuel master node
+## Install Upgrade Target cloud
 
-We install Fuel master node on one of the nodes reserved for Mirantis OpenStack.
-Mirantis OpenStack must be configured so it shares Private and Public L2 networks
-with the existing OpenStack cluster.
+Currently, Pumphouse does not handle installation of 'seed' for Upgrade Target
+cloud. It is operator's responsibility to properly configure environment and
+initial set of Compute nodes via Fuel UI or API. Pumphouse will use the
+configuration of initail Compute nodes as a template to add upgraded hypervisors
+to target environment.
 
-![Pumphouse network diagram](pumphouse-network-diagram.png)
-
-In this diagram, components of source clouds are in purple, components of
-Mirantis OpenStack cloud are in green, and shared Private and Public networks
-are golden.
-
-## Configure source and target clouds
+## Configure source and target clouds in Pumphouse
 
 Use configuration file `config.yaml` to configure source and target clouds, see
 example in `samples/config.yaml`
@@ -69,66 +69,49 @@ being moved about. See details on migration strategies in
 
 ## Migrate resources
 
-Use standard OpenStack clients (installed as dependencies with `pumphouse`
-package) to find and identify resources you`d like to migrate. 
+Pumphouse provides Web service with HTTP-based API. See API specification in the
+[document](API.md).
 
-In version 0.1, you can use `migration.py` script to move resources about. See
-usage details in [`README.md`](README.md) file.
+CLI script included with Pumphouse allows for granular migration of resources,
+including individual images, all servers of a project or all identity resources
+(tenants, users, roles, etc).
 
-In future versions, we will implement subcommands-based CLI for atomic
-operations and Web-based UI.
+## Maintenance mode on hosts
 
-## Prepare host for upgrade
+Pumphouse leverages Fuel deployment framework for upgrade of hypervisor hosts.
+Preparations for upgrade include removing all virtual resources from that host
+and disabling of provisioning new resources to it. This is also called
+*maintenance mode* of host.
 
-We need to upgrade the whole customer's OpenStack cluster to the latest version
-of Mirantis OpenStack. It is possible with Fuel deployment framework.
+Maintenance mode requires 2 steps:
 
-We must prepare a host in the source cloud for rolling upgrade to Mirantis
-OpenStack. Preparations include removing all virtual resources from that host
-and disabling of provisioning new resources to it.
-
-Removing resources combines 2 processes:
-
-* moving targeted workloads to the Mirantis OpenStack cluster with Pumphouse
+* moving targeted workloads to the Upgrade Target cluster with Pumphouse
 application;
 * moving remaining workloads to other hosts in source cloud with live/block
 migration or evacuate/rebuild.
 
-Both are implemented in `scripts/migration.py` script. Move designated resources
-to Mirantis OpenStack with `migrate` subcommand. Move remaining resources within
-Source cloud with `evacuate` subcommand. See details in
-[`README.md`](README.md) file.
-
 ## Upgrade host
-
-Use `nova hypervisor-list`, `nova hypervisor-show` commands to identify which
-hosts are cleansed from all work load. To decomission host from the existing
-cloud and move it to Mirantis OpenStack, use script `scripts/migrate_host.py`.
-See usage details for that script in 
-[`README.md`](README.md) document.
 
 To perform the upgrade, you have to connect the host to Fuel-managed PXE network,
 reboot it into PXE bootstrap, configure it in the Fuel API and start deployment.
 
-Following steps are performed by the upgrade script:
+Following steps are performed by Pumphouse during upgrade procedure:
 
 - configure host to boot from PXE boot server using IPMI
 - reset host via IPMI Power Control function
 - wait for host to boot into bootstrap image via PXE and self-register as node
   in Fuel deployment framework
 - assign 'compute' role to the node via Fuel API
-- start deployment of host as in Mirantis OpenStack cluster via Fuel API
+- configure disk drives and network interfaces consistently with existing
+  Compute nodes preconfigured by operator
+- start deployment of the host as Compute node OpenStack cluster via Fuel API
 
 After deployment has started, you could check it's progress in Fuel UI or via
 Fuel CLI client.
 
 ### Decomission source cloud
 
-If the ultimate goal of the migration process is to completely replace existing
-OpenStack infrastructure with Mirantis OpenStack, then as a final step of the
-move controllers of the source cloud should be decomissioned and added to
-Mirantis OpenStack cluster.
-
-Steps for decomissioning the controller node are generally the same as steps to
-move compute node from source to destination cluster and could be automatically
-done with the same script.
+If the ultimate goal of the migration process is to completely replace original
+OpenStack infrastructure with new release, then as a final step of the move
+controllers of the source cloud should be decomissioned and added to Mirantis
+OpenStack cluster.
