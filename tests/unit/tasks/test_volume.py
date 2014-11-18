@@ -53,9 +53,9 @@ class TestVolume(unittest.TestCase):
         self.volume.status = "available"
         self.volume._info = self.volume_info
 
-        self.image = MagicMock()
-        self.image.id = self.test_image_id
-        self.image.status = "active"
+        self.image = MagicMock(**self.image_info)
+        self.image.__getitem__.side_effect = self.image_info.__getitem__
+        self.image.keys.side_effect = self.image_info.keys
 
         self.resp = Mock()
         self.resp.ok = True
@@ -64,7 +64,7 @@ class TestVolume(unittest.TestCase):
         self.cloud = Mock()
         self.cloud.name = "test_cloud"
         self.cloud.cinder.volumes.get.return_value = self.volume
-        self.cloud.cinder.volumes.upload_to_glance.return_value = (
+        self.cloud.cinder.volumes.upload_to_image.return_value = (
             self.resp,
             self.upload_info
         )
@@ -98,8 +98,12 @@ class TestUploadVolume(TestVolume):
         upload_volume.upload_to_glance_event = Mock()
 
         image_id = upload_volume.execute(self.volume_info)
-        self.cloud.cinder.volumes.upload_to_glance.assert_called_once_with(
-            self.test_volume_id)
+        self.cloud.cinder.volumes.upload_to_image.assert_called_once_with(
+            self.test_volume_id,
+            False,
+            "volume-{}-image".format(self.volume_info["id"]),
+            'bare',
+            'raw')
         self.assertEqual(len(self.cloud.glance.images.get.call_args), 2)
         self.assertEqual(self.test_image_id, image_id)
         upload_volume.upload_to_glance_event.assert_called_once_with(
@@ -107,7 +111,7 @@ class TestUploadVolume(TestVolume):
 
     def test_execute_bad_request(self):
         upload_volume = volume.UploadVolume(self.cloud)
-        self.cloud.cinder.volumes.upload_to_glance.side_effect = \
+        self.cloud.cinder.volumes.upload_to_image.side_effect = \
             exceptions.cinder_excs.BadRequest("400 Bad Request")
 
         with self.assertRaises(exceptions.cinder_excs.BadRequest):
