@@ -36,8 +36,12 @@ class UploadVolume(task.BaseCloudTask):
     def execute(self, volume_info):
         volume_id = volume_info["id"]
         try:
-            resp, upload_info = self.cloud.cinder.volumes.upload_to_glance(
-                volume_id)
+            resp, upload_info = self.cloud.cinder.volumes.upload_to_image(
+                volume_id,
+                False,
+                "volume-{}-image".format(volume_id),
+                'bare',
+                'raw')
         except Exception as exc:
             LOG.exception("Upload failed: %s", exc.message)
             raise exc
@@ -50,7 +54,7 @@ class UploadVolume(task.BaseCloudTask):
         image = utils.wait_for(image.id,
                                self.cloud.glance.images.get,
                                value="active")
-        self.upload_to_glance_event(image.to_dict())
+        self.upload_to_glance_event(dict(image))
         return image.id
 
     def upload_to_glance_event(self, image_info):
@@ -90,7 +94,7 @@ class CreateVolumeFromImage(task.BaseCloudTask):
             "id": volume_info["id"],
             "status": "active",
             "display_name": volume_info["display_name"],
-            "tenant_id": volume_info["project_id"],
+            "tenant_id": volume_info["os-vol-tenant-attr:tenant_id"],
             "host_id": volume_info["os-vol-host-attr:host"],
             "attachment_server_ids": [],
         }, namespace="/events")
@@ -126,4 +130,5 @@ def migrate_detached_volume(context, volume):
                                    provides=volume_ensure,
                                    rebind=[volume_binding,
                                            image_ensure]))
+    context.store[volume_retrieve] = volume.id
     return flow
