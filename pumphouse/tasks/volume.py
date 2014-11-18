@@ -83,7 +83,9 @@ class CreateVolumeFromImage(task.BaseCloudTask):
         else:
             volume = utils.wait_for(volume.id,
                                     self.cloud.cinder.volumes.get,
-                                    value="available")
+                                    value="available",
+                                    timeout=120,
+                                    check_interval=10)
             self.create_volume_event(volume._info)
         return volume._info
 
