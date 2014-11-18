@@ -14,15 +14,20 @@ hosts.
 ## Requirements and constraints
 
 Following OpenStack releases can be upgraded with Pumphouse:
-  - Havana (2013.2)
-  - Icehouse (2014.1)
-  - Juno (2014.2)
+
+- Havana (2013.2)
+- Icehouse (2014.1)
+- Juno (2014.2)
+
 Following network managers are suitable for upgrade:
-  - `nova-network` in FlatDHCP and VLAN modes
-  - `neutron` in OVS+GRE mode
+
+- `nova-network` in FlatDHCP and VLAN modes
+- `neutron` in OVS+GRE mode
+
 Every hypervisor host in original cloud must have at least 2 NICs for:
-  - Admin/PXE boot network
-  - Management/Public/Private networks
+
+- Admin/PXE boot network
+- Management/Public/Private networks
 
 Usage
 =====
@@ -57,26 +62,24 @@ $ pumphouse-api [config]
 
 The config file is an YAML file with the following structure:
 
-```
-DEBUG: true
-CLOUDS:
-    source: # a role name of the cloud, source or destination
-        endpoint: # OpenStack APIs admin access credentials
-            auth_url: http://172.18.18.157:5000/v2.0 # URL of the Keystone service
-            username: admin # name of the user with administrative access
-            password: secrete # password
-            tenant_name: admin # name of the administrative tenant
-        identity: # Identity store access credentials, for passwords retrieval
-            connection: mysql+mysqlconnector://root:stackdb@172.18.18.157/keystone
-    destination:
-        endpoint:
-            auth_url: http://172.18.18.132:5000/v2.0
-            username: admin
-            password: secrete
-            tenant_name: admin
-        identity:
-            connection: mysql+mysqlconnector://keystone:secrete@172.18.18.132/keystone
-```
+  DEBUG: true
+  CLOUDS:
+      source: # a role name of the cloud, source or destination
+          endpoint: # OpenStack APIs admin access credentials
+              auth_url: http://172.18.18.157:5000/v2.0 # URL of the Keystone service
+              username: admin # name of the user with administrative access
+              password: secrete # password
+              tenant_name: admin # name of the administrative tenant
+          identity: # Identity store access credentials, for passwords retrieval
+              connection: mysql+mysqlconnector://root:stackdb@172.18.18.157/keystone
+      destination:
+          endpoint:
+              auth_url: http://172.18.18.132:5000/v2.0
+              username: admin
+              password: secrete
+              tenant_name: admin
+          identity:
+              connection: mysql+mysqlconnector://keystone:secrete@172.18.18.132/keystone
 
 See example in [`doc/samples/api-config.yaml`](doc/samples/api-config.yaml)
 file.
@@ -146,7 +149,7 @@ $ pumphouse config.yaml migrate <resource_class> --ids <ID> [<ID> ...]
   identified by its ID in source cloud and all resources they depend on.
 * `volumes` - migrate all volumes with specified IDs.
 
-You can obtain <ID>s of resources you want to migrate by using standard
+You can obtain `<ID>`s of resources you want to migrate by using standard
 OpenStack clients or Horizon dashboard UI.
 
 If you need to clean your source or target cloud up, run migration script
@@ -161,8 +164,8 @@ See detailed usage scenario in [USAGE](doc/USAGE.md) document.
 ## User Interface
 
 To perform installation with a third-party user interface the package should be
-prepared. It is a simple action and it require just copy files in the
-pumphouse/api/static directory. A file with the index.html name must be there.
+prepared. It is a simple action and it require just copy files in the 
+`pumphouse/api/static directory`. A file with the index.html name must be there.
 
 You can prepare for running API service with 3rd-party user interface with:
 
@@ -172,7 +175,7 @@ UI_URL=$UI_URL \
 make api
 ```
 
-Set `$SERVER_NAME` to 'address:port' of the server you're installing on. Defaults
+Set `$SERVER_NAME` to `address:port` of the server you're installing on. Defaults
 to `127.0.0.1:5000`.
 Set `$UI_URL` to the working Git repo URL where user interface is being
 developed.
