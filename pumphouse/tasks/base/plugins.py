@@ -35,11 +35,17 @@ class Plugin(resources.Resource):
                                                            cls_vars)
             res._implementations = {}
             res._tasks = MemoSet()
+            res._unbound_tasks = {}
             return res
 
         def __getattr__(cls, name):
-            cls._tasks.add(name)
-            return PluginUnboundTask(name, cls)
+            try:
+                return cls._unbound_tasks[name]
+            except KeyError:
+                cls._tasks.add(name)
+                task = PluginUnboundTask(name, cls)
+                cls._unbound_tasks[name] = task
+                return task
 
     @classmethod
     def register(cls, name):
@@ -55,12 +61,16 @@ class Plugin(resources.Resource):
         assert set(impl._tasks) >= cls._tasks.items
         return impl
 
-    def __new__(cls, data, runner, **kwargs):
+    def __new__(cls, data=None, runner=None, **kwargs):
         kwargs.update(data=data, runner=runner)
         if data is not None:
             return cls.get_impl(runner)(**kwargs)
         else:
             return super(Plugin, cls).__new__(cls, **kwargs)
+
+    def __getattr__(self, name):
+        unbound_task = getattr(type(self), name)
+        return unbound_task.__get__(self, type(self))
 
     @classmethod
     def get_id_for_runner(cls, data, runner):
