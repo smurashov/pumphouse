@@ -62,24 +62,26 @@ $ pumphouse-api [config]
 
 The config file is an YAML file with the following structure:
 
-  DEBUG: true
-  CLOUDS:
-      source: # a role name of the cloud, source or destination
-          endpoint: # OpenStack APIs admin access credentials
-              auth_url: http://172.18.18.157:5000/v2.0 # URL of the Keystone service
-              username: admin # name of the user with administrative access
-              password: secrete # password
-              tenant_name: admin # name of the administrative tenant
-          identity: # Identity store access credentials, for passwords retrieval
-              connection: mysql+mysqlconnector://root:stackdb@172.18.18.157/keystone
-      destination:
-          endpoint:
-              auth_url: http://172.18.18.132:5000/v2.0
-              username: admin
-              password: secrete
-              tenant_name: admin
-          identity:
-              connection: mysql+mysqlconnector://keystone:secrete@172.18.18.132/keystone
+```
+DEBUG: true
+CLOUDS:
+    source: # a role name of the cloud, source or destination
+        endpoint: # OpenStack APIs admin access credentials
+            auth_url: http://172.18.18.157:5000/v2.0 # URL of the Keystone service
+            username: admin # name of the user with administrative access
+            password: secrete # password
+            tenant_name: admin # name of the administrative tenant
+        identity: # Identity store access credentials, for passwords retrieval
+            connection: mysql+mysqlconnector://root:stackdb@172.18.18.157/keystone
+    destination:
+        endpoint:
+            auth_url: http://172.18.18.132:5000/v2.0
+            username: admin
+            password: secrete
+            tenant_name: admin
+        identity:
+            connection: mysql+mysqlconnector://keystone:secrete@172.18.18.132/keystone
+```
 
 See example in [`doc/samples/api-config.yaml`](doc/samples/api-config.yaml)
 file.
