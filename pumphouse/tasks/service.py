@@ -71,7 +71,7 @@ class DiableServiceWithRollback(DisableService):
 
 
 class DeleteServicesSilently(task.BaseCloudTask):
-    def execute(self, hostname, **requires):
+    def execute(self, hostname):
         services = []
         for service in self.cloud.nova.services.list(host=hostname):
             try:

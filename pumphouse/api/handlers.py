@@ -292,10 +292,6 @@ def reassign_host(host_id):
             "destination": dst_config["environment"],
         }
 
-        events.emit("host reassign", {
-            "id": host_id,
-        }, namespace="/events")
-
         try:
             src = hooks.source.connect()
             dst = hooks.destination.connect()
@@ -308,20 +304,8 @@ def reassign_host(host_id):
         except Exception:
             LOG.exception("Error is occured during reassigning host %r",
                           host_id)
-            status = "error"
-            new_host_id = ""
-        else:
-            status = ""
-            hostname_attr = "node-assigned-hosetname-{}".format(host_id)
-            new_host_id = result[hostname_attr]
+            # TODO(akscram): Send the error event.
 
-        events.emit("host reassigned", {
-            "id": host_id,
-            "name": new_host_id,
-            "new_id": new_host_id,
-            "cloud": dst.name,
-            "status": status,
-        }, namespace="/events")
     gevent.spawn(reassign)
     return flask.make_response()
 
