@@ -56,7 +56,6 @@ class Service(object):
             cleanup_workload = runner.get_resource(reset.CleanupWorkload,
                                                    {"id": cloud.name})
             runner.add(cleanup_workload.delete)
-            runner.run()
 
             populate = self.populate_config
             workloads = self.workloads_config
@@ -65,14 +64,13 @@ class Service(object):
                     populate = {}
                 if workloads is None:
                     workloads = {}
-                runner = base.TaskflowRunner(env)
                 setup_workload = runner.get_resource(reset.SetupWorkload, {
                     "id": "src",
                     "populate": populate,
                     "workloads": workloads,
                 })
                 runner.add(setup_workload.create)
-                runner.run()
+            runner.run()
         except Exception:
             LOG.exception("Unexpected exception during cloud reset")
 

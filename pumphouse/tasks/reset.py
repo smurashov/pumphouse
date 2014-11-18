@@ -20,6 +20,7 @@ import random
 import tempfile
 import urllib
 
+import netaddr
 from novaclient import exceptions as nova_excs
 
 from pumphouse import events
@@ -128,7 +129,7 @@ class Tenant(EventResource):
         )
         self.data = tenant.to_dict()
 
-    @task
+    @task(before=[create])
     def delete(self):
         self.env.cloud.keystone.tenants.delete(self.data["id"])
 
@@ -142,7 +143,7 @@ class Role(EventResource):
             name=self.data["name"],
         ).to_dict()
 
-    @task
+    @task(before=[create])
     def delete(self):
         self.env.cloud.keystone.roles.delete(self.data["id"])
 
@@ -162,7 +163,7 @@ class User(EventResource):
             tenant_id=self.tenant["id"],
         ).to_dict()
 
-    @task
+    @task(before=[create])
     def delete(self):
         self.env.cloud.keystone.users.delete(self.data["id"])
 
@@ -191,7 +192,7 @@ class Flavor(EventResource):
             )
         ).to_dict()
 
-    @task
+    @task(before=[create])
     def delete(self):
         self.env.cloud.nova.flavors.delete(self.data["id"])
 
@@ -221,7 +222,7 @@ class SecurityGroup(EventResource):
             cloud.nova.security_group_rules.create(sg.id, **rule)
         self.data = cloud.nova.security_groups.get(sg.id).to_dict()
 
-    @task(before=[tenant.delete])
+    @task(before=[create, tenant.delete])
     def delete(self):
         if self.data["name"] != "default":
             cloud.nova.security_groups.delete(self.data["id"])
@@ -289,7 +290,7 @@ class Image(EventResource):
         image = self.env.cloud.glance.images.get(self.data["id"])
         self.data = dict(image)
 
-    @task
+    @task(before=[create])
     def delete(self):
         self.env.cloud.glance.images.delete(self.data["id"])
 
@@ -325,7 +326,7 @@ class NovaFloatingIP(EventResource):
                 self.data["address"],
             )
 
-    @task(requires=[disassociate])
+    @task(before=[create], requires=[disassociate])
     def delete(self):
         self.env.cloud.nova.floating_ips_bulk.delete(
             self.data["address"],
@@ -408,6 +409,20 @@ class Server(EventResource):
                        stop_excs=(nova_excs.NotFound,))
 
 
+class Subnet(base.Plugin):
+    plugin_key = "network"
+    default = "nova"
+
+
+@Subnet.register("nova")
+class NovaSubnet(EventResource):
+    data_id_key = "cidr"
+    event_id_key = "cidr"
+
+    create = task(name="create")
+    delete = task(name="delete", before=[create])
+
+
 class Network(base.Plugin):
     plugin_key = "network"
     default = "nova"
@@ -421,11 +436,18 @@ class NovaNetwork(EventResource):
     def tenant(self):
         return self.data["tenant"]
 
+    @Subnet()
+    def subnet(self):
+        cidr = self.data["cidr"]
+        if isinstance(cidr, list):
+            cidr = str(list(netaddr.IPSet(cidr).iter_cidrs())[0])
+        return {"cidr": cidr}
+
     @base.Collection(Server)
     def servers(self):
         return self.data["servers"]
 
-    @task(requires=[tenant.create])
+    @task(requires=[tenant.create, subnet.create])
     def create(self):
         self.data = self.env.cloud.nova.networks.create(
             label=self.data["label"],
@@ -433,10 +455,12 @@ class NovaNetwork(EventResource):
             project_id=self.tenant["id"],
         ).to_dict()
 
-    @task(requires=[servers.each().delete])
-    def delete(self):
+    @task(before=[create, subnet.delete], requires=[servers.each().delete])
+    def do_delete(self):
         self.env.cloud.nova.networks.disassociate(self.data["id"])
         self.env.cloud.nova.networks.delete(self.data["id"])
+
+    delete = task(name="delete", requires=[do_delete, subnet.delete])
 
 
 class CleanupWorkload(EventResource):
