@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import unittest
-from mock import Mock
+from mock import Mock, MagicMock
 
 from pumphouse import task
 from pumphouse.tasks import volume
@@ -53,10 +53,9 @@ class TestVolume(unittest.TestCase):
         self.volume.status = "available"
         self.volume._info = self.volume_info
 
-        self.image = Mock()
+        self.image = MagicMock()
         self.image.id = self.test_image_id
         self.image.status = "active"
-        self.image.to_dict.return_value = self.image_info
 
         self.resp = Mock()
         self.resp.ok = True
