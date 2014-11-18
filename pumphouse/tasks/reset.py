@@ -77,8 +77,10 @@ class EventResource(base.Resource):
             return base.Resource.__metaclass__.__new__(mcs, name, bases,
                                                        cls_vars)
 
+    event_id_key = "id"
+    
     def event_id(self):
-        return self.data["id"]
+        return self.data[self.event_id_key]
 
     def event_data(self):
         return self.data
@@ -295,10 +297,8 @@ class FloatingIP(base.Plugin):
 @FloatingIP.register("nova")
 class NovaFloatingIP(EventResource):
     data_id_key = "address"
+    event_id_key = "address"
     events_type = "floating_ip"
-
-    def event_id(self):
-        return self.data["address"]
 
     def event_data(self):
         data = self.data.copy()
