@@ -173,7 +173,7 @@ class Flavor(EventResource):
         self.data = self.env.cloud.nova.flavors.create(
             self.data["name"],
             self.data["ram"],
-            self.data["vcpu"],
+            self.data["vcpus"],
             self.data["disk"],
             **make_kwargs(
                 flavorid=self.data.get("id"),
@@ -564,7 +564,7 @@ class SetupWorkload(EventResource):
         return [{
             "name": "{}-flavor".format(TEST_RESOURCE_PREFIX),
             "ram": 1024,
-            "vcpu": 1,
+            "vcpus": 1,
             "disk": 5,
         }]
 

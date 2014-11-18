@@ -42,17 +42,17 @@ CLOUDS:
               - &small
                 name: pumphouse-flavor-0001-small
                 ram: 1024
-                vcpu: 1
+                vcpus: 1
                 disk: 10
               - &medium
                 name: pumphouse-flavor-0001-medium
                 ram: 4096
-                vcpu: 2
+                vcpus: 2
                 disk: 40
               - &large
                 name: pumphouse-flavor-0001-large
                 ram: 8192
-                vcpu: 4
+                vcpus: 4
                 disk: 80
             images:
               - &image
