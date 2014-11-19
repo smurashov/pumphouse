@@ -251,6 +251,7 @@ def evacuate_host(host_id):
             "id": host_id,
             "type": "host",
             "cloud": src.name,
+            "progress": None,
             "action": "evacuation",
         }, namespace="/events")
 
@@ -260,14 +261,19 @@ def evacuate_host(host_id):
             result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of evacuation: %s", result)
         except Exception:
-            LOG.exception("Error is occured during evacuating host %r",
-                          host_id)
+            msg = ("Error is occured during evacuating host {}"
+                   .format(host_id))
+            LOG.exception(msg)
+            events.emit("error", {
+                "message": msg,
+            }, namespace="/events")
 
         events.emit("update", {
             "id": host_id,
             "type": "host",
             "cloud": src.name,
-            "action": "",
+            "progress": None,
+            "action": None,
         }, namespace="/events")
     gevent.spawn(evacuate)
     return flask.make_response()
@@ -302,9 +308,12 @@ def reassign_host(host_id):
             result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of migration: %s", result)
         except Exception:
-            LOG.exception("Error is occured during reassigning host %r",
-                          host_id)
-            # TODO(akscram): Send the error event.
+            msg = ("Error is occured during reassigning host {}"
+                   .format(host_id))
+            LOG.exception(msg)
+            events.emit("error", {
+                "message": msg,
+            }, namespace="/events")
 
     gevent.spawn(reassign)
     return flask.make_response()

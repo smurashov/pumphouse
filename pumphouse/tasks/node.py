@@ -301,8 +301,8 @@ class HostsSuccessEvents(pump_task.BaseCloudTask):
             "id": service["host"],
             "cloud": self.cloud.name,
             "type": "host",
-            "progress": "",
-            "action": "",
+            "progress": None,
+            "action": None,
         }, namespace="/events")
 
 
