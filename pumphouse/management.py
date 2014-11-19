@@ -97,6 +97,13 @@ def cleanup(events, cloud, target):
                 "id": flavor.id,
             }, namespace="/events")
 
+    if (cloud.cinder):
+        for volume in cloud.cinder.volumes.list():
+            vol_name = volume._info['name']
+            vol_id = volume._info['id']
+            if not is_prefixed(vol_name):
+                cloud.cinder.volumes.delete(vol_id)
+
     for image in cloud.glance.images.list():
         if not is_prefixed(image.name):
             continue
