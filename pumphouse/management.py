@@ -336,6 +336,11 @@ def cache_image_file(url=TEST_IMAGE_URL):
     return path
 
 
+def setup_volume(cloud, volume_dict):
+    LOG.info("Create volume: %s", str(volume_dict))
+    return cloud.cinder.volumes.create(**volume_dict)
+
+
 def setup_server(cloud, server_dict):
     image = list(cloud.glance.images.list(
         filters={
