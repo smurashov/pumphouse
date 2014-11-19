@@ -145,7 +145,7 @@ class TestEnsureSecGroup(SecGroupTestCase):
         events.emit = Mock()
         event_dict = {
             "id": self.test_secgroup_id,
-            "type": "security_group",
+            "type": "secgroup",
             "cloud": self.cloud.name,
             "data": self.secgroup_info,
         }

@@ -53,7 +53,7 @@ class EnsureSecGroup(task.BaseCloudTask):
     def created_event(self, secgroup_info):
         events.emit("create", {
             "id": secgroup_info["id"],
-            "type": "security_group",
+            "type": "secgroup",
             "cloud": self.cloud.name,
             "data": secgroup_info,
         }, namespace="/events")
