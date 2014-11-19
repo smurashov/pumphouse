@@ -104,6 +104,12 @@ def cleanup(events, cloud, target):
             if not is_prefixed(vol_name):
                 cloud.cinder.volumes.delete(vol_id)
 
+                LOG.info("Delete volume: %s", str(volume._info))
+                events.emit("volume delete", {
+                    "cloud": target,
+                    "id": vol_id
+                }, namespace="/events")
+
     for image in cloud.glance.images.list():
         if not is_prefixed(image.name):
             continue
