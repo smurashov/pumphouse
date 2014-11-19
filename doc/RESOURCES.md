@@ -33,7 +33,7 @@ dependencies per resource type.
 
 On a higher level, all resources could be categorized into two major categories:
 
-* **workload resources** are directly added to workload and explicitly grouped
+* **workload resources** directly add to workload and explicitly grouped
   by the workload. Servers that execute user processes and volumes that store
   user data are workload resources. See detailed descriptions of workload
   types in [WORKLOADS](WORKLOADS.md) document.
