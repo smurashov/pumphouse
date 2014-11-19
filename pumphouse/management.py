@@ -144,6 +144,25 @@ def cleanup(events, cloud, target):
             "id": floating_ip.address
         }, namespace="/events")
 
+    if (cloud.neutron):
+        for port in cloud.neutron.list_ports()['ports']:
+            LOG.info("Deleted network: %s", port['id'])
+            cloud.neutron.delete_port(port['id'])
+
+        for subnet in cloud.neutron.list_subnets()['subnets']:
+            LOG.info("Deleted subnet: %s", subnet['name'])
+            cloud.neutron.delete_subnet(subnet['id'])
+
+        for network in cloud.neutron.list_networks()['networks']:
+            LOG.info("Delete network: %s", network['name'])
+            cloud.neutron.delete_network(network['id'])
+
+            LOG.info("Deleted network: %s", network._info)
+            events.emit("network delete", {
+                "cloud": target,
+                "id": network['id']
+            }, namespace="/events")
+
     for network in cloud.nova.networks.list():
         if not is_prefixed(network.label):
             continue

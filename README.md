@@ -14,15 +14,20 @@ hosts.
 ## Requirements and constraints
 
 Following OpenStack releases can be upgraded with Pumphouse:
-  - Havana (2013.2)
-  - Icehouse (2014.1)
-  - Juno (2014.2)
+
+- Havana (2013.2)
+- Icehouse (2014.1)
+- Juno (2014.2)
+
 Following network managers are suitable for upgrade:
-  - `nova-network` in FlatDHCP and VLAN modes
-  - `neutron` in OVS+GRE mode
+
+- `nova-network` in FlatDHCP and VLAN modes
+- `neutron` in OVS+GRE mode
+
 Every hypervisor host in original cloud must have at least 2 NICs for:
-  - Admin/PXE boot network
-  - Management/Public/Private networks
+
+- Admin/PXE boot network
+- Management/Public/Private networks
 
 Usage
 =====
@@ -146,7 +151,7 @@ $ pumphouse config.yaml migrate <resource_class> --ids <ID> [<ID> ...]
   identified by its ID in source cloud and all resources they depend on.
 * `volumes` - migrate all volumes with specified IDs.
 
-You can obtain <ID>s of resources you want to migrate by using standard
+You can obtain `<ID>`s of resources you want to migrate by using standard
 OpenStack clients or Horizon dashboard UI.
 
 If you need to clean your source or target cloud up, run migration script
@@ -161,8 +166,8 @@ See detailed usage scenario in [USAGE](doc/USAGE.md) document.
 ## User Interface
 
 To perform installation with a third-party user interface the package should be
-prepared. It is a simple action and it require just copy files in the
-pumphouse/api/static directory. A file with the index.html name must be there.
+prepared. It is a simple action and it require just copy files in the 
+`pumphouse/api/static directory`. A file with the index.html name must be there.
 
 You can prepare for running API service with 3rd-party user interface with:
 
@@ -172,7 +177,7 @@ UI_URL=$UI_URL \
 make api
 ```
 
-Set `$SERVER_NAME` to 'address:port' of the server you're installing on. Defaults
+Set `$SERVER_NAME` to `address:port` of the server you're installing on. Defaults
 to `127.0.0.1:5000`.
 Set `$UI_URL` to the working Git repo URL where user interface is being
 developed.

@@ -1,5 +1,4 @@
-Usage Scenario
-==============
+## Usage Scenario
 
 Pumphouse application is intended to be used by cloud operators or service
 engineers to perform forklift upgrade of OpenStack-based cloud. This type of
@@ -13,7 +12,7 @@ Pumphouse assumes that upgrade target cloud is managed by Fuel deployment
 engine. For original cloud, both Fuel API and IPMI management modes are
 supported.
 
-## Install pumphouse
+### Install pumphouse
 
 Pumphouse is a python application and can be installed as a pip package:
 
@@ -21,7 +20,7 @@ Pumphouse is a python application and can be installed as a pip package:
 $ pip install pumphouse
 ```
 
-## Acquire initial nodes
+### Acquire initial nodes
 
 Optionally, Pumphouse might allow to prepare nodes for deployment of initial
 Upgrade Target cloud. This preparation includes following steps:
@@ -34,7 +33,7 @@ Upgrade Target cloud. This preparation includes following steps:
 - move released bare metal nodes to isolated L2 network (VLAN) which will serve
   as Admin network for Fuel deployment framework
 
-## Install Upgrade Target cloud
+### Install Upgrade Target cloud
 
 Currently, Pumphouse does not handle installation of 'seed' for Upgrade Target
 cloud. It is operator's responsibility to properly configure environment and
@@ -42,18 +41,18 @@ initial set of Compute nodes via Fuel UI or API. Pumphouse will use the
 configuration of initail Compute nodes as a template to add upgraded hypervisors
 to target environment.
 
-## Configure source and target clouds in Pumphouse
+### Configure source and target clouds in Pumphouse
 
 Use configuration file `config.yaml` to configure source and target clouds, see
 example in `samples/config.yaml`
 
-## Discover cloud
+### Discover cloud
 
 Given the auth URL and credentials, we could learn basic information about the
 source and the destination clouds. Basic information includes the list of
 services available in those clouds and URLs to API endpoints of those services.
 
-## Moving workloads
+### Moving workloads
 
 We need to migrate workloads and virtual resources associated with them from
 (arbitrary) custom OpenStack cloud to the cloud based on the latest release of
@@ -67,16 +66,16 @@ different grouping criteria. The exact criteria depend on the type of resource
 being moved about. See details on migration strategies in
 [RESOURCES](RESOURCES.md) document.
 
-## Migrate resources
+#### Migrate resources
 
-Pumphouse provides Web service with HTTP-based API. See API specification in the
-[document](API.md).
+Pumphouse provides Web service with HTTP-based API. See API specification in
+[API document](API.md).
 
 CLI script included with Pumphouse allows for granular migration of resources,
 including individual images, all servers of a project or all identity resources
 (tenants, users, roles, etc).
 
-## Maintenance mode on hosts
+#### Maintenance mode on hosts
 
 Pumphouse leverages Fuel deployment framework for upgrade of hypervisor hosts.
 Preparations for upgrade include removing all virtual resources from that host
@@ -90,7 +89,7 @@ application;
 * moving remaining workloads to other hosts in source cloud with live/block
 migration or evacuate/rebuild.
 
-## Upgrade host
+#### Upgrade host
 
 To perform the upgrade, you have to connect the host to Fuel-managed PXE network,
 reboot it into PXE bootstrap, configure it in the Fuel API and start deployment.
