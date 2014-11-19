@@ -114,7 +114,7 @@ def cloud_resources(cloud):
             "id": volume.id,
             "cloud": cloud.name,
             "type": "volume",
-            {
+            "data": {
                 "id": volume.id,
                 "status": volume.status.lower(),
                 "display_name": volume.display_name,
