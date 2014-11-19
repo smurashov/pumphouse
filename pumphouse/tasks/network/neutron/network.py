@@ -1,4 +1,5 @@
 import logging
+import json
 
 from taskflow.patterns import graph_flow
 from sets import Set
@@ -140,7 +141,7 @@ def del_subnet(client, **subnet_filter):
         for subnet in get_subnet_by(client, subnet_filter):
             LOG.debug("Delete subnet '%s' match by '%s' filter" %
                       (subnet['id'], str(subnet_filter)))
-            client.delete_subnet(subnet_id=subnet['id'])
+            client.delete_subnet(subnet['id'])
             i = i + 1
         return i
     except Exception as e:
@@ -150,20 +151,41 @@ def del_subnet(client, **subnet_filter):
 
 
 def create_subnet(client, **subnet_params):
-    # FIXME (verify args)
+    """
+        body_create_subnet = {'subnets': [{'cidr': '192.168.199.0/24',
+            'ip_version': 4, 'network_id': network_id}]}
+
+        neutron.create_subnet(body=body_create_subnet)
+
+    """
+
     try:
         LOG.debug("Create subnet '%s'" % (str(subnet_params)))
-        return client.create_subnet(**subnet_params)
+        return client.create_subnet(body=json.dumps(subnet_params))
     except Exception as e:
         LOG.exception("Error in list subnets: %s" % e.message)
         raise
 
 
-def create_network(client, network_name):
+def del_network(client, network_filter):
+    try:
+        i = 0
+        for network in get_network_by(network_filter):
+            LOG.debug("Delete network '%s' match by '%s' filter" %
+                      (network['id'], str(network_filter)))
+            client.delete_network(network['id'])
+            i = i + 1
+        return i
+    except Exception as e:
+        LOG.exception("Error in delete network: %s" % e.message)
+        raise
+
+
+def create_network(client, network_data):
     try:
         # TODO (sryabin) stub create_network
         return client.create_network({
-            'network': network_name
+            'network': network_data
         })
     except Exception as e:
         LOG.exception("Error in list subnets: %s" % e.message)

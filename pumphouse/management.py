@@ -130,6 +130,25 @@ def cleanup(events, cloud, target):
             "id": floating_ip.address
         }, namespace="/events")
 
+    if (cloud.neutron):
+        for port in cloud.neutron.list_ports()['ports']:
+            LOG.info("Deleted network: %s", port['id'])
+            cloud.neutron.delete_port(port['id'])
+
+        for subnet in cloud.neutron.list_subnets()['subnets']:
+            LOG.info("Deleted subnet: %s", subnet['name'])
+            cloud.neutron.delete_subnet(subnet['id'])
+
+        for network in cloud.neutron.list_networks()['networks']:
+            LOG.info("Delete network: %s", network['name'])
+            cloud.neutron.delete_network(network['id'])
+
+            LOG.info("Deleted network: %s", network._info)
+            events.emit("network delete", {
+                "cloud": target,
+                "id": network['id']
+            }, namespace="/events")
+
     for network in cloud.nova.networks.list():
         if not is_prefixed(network.label):
             continue
@@ -353,7 +372,7 @@ def setup_server_floating_ip(cloud, server):
         return server, floating_ip
 
 
-def setup(config, events, cloud, target,
+def setup(plugins, events, cloud, target,
           num_tenants=0, num_servers=0, workloads={}):
 
     """Prepares test resources in the source cloud
@@ -384,7 +403,7 @@ def setup(config, events, cloud, target,
     floating_ips = workloads.get(
         'floating_ips', list(generate_floating_ips_list(
             num_tenants * sum([len(t["servers"]) for t in tenants]))))
-    generate_networks_list = network_generator.select_from_config(config)
+    generate_networks_list = network_generator.select_from_config(plugins)
     networks = workloads.get('networks',
                              generate_networks_list(num_tenants))
     for image_dict in images:
@@ -410,7 +429,7 @@ def setup(config, events, cloud, target,
             "cloud": target
         }, namespace="/events")
 
-    setup_network = network_manager.select_from_config(config)
+    setup_network = network_manager.select_from_config(plugins)
     setup_network(events, cloud, networks)
 
     for pool in floating_ips:

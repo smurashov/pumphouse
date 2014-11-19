@@ -254,7 +254,11 @@ def reprovision_server(context, server, server_nics):
                             rebind=[server_suspend, image_ensure,
                                     flavor_ensure, user_ensure,
                                     tenant_ensure, server_nics]),
-        restore_floating_ips(context, server.to_dict()),
+    )
+    subflow = restore_floating_ips(context, server.to_dict())
+    if subflow:
+        flow.add(subflow)
+    flow.add(
         TerminateServer(context.src_cloud,
                         name=server_terminate,
                         rebind=[server_suspend]),

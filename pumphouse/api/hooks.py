@@ -85,7 +85,9 @@ class Cloud(object):
                  config["CLOUD_SERVICE"])
         cloud_config = config["CLOUDS"][self.target].copy()
         cloud_service = utils.load_class(config["CLOUD_SERVICE"])
+        plugins = config.get("PLUGINS", {})
         service = cloud_service(cloud_config,
+                                plugins,
                                 self.target,
                                 cloud_driver,
                                 identity_driver)

@@ -24,12 +24,13 @@ class Service(object):
     default_num_tenants = 2
     default_num_servers = 2
 
-    def __init__(self, config, target, cloud_driver, identity_driver):
+    def __init__(self, config, plugins, target, cloud_driver, identity_driver):
         self.identity_config = config.pop("identity")
         self.populate_config = config.pop("populate", None)
         self.workloads_config = config.pop("workloads", None)
         self.cloud_urls = config.pop("urls", None)
         self.cloud_config = config
+        self.plugins = plugins
         self.target = target
         self.cloud_driver = cloud_driver
         self.identity_driver = identity_driver
@@ -58,7 +59,7 @@ class Service(object):
                 kwargs['num_servers'] = self.populate_config.get(
                     "num_servers", self.default_num_servers)
             if kwargs:
-                management.setup(self.cloud_config.get("PLUGINS", {}), events,
+                management.setup(self.plugins, events,
                                  cloud, self.target, **kwargs)
         except Exception:
             LOG.exception("Unexpected exception during cloud reset")
