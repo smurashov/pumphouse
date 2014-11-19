@@ -242,6 +242,14 @@ def generate_servers_list(num, images, flavors):
                "flavor": flavor}
 
 
+def generate_volumes_list(num):
+    for i in xrange(num):
+        volume_ref = str(random.randint(1, 0x7fffffff))
+        yield {"size": 1,
+               "display_name": "{}-{}".format(TEST_RESOURCE_PREFIX,
+                                              volume_ref)}
+
+
 def _create_networks(events, cloud, networks):
     for network_dict in networks:
         net = cloud.nova.networks.create(**network_dict)
