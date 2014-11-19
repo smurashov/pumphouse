@@ -53,7 +53,7 @@ class TestUser(unittest.TestCase):
             tenant_id=tenant_info["id"] if tenant_info else None,
             enabled=self.user_info["enabled"]
         )
-        self.user.to_dict.assert_called_once_with()
+        self.assertEqual(2, self.user.to_dict.call_count)
 
 
 class TestRetrieveUser(TestUser):

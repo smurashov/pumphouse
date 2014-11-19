@@ -145,12 +145,12 @@ class TestEnsureSecGroup(SecGroupTestCase):
         events.emit = Mock()
         event_dict = {
             "id": self.test_secgroup_id,
-            "name": self.secgroup_info["name"],
-            "description": self.secgroup_info["description"],
-            "cloud": self.cloud.name
+            "type": "security_group",
+            "cloud": self.cloud.name,
+            "data": self.secgroup_info,
         }
         ensure_secgroup.created_event(self.secgroup_info)
-        events.emit.assert_called_once_with("secgroup created",
+        events.emit.assert_called_once_with("create",
                                             event_dict,
                                             namespace="/events")
 

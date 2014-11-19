@@ -53,10 +53,11 @@ class EnsureFlavor(task.BaseCloudTask):
 
     def created_event(self, flavor):
         LOG.info("Flavor created: %s", flavor.id)
-        events.emit("flavor created", {
+        events.emit("create", {
             "id": flavor.id,
-            "name": flavor.name,
-            "cloud": self.cloud.name
+            "type": "flavor",
+            "cloud": self.cloud.name,
+            "data": flavor.to_dict(),
         }, namespace="/events")
 
 

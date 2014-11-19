@@ -54,10 +54,11 @@ class EnsureUser(task.BaseCloudTask):
 
     def created_event(self, user):
         LOG.info("Created user: %s", user)
-        events.emit("user created", {
+        events.emit("create", {
             "id": user.id,
-            "name": user.name,
+            "type": "user",
             "cloud": self.cloud.name,
+            "data": user.to_dict(),
         }, namespace="/events")
 
 
@@ -81,11 +82,6 @@ class EnsureUserRole(task.BaseCloudTask):
     def role_assigned_event(self, role_info, user_info, tenant_info):
         LOG.info("Created role %s assignment for user %s in tenant %s",
                  role_info["id"], user_info["id"], tenant_info["id"])
-        events.emit("user role assigned", {
-            "id": user_info["id"],
-            "role_id": role_info["id"],
-            "tenant_id": tenant_info["id"],
-        }, namespace="/events")
 
 
 def migrate_membership(context, user_id, role_id, tenant_id):
