@@ -380,7 +380,7 @@ def setup_server_floating_ip(cloud, server):
 
 
 def setup(plugins, events, cloud, target,
-          num_tenants=0, num_servers=0, workloads={}):
+          num_tenants=0, num_servers=0, num_volumes=0, workloads={}):
 
     """Prepares test resources in the source cloud
 
@@ -389,7 +389,9 @@ def setup(plugins, events, cloud, target,
     :param num_tenants: a number of tenants to create in the source cloud.
     :type num_tenants:  int
     :param num_servers: a number of servers to create per tenant
-    :type servers:      int
+    :type num_servers:  int
+    :param num_volumes: a number of volumes to create per tenant
+    :type num_volumes:  int
     """
 
     prefix = TEST_RESOURCE_PREFIX
@@ -401,12 +403,17 @@ def setup(plugins, events, cloud, target,
     flavors = workloads.get('flavors',
                             list(generate_flavors_list(num_tenants)))
     images = workloads.get('images', list(generate_images_list(num_tenants)))
+
     for tenant_dict in tenants:
         servers = tenant_dict.get("servers",
                                   list(generate_servers_list(num_servers,
                                                              images,
                                                              flavors)))
         tenant_dict["servers"] = servers
+        volumes = workloads.get("volumes",
+                                list(generate_volumes_list(num_volumes)))
+        tenant_dict["volumes"] = volumes
+
     floating_ips = workloads.get(
         'floating_ips', list(generate_floating_ips_list(
             num_tenants * sum([len(t["servers"]) for t in tenants]))))
@@ -474,6 +481,23 @@ def setup(plugins, events, cloud, target,
             "name": tenant.name,
             "description": tenant.description,
         }, namespace="/events")
+
+        for volume_dict in tenant_dict["volumes"]:
+            try:
+                volume = setup_volume(user_cloud, volume_dict)
+            except Exception as exc:
+                LOG.exception("Exception: %s", exc.message)
+                raise exc
+            LOG.info("Created: %s", volume._info)
+            events.emit("volume create", {
+                "cloud": target,
+                "id": volume._info["id"],
+                "status": "active",
+                "display_name": volume._info["display_name"],
+                "tenant_id": volume._info["os-vol-tenant-attr:tenant_id"],
+                "host_id": volume._info["os-vol-host-attr:host"],
+                "attachment_server_ids": [],
+            }, namespace="/events")
 
         for server_dict in tenant_dict["servers"]:
             server = setup_server(user_cloud, server_dict)
