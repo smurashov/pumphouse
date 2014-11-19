@@ -82,6 +82,11 @@ def get_parser():
                                 type=int,
                                 help="Number of servers per tenant to create "
                                 "on setup.")
+    migrate_parser.add_argument("--num-volumes",
+                                default='1',
+                                type=int,
+                                help="Number of volumes per tenant to create "
+                                "on setup.")
     migrate_parser.add_argument("resource",
                                 choices=RESOURCES_MIGRATIONS.keys(),
                                 nargs="?",
@@ -124,6 +129,11 @@ def get_parser():
                               default='1',
                               type=int,
                               help="Number of servers per tenant to create "
+                              "on setup.")
+    setup_parser.add_argument("--num-volumes",
+                              default='1',
+                              type=int,
+                              help="Number of volumes per tenant to create "
                               "on setup.")
     evacuate_parser = subparsers.add_parser("evacuate",
                                             help="Evacuate instances from "
@@ -311,7 +321,7 @@ def main():
         if args.setup:
             workloads = clouds_config["source"].get("workloads", {})
             management.setup(events, src, "source", args.num_tenants,
-                             args.num_servers, workloads)
+                             args.num_servers, args.num_volumes, workloads)
         dst_config = clouds_config["destination"]
         dst = init_client(dst_config,
                           "destination",
@@ -351,6 +361,7 @@ def main():
         management.setup(plugins_config, events, src, "source",
                          args.num_tenants,
                          args.num_servers,
+                         args.num_volumes,
                          workloads)
     elif args.action == "evacuate":
         cloud_config = clouds_config["source"]
