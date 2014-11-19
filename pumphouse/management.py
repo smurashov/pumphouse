@@ -98,10 +98,11 @@ def cleanup(events, cloud, target):
             }, namespace="/events")
 
     if (cloud.cinder):
-        for volume in cloud.cinder.volumes.list():
-            vol_name = volume._info['name']
+        for volume in cloud.cinder.volumes.list(
+                search_opts={'all_tenants': 1}):
+            vol_name = volume._info['display_name']
             vol_id = volume._info['id']
-            if not is_prefixed(vol_name):
+            if vol_name and is_prefixed(vol_name):
                 cloud.cinder.volumes.delete(vol_id)
 
                 LOG.info("Delete volume: %s", str(volume._info))
@@ -488,14 +489,22 @@ def setup(plugins, events, cloud, target,
             except Exception as exc:
                 LOG.exception("Exception: %s", exc.message)
                 raise exc
-            LOG.info("Created: %s", volume._info)
+            tries = []
+            while volume.status != 'available':
+                volume = user_cloud.cinder.volumes.get(volume.id)
+                tries.append(volume)
+                if len(tries) > 30:
+                    LOG.exception("Volume not available in time: %s",
+                                  str(volume._info))
+                    raise exceptions.TimeoutException()
+            LOG.info("Created: %s", str(volume._info))
             events.emit("volume create", {
                 "cloud": target,
                 "id": volume._info["id"],
                 "status": "active",
                 "display_name": volume._info["display_name"],
                 "tenant_id": volume._info["os-vol-tenant-attr:tenant_id"],
-                "host_id": volume._info["os-vol-host-attr:host"],
+                "host_id": volume._info.get("os-vol-host-attr:host"),
                 "attachment_server_ids": [],
             }, namespace="/events")
 
