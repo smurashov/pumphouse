@@ -211,8 +211,12 @@ def migrate_tenant(tenant_id):
         src = hooks.source.connect()
         dst = hooks.destination.connect()
         ctx = context.Context(config, src, dst)
-        events.emit("tenant migrate", {
-            "id": tenant_id
+        events.emit("update", {
+            "id": tenant_id,
+            "cloud": src.name,
+            "type": "tenant",
+            "progress": None,
+            "action": "migration",
         }, namespace="/events")
 
         try:
@@ -220,18 +224,20 @@ def migrate_tenant(tenant_id):
             LOG.debug("Migration flow: %s", flow)
             result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of migration: %s", result)
-            # TODO(akcram): All users' passwords should be restored when all
-            #               migration operations ended.
         except Exception:
-            LOG.exception("Error is occured during migration resources of "
-                          "tenant: %s", tenant_id)
-            status = "error"
-        else:
-            status = ""
+            msg = ("Error is occured during migration resources of tenant: {}"
+                   .format(tenant_id))
+            LOG.exception(msg)
+            events.emit("error", {
+                "message": msg,
+            }, namespace="/events")
 
-        events.emit("tenant migrated", {
+        events.emit("update", {
             "id": tenant_id,
-            "status": status
+            "cloud": src.name,
+            "type": "tenant",
+            "progress": None,
+            "action": None,
         }, namespace="/events")
 
     gevent.spawn(migrate)

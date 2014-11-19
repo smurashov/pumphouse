@@ -43,10 +43,11 @@ class EnsureRole(task.BaseCloudTask):
         return role.to_dict()
 
     def created_event(self, role):
-        events.emit("role created", {
+        events.emit("create", {
             "id": role.id,
-            "name": role.name,
+            "type": "role",
             "cloud": self.cloud.name,
+            "data": role.to_dict(),
         }, namespace="/events")
 
 
