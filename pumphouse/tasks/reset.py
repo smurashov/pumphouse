@@ -431,6 +431,7 @@ class Network(base.Plugin):
 @Network.register("nova")
 class NovaNetwork(EventResource):
     data_id_key = "label"
+    events_type = "network"
 
     @Tenant()
     def tenant(self):
