@@ -96,8 +96,8 @@ class CreateVolumeFromImage(task.BaseCloudTask):
             "id": volume_info["id"],
             "status": "active",
             "display_name": volume_info["display_name"],
-            "tenant_id": volume_info["os-vol-tenant-attr:tenant_id"],
-            "host_id": volume_info["os-vol-host-attr:host"],
+            "tenant_id": volume_info.get("os-vol-tenant-attr:tenant_id"),
+            "host_id": volume_info.get("os-vol-host-attr:host"),
             "attachment_server_ids": [],
         }, namespace="/events")
 
