@@ -124,7 +124,7 @@ def cloud_resources(cloud):
             "cloud": cloud.name,
             "type": "floating_ip",
             "data": {
-                "id": floating_ip.address,
+                "name": floating_ip.address,
                 "server_id": floating_ip.instance_uuid,
             }
         }
