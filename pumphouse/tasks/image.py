@@ -19,6 +19,7 @@ from taskflow.patterns import graph_flow
 
 from pumphouse import task
 from pumphouse import events
+from pumphouse import exceptions
 from pumphouse.tasks import utils as task_utils
 
 
