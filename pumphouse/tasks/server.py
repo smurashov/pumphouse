@@ -323,6 +323,6 @@ def evacuate_server(context, flow, hostname, requires=None):
     if server_binding not in context.store:
         context.store[server_binding] = hostname
         flow.add(RetrieveServer(context.src_cloud,
-                                name=server_binding,
+                                name=server_retrieve,
                                 provides=server_retrieve,
                                 rebind=[server_binding]))
