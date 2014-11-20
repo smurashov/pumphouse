@@ -53,64 +53,67 @@ class EvacuateServer(task.BaseCloudTask):
                                              self.block_migration,
                                              self.disk_over_commit)
         server = utils.wait_for(server_id, self.cloud.nova.servers.get)
-        server = server.to_dict()
-        self.evacuation_end_event(server)
-        return server
+        migrated_server_info = server.to_dict()
+        self.evacuation_end_event(migrated_server_info)
+        return migrated_server_info
 
     def evacuation_start_event(self, server):
-        server_id = server["id"]
-        try:
-            hostname = server[HYPERVISOR_HOSTNAME_ATTR]
-        except KeyError:
-            LOG.warning("Could not get %r attribute from server %r: %s",
-                        HYPERVISOR_HOSTNAME_ATTR, server_id)
-        else:
-            LOG.info("Perform evacuation of server %r from %r host",
-                     server_id, hostname)
-            events.emit("server live migration", {
-                "id": server_id,
-                "cloud": self.cloud.name,
-            }, namespace="/events")
+        if HYPERVISOR_HOSTNAME_ATTR not in server:
+            LOG.warning("Could not get %r attribute from server %r",
+                        HYPERVISOR_HOSTNAME_ATTR, server)
+            return
+        hostname = server[HYPERVISOR_HOSTNAME_ATTR]
+        LOG.info("Perform evacuation of server %r from %r host",
+                 server["id"], hostname)
+        events.emit("update", {
+            "id": server["id"],
+            "type": "server",
+            "cloud": self.cloud.name,
+            "action": "live migration",
+        }, namespace="/events")
 
     def evacuation_end_event(self, server):
-        server_id = server["id"]
-        try:
-            hostname = server[HYPERVISOR_HOSTNAME_ATTR]
-        except KeyError:
-            LOG.warning("Could not get %r attribute from server %r: %s",
-                        HYPERVISOR_HOSTNAME_ATTR, server_id)
-        else:
-            LOG.info("Server %r evacuated to host %r", server_id, hostname)
-            events.emit("server live migrated", {
-                "id": server_id,
-                "host_id": hostname,
-                "cloud": self.cloud.name,
-            }, namespace="/events")
+        if HYPERVISOR_HOSTNAME_ATTR not in server:
+            LOG.warning("Could not get %r attribute from server %r",
+                        HYPERVISOR_HOSTNAME_ATTR, server)
+            return
+        hostname = server[HYPERVISOR_HOSTNAME_ATTR]
+        LOG.info("Server %r evacuated to host %r", server["id"], hostname)
+        events.emit("update", {
+            "id": server["id"],
+            "type": "server",
+            "cloud": self.cloud.name,
+            "action": "",
+            "data": dict(server,
+                         status=server["status"].lower(),
+                         image_id=server["image"]["id"],
+                         host_id=hostname),
+        }, namespace="/events")
 
 
 class ServerStartMigrationEvent(task.BaseCloudTask):
     def execute(self, server_id):
         LOG.info("Migration of server %r started", server_id)
-        events.emit("server migrate", {
+        events.emit("update", {
             "id": server_id,
+            "cloud": self.cloud.name,
+            "type": "server",
+            "action": "migration",
         }, namespace="/events")
 
-    # TODO(akscram): Here we can emit the event to report about
-    #                failures during migration process. It's commented
-    #                because didn't supported by UI and untested.
-#    def revert(self, server_id, result, flow_failures):
-#        LOG.info("Migration of server %r failed by reason %s",
-#                 server_id, result)
-#        events.emit("server migration failed", {
-#            "id": server_id,
-#        }, namespace="/events")
-
-
-class ServerSuccessMigrationEvent(task.BaseCloudsTask):
-    def execute(self, src_server_info, dst_server_info):
-        events.emit("server migrated", {
-            "source_id": src_server_info["id"],
-            "destination_id": dst_server_info["id"],
+    def revert(self, server_id, result, flow_failures):
+        msg = ("Migration of server {} failed by reason {}"
+               .format(server_id, result))
+        LOG.warning(msg)
+        events.emit("error", {
+            "message": msg,
+        }, namespace="/events")
+        events.emit("update", {
+            "id": server_id,
+            "cloud": self.cloud.name,
+            "type": "server",
+            "progress": None,
+            "action": None,
         }, namespace="/events")
 
 
@@ -125,28 +128,34 @@ class SuspendServer(task.BaseCloudTask):
         self.cloud.nova.servers.suspend(server_info["id"])
         server = utils.wait_for(server_info["id"], self.cloud.nova.servers.get,
                                 value="SUSPENDED")
-        self.suspend_event(server)
-        return server.to_dict()
+        suspend_server_info = server.to_dict()
+        self.suspend_event(suspend_server_info)
+        return suspend_server_info
 
     def suspend_event(self, server):
-        LOG.info("Server suspended: %s", server.id)
-        events.emit("server suspended", {
-            "id": server.id,
+        LOG.info("Server suspended: %s", server)
+        events.emit("update", {
+            "id": server["id"],
             "cloud": self.cloud.name,
+            "type": "server",
+            "data": server,
         }, namespace="/events")
 
     def revert(self, server_info, result, flow_failures):
         self.cloud.nova.servers.resume(server_info["id"])
         server = utils.wait_for(server_info["id"], self.cloud.nova.servers.get,
                                 value="ACTIVE")
-        self.resume_event(server)
-        return server.to_dict()
+        resume_server_info = server.to_dict()
+        self.resume_event(resume_server_info)
+        return resume_server_info
 
     def resume_event(self, server):
-        LOG.info("Server resumed: %s", server.id)
-        events.emit("server resumed", {
-            "id": server.id,
+        LOG.info("Server resumed: %s", server["id"])
+        events.emit("update", {
+            "id": server["id"],
             "cloud": self.cloud.name,
+            "type": "server",
+            "data": server,
         }, namespace="/events")
 
 
@@ -164,26 +173,26 @@ class BootServerFromImage(task.BaseCloudTask):
                                                     nics=server_nics)
         server = utils.wait_for(server, self.cloud.nova.servers.get,
                                 value="ACTIVE")
-        self.spawn_event(server)
-        return server.to_dict()
+        spawn_server_info = server.to_dict()
+        self.spawn_event(spawn_server_info)
+        return spawn_server_info
 
     def spawn_event(self, server):
-        LOG.info("Server spawned: %s", server.id)
-        try:
-            hostname = getattr(server, HYPERVISOR_HOSTNAME_ATTR)
-        except AttributeError as err:
-            LOG.warning("Could not get %r attribute from server %r: %s",
-                        HYPERVISOR_HOSTNAME_ATTR, server.id, err)
-        else:
-            events.emit("server boot", {
-                "cloud": self.cloud.name,
-                "id": server.id,
-                "name": server.name,
-                "tenant_id": server.tenant_id,
-                "image_id": server.image["id"],
-                "host_id": hostname,
-                "status": "active",
-            }, namespace="/events")
+        LOG.info("Server spawned: %s", server)
+        if HYPERVISOR_HOSTNAME_ATTR not in server:
+            LOG.warning("Could not get %r attribute from server %r",
+                        HYPERVISOR_HOSTNAME_ATTR, server)
+            return
+        hostname = server[HYPERVISOR_HOSTNAME_ATTR]
+        events.emit("create", {
+            "id": server["id"],
+            "cloud": self.cloud.name,
+            "type": "server",
+            "action": "migration",
+            "data": dict(server,
+                         image_id=server["image"]["id"],
+                         host_id=hostname),
+        }, namespace="/events")
 
 
 class TerminateServer(task.BaseCloudTask):
@@ -193,9 +202,10 @@ class TerminateServer(task.BaseCloudTask):
 
     def terminate_event(self, server):
         LOG.info("Server terminated: %s", server["id"])
-        events.emit("server terminate", {
-            "cloud": self.cloud.name,
+        events.emit("delete", {
             "id": server["id"],
+            "type": "server",
+            "cloud": self.cloud.name,
         }, namespace="/events")
 
 
@@ -252,9 +262,6 @@ def reprovision_server(context, server, server_nics):
         TerminateServer(context.src_cloud,
                         name=server_terminate,
                         rebind=[server_suspend]),
-        ServerSuccessMigrationEvent(context.src_cloud, context.dst_cloud,
-                                    name=server_finish_event,
-                                    rebind=[server_binding, server_boot]),
     )
     context.store[server_retrieve] = server_id
     return pre_suspend_tasks, flow

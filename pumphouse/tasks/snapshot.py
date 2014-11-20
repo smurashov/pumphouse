@@ -46,9 +46,12 @@ class SnapshotServer(task.BaseCloudTask):
             return snapshot.id
 
     def created_event(self, snapshot):
-        events.emit("image created", {
-            "id": snapshot.id,
+        events.emit("create", {
+            "id": snapshot["id"],
+            "type": "image",
             "cloud": self.cloud.name,
+            "action": "uploading",
+            "data": dict(snapshot),
         }, namespace="/events")
 
 

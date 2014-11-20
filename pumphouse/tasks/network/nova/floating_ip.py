@@ -50,21 +50,24 @@ class EnsureFloatingIPBulk(task.BaseCloudTask):
                 raise
             else:
                 LOG.info("Created: %s", floating_ip.to_dict())
-                self.created_event(address)
+                self.created_event(floating_ip)
         else:
             LOG.warn("Already exists, %s", floating_ip.to_dict())
         return floating_ip.to_dict()
 
-    def created_event(self, address):
-        events.emit("floating_ip created", {
-            "id": address,
-            "cloud": self.cloud.name
+    def created_event(self, floating_ip):
+        events.emit("create", {
+            "id": floating_ip.address,
+            "type": "floating_ip",
+            "cloud": self.cloud.name,
+            "data": dict(floating_ip.to_dict(),
+                         name=floating_ip.address),
         }, namespace="/events")
 
     def not_added_event(self, address):
-        events.emit("floating_ip error", {
-            "id": address,
-            "cloud": self.cloud.name
+        events.emit("error", {
+            "message": "FloatingIpsBulk {} was not created, next attempt"
+                       .format(address),
         }, namespace="/events")
 
 
@@ -113,17 +116,19 @@ class EnsureFloatingIP(task.BaseCloudTask):
             raise exceptions.Conflict()
 
     def assigned_event(self, address, server_id):
-        events.emit("floating_ip assigned", {
+        events.emit("update", {
             "id": address,
-            "server_id": server_id,
-            "cloud": self.cloud.name
+            "type": "floating_ip",
+            "cloud": self.cloud.name,
+            "data": {
+                "server_id": server_id,
+            }
         }, namespace="/events")
 
     def assigning_error_event(self, address, server_id):
-        events.emit("floating_ip assign error", {
-            "id": address,
-            "server_id": server_id,
-            "cloud": self.cloud.name
+        events.emit("error", {
+            "message": "Couldn't assign FloatingIp {} to Server {}"
+                       .format(address, server_id),
         }, namespace="/events")
 
 
