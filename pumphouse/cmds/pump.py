@@ -247,8 +247,8 @@ RESOURCES_MIGRATIONS = collections.OrderedDict([
 
 
 class Events(object):
-    def emit(self, *args, **kwargs):
-        pass
+    def emit(self, event, *args, **kwargs):
+        LOG.info("Event {!r}: {}, {}".format(args, kwargs))
 
 
 def init_client(config, name, client_class, identity_class):
