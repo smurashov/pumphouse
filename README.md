@@ -66,6 +66,7 @@ The config file is an YAML file with the following structure:
 DEBUG: true
 CLOUDS:
     source: # a role name of the cloud, source or destination
+        environment: source-env # a name of the environment in FUEL
         endpoint: # OpenStack APIs admin access credentials
             auth_url: http://172.18.18.157:5000/v2.0 # URL of the Keystone service
             username: admin # name of the user with administrative access
@@ -74,6 +75,7 @@ CLOUDS:
         identity: # Identity store access credentials, for passwords retrieval
             connection: mysql+mysqlconnector://root:stackdb@172.18.18.157/keystone
     destination:
+        environment: destination-env # a name of the environment in FUEL
         endpoint:
             auth_url: http://172.18.18.132:5000/v2.0
             username: admin
@@ -81,7 +83,16 @@ CLOUDS:
             tenant_name: admin
         identity:
             connection: mysql+mysqlconnector://keystone:secrete@172.18.18.132/keystone
+    fuel:
+        endpoint: # FUEL admin access credentials
+            host: 172.18.167.155
+            port: 8000
+            username: admin
+            password: admin
 ```
+
+The `environment` and `fuel` sections are optional and necessary only for
+the reassigning of hosts functionality.
 
 See example in [`doc/samples/api-config.yaml`](doc/samples/api-config.yaml)
 file.
