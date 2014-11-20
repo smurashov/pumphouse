@@ -15,7 +15,6 @@
 import collections
 import functools
 import itertools
-import os
 import random
 import tempfile
 import urllib
@@ -79,7 +78,7 @@ class EventResource(base.Resource):
                                                        cls_vars)
 
     event_id_key = "id"
-    
+
     def event_id(self):
         return self.data[self.event_id_key]
 
@@ -173,7 +172,7 @@ class Flavor(EventResource):
 
     @task
     def create(self):
-        swap=self.data.get("swap")
+        swap = self.data.get("swap")
         if swap == '':
             swap = None
         else:
