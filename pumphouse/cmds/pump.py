@@ -15,6 +15,7 @@
 import argparse
 import collections
 import logging
+import os
 
 from pumphouse import exceptions
 from pumphouse import management
@@ -25,6 +26,7 @@ from pumphouse.tasks import evacuation as evacuation_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import identity as identity_tasks
 from pumphouse.tasks import resources as resources_tasks
+from pumphouse.tasks import node as reassignment_tasks
 
 from taskflow.patterns import graph_flow
 
@@ -132,6 +134,12 @@ def get_parser():
     evacuate_parser.add_argument("hostname",
                                  help="The hostname of the host for "
                                       "evacuation")
+    evacuate_parser = subparsers.add_parser("reassign",
+                                            help="Reassign the given host "
+                                                 "from one cloud to another.")
+    evacuate_parser.set_defaults(action="reassign")
+    evacuate_parser.add_argument("hostname",
+                                 help="The hostname of the host to reassign.")
     return parser
 
 
@@ -329,6 +337,34 @@ def main():
                           Identity)
         ctx = context.Context(plugins_config, src, dst)
         flow = evacuation_tasks.evacuate_servers(ctx, args.hostname)
+        if (args.dump):
+            with open(args.dump, "w") as f:
+                utils.dump_flow(flow, f, True)
+            return
+        flows.run_flow(flow, ctx.store)
+    elif args.action == "reassign":
+        fuel_config = clouds_config["fuel"]["endpoint"]
+        os.environ["SERVER_ADDRESS"] = fuel_config["host"]
+        os.environ["LISTEN_PORT"] = str(fuel_config["port"])
+        os.environ["KEYSTONE_USER"] = fuel_config["username"]
+        os.environ["KEYSTONE_PASS"] = fuel_config["password"]
+
+        src_config = clouds_config["source"]
+        dst_config = clouds_config["destination"]
+        config = {
+            "source": src_config["environment"],
+            "destination": dst_config["environment"],
+        }
+        src = init_client(src_config,
+                          "source",
+                          Cloud,
+                          Identity)
+        dst = init_client(dst_config,
+                          "destination",
+                          Cloud,
+                          Identity)
+        ctx = context.Context(config, src, dst)
+        flow = reassignment_tasks.reassign_node(ctx, args.hostname)
         if (args.dump):
             with open(args.dump, "w") as f:
                 utils.dump_flow(flow, f, True)
