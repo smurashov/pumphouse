@@ -128,6 +128,18 @@ class EnsureSingleImage(EnsureImage):
                                                       None, None)
 
 
+class DeleteImage(task.BaseCloudTask):
+    def execute(self, image_info):
+        image_id = image_info["id"]
+        try:
+            self.cloud.glance.images.delete(image_id)
+        except exceptions.glance_excs.BadRequest as exc:
+            LOG.exception("Error deleting: %s", str(image_info))
+            raise exc
+        else:
+            LOG.info("Deleted: %s", str(image_info))
+
+
 def migrate_image_task(context, task_class, image_id, user_id, *rebind):
     image_binding = "image-{}".format(image_id)
     image_ensure = "image-{}-ensure".format(image_id)

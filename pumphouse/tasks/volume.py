@@ -102,18 +102,6 @@ class CreateVolumeFromImage(task.BaseCloudTask):
         }, namespace="/events")
 
 
-class DeleteTempImage(task.BaseCloudTask):
-    def execute(self, image_info):
-        image_id = image_info["id"]
-        try:
-            self.cloud.glance.images.delete(image_id)
-        except exceptions.glance_excs.BadRequest as exc:
-            LOG.exception("Error deleting: %s", str(image_info))
-            raise exc
-        else:
-            LOG.info("Deleted: %s", str(image_info))
-
-
 def migrate_detached_volume(context, volume):
     volume_binding = "volume-{}".format(volume.id)
     volume_retrieve = "{}-retrieve".format(volume_binding)
