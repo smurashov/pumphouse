@@ -21,6 +21,7 @@ from pumphouse import management
 from pumphouse import utils
 from pumphouse import flows
 from pumphouse import context
+from pumphouse.tasks import evacuation as evacuation_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import identity as identity_tasks
 from pumphouse.tasks import resources as resources_tasks
@@ -128,8 +129,9 @@ def get_parser():
                                             help="Evacuate instances from "
                                                  "the given host.")
     evacuate_parser.set_defaults(action="evacuate")
-    evacuate_parser.add_argument("host",
-                                 help="The source host of the evacuation")
+    evacuate_parser.add_argument("hostname",
+                                 help="The hostname of the host for "
+                                      "evacuation")
     return parser
 
 
@@ -156,30 +158,6 @@ def migrate_resources(ctx, flow, ids):
             ctx, tenant_id)
         flow.add(resources_flow)
     return flow
-
-
-def evacuate(cloud, host):
-    binary = "nova-compute"
-    try:
-        hypervs = cloud.nova.hypervisors.search(host, servers=True)
-    except exceptions.nova_excs.NotFound:
-        LOG.exception("Could not find hypervisors at the host %r.", host)
-    else:
-        if len(hypervs) > 1:
-            LOG.warning("More than one hypervisor found at the host: %s",
-                        host)
-        for hyperv in hypervs:
-            details = cloud.nova.hypervisors.get(hyperv.id)
-            host = details.service["host"]
-            cloud.nova.services.disable(host, binary)
-            try:
-                for server in hyperv.servers:
-                    cloud.nova.servers.live_migrate(server["uuid"], None,
-                                                    True, False)
-            except Exception:
-                LOG.exception("An error occured during evacuation servers "
-                              "from the host %r", host)
-                cloud.nova.services.enable(host, binary)
 
 
 def get_ids_by_tenant(cloud, resource_type, tenant_id):
@@ -285,11 +263,11 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     events = Events()
-    flow = graph_flow.Flow("migrate-resources")
     Cloud, Identity = load_cloud_driver(is_fake=args.fake)
     clouds_config = args.config["CLOUDS"]
     plugins_config = args.config["PLUGINS"]
     if args.action == "migrate":
+        flow = graph_flow.Flow("migrate-resources")
         store = {}
         src_config = clouds_config["source"]
         src = init_client(src_config,
@@ -341,12 +319,21 @@ def main():
                          args.num_servers,
                          workloads)
     elif args.action == "evacuate":
-        cloud_config = clouds_config["source"]
-        cloud = init_client(cloud_config,
-                            "source",
-                            Cloud,
-                            Identity)
-        evacuate(cloud, args.host)
+        src = init_client(clouds_config["source"],
+                          "source",
+                          Cloud,
+                          Identity)
+        dst = init_client(clouds_config["destination"],
+                          "destination",
+                          Cloud,
+                          Identity)
+        ctx = context.Context(plugins_config, src, dst)
+        flow = evacuation_tasks.evacuate_servers(ctx, args.hostname)
+        if (args.dump):
+            with open(args.dump, "w") as f:
+                utils.dump_flow(flow, f, True)
+            return
+        flows.run_flow(flow, ctx.store)
 
 if __name__ == "__main__":
     main()
