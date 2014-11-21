@@ -175,7 +175,7 @@ class Flavor(EventResource):
         swap = self.data.get("swap")
         if swap == '':
             swap = None
-        else:
+        elif swap is not None:
             swap = int(swap)
         self.data = self.env.cloud.nova.flavors.create(
             self.data["name"],
