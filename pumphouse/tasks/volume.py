@@ -27,12 +27,36 @@ LOG = logging.getLogger(__name__)
 
 
 class RetrieveVolume(task.BaseCloudTask):
+
     def execute(self, volume_id):
         volume = self.cloud.cinder.volumes.get(volume_id)
         return volume._info
 
 
+class CreateVolumeSnapshot(task.BaseCloudTask):
+
+    def execute(self, volume_info):
+        volume_id = volume_info["id"]
+
+        try:
+            # TODO (sryabin) check the volume has been detached
+            snapshot = utils.wait_for(
+                volume_id,
+                self.cloud.cinder.volume_snapshots.create,
+                value='available',
+                timeout=300,
+                error_status='error')
+
+        # except cinder_excs.BadRequest as e:
+        except Exception as e:
+            LOG.exception("Can't create snapshot from volume: %s",
+                          str(volume_info))
+
+        return snapshot._info
+
+
 class UploadVolume(task.BaseCloudTask):
+
     def execute(self, volume_info):
         volume_id = volume_info["id"]
         try:
@@ -68,6 +92,7 @@ class UploadVolume(task.BaseCloudTask):
 
 
 class CreateVolumeFromImage(task.BaseCloudTask):
+
     def execute(self, volume_info, image_info):
         image_id = image_info["id"]
         try:
