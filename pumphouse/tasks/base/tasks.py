@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and#
 # limitations under the License.
 
+import collections
+import itertools
+
 __all__ = ['UnboundTask', 'Task', 'task']
 
 
@@ -91,13 +94,15 @@ class BoundTask(object):
 
 
 class Task(object):
-    def __init__(self, fn, name, resource, requires=[], after=[], before=[]):
+    def __init__(self, fn, name, resource, requires=[], after=[], before=[],
+                 includes=[]):
         self.fn = fn
         self.name = name
         self.resource = resource
-        self.requires = frozenset(requires)
+        self.requires = set(requires)
         self.after = set(after)
         self.before = set(before)
+        self.includes = set(includes)
 
     def __repr__(self):
         requires = ''
@@ -114,33 +119,46 @@ class Task(object):
             requires,
         )
 
+_Pair = collections.namedtuple("_Pair", ["left", "right"])
+
 
 def process_tasks(tasks):
     def get_tasks(task):
-        for req_task in task.requires:
+        for req_task in itertools.chain(task.requires, task.includes):
             for _task in get_tasks(req_task):
                 yield _task
         yield task
+
+    def before_after(task1, task2):
+        task1.before.add(task2)
+        task2.after.add(task1)
     all_tasks = {}
     for task in tasks:
         for _task in get_tasks(task):
             if _task not in all_tasks:
-                all_tasks[_task] = Task(_task.fn, _task.name, _task.resource)
-    for old_task, new_task in all_tasks.iteritems():
-        new_task.requires = set(all_tasks[task] for task in old_task.requires)
+                fn, name, resource = _task.fn, _task.name, _task.resource
+                left_task = right_task = Task(fn, name, resource)
+                if _task.includes:
+                    right_task = Task(None, name + "__post", resource)
+                all_tasks[_task] = _Pair(left_task, right_task)
+    for old_task, (left_task, right_task) in all_tasks.iteritems():
+        left_task.requires = set(all_tasks[task].right
+                                 for task in old_task.requires)
+        for inc_task in old_task.includes:
+            new_inc_task = all_tasks[inc_task]
+            before_after(left_task, new_inc_task.left)
+            before_after(new_inc_task.right, right_task)
         for pretask, resource in old_task.after:
             real_task = pretask.get_for_resource(resource, realize=False)
             if real_task and real_task in all_tasks:
-                new_real_task = all_tasks[real_task]
-                new_real_task.before.add(new_task)
-                new_task.after.add(new_real_task)
+                before_after(all_tasks[real_task].right, left_task)
         for posttask, resource in old_task.before:
             real_task = posttask.get_for_resource(resource, realize=False)
             if real_task and real_task in all_tasks:
-                new_real_task = all_tasks[real_task]
-                new_real_task.after.add(new_task)
-                new_task.before.add(new_real_task)
-    for task in all_tasks.itervalues():
-        yield task
+                before_after(right_task, all_tasks[real_task].left)
+    for left_task, right_task in all_tasks.itervalues():
+        yield left_task
+        if right_task != left_task:
+            yield right_task
 
 task = UnboundTask

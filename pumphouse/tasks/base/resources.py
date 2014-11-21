@@ -181,13 +181,13 @@ class CollectionUnboundTask(tasks.UnboundTask):
     def realize_with(self, resource):
         assert resource.bound
         runner = resource.get_runner()
-        requires = []
+        includes = []
         for data in resource.data:
             res = runner.get_resource(resource.base_cls, data)
-            requires.append(self.base_task.get_for_resource(res))
+            includes.append(self.base_task.get_for_resource(res))
         return tasks.Task(
-            None,  # Wow! We'll call this None!
+            None,
             self.name,
             resource,
-            requires=requires,
+            includes=includes,
         )
