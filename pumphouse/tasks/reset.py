@@ -455,12 +455,12 @@ class NovaNetwork(EventResource):
             project_id=self.tenant["id"],
         ).to_dict()
 
-    @task(before=[create, subnet.delete], requires=[servers.each().delete])
-    def do_delete(self):
+    @task(before=[create],
+          requires=[servers.each().delete],
+          includes=[subnet.delete])
+    def delete(self):
         self.env.cloud.nova.networks.disassociate(self.data["id"])
         self.env.cloud.nova.networks.delete(self.data["id"])
-
-    delete = task(name="delete", requires=[do_delete, subnet.delete])
 
 
 class CleanupWorkload(EventResource):

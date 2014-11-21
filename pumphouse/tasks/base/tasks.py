@@ -22,7 +22,7 @@ class UnboundTask(object):
     wrapper = None
 
     def __init__(self, fn=None, name=None,
-                 requires=[], after=[], before=[]):
+                 requires=[], after=[], before=[], includes=[]):
         self._resource_task = {}
         if fn is not None and self.wrapper is not None:
             self.fn = self.wrapper(fn)
@@ -35,6 +35,7 @@ class UnboundTask(object):
         self.requires = frozenset(requires)
         self.after = frozenset(after)
         self.before = frozenset(before)
+        self.includes = frozenset(includes)
 
     def __call__(self, fn):
         assert self.fn is None and self.name is None
@@ -69,10 +70,13 @@ class UnboundTask(object):
         requires = []
         for task in self.requires:
             requires.append(task.get_for_resource(resource))
+        includes = []
+        for task in self.includes:
+            includes.append(task.get_for_resource(resource))
         after = [(task, resource) for task in self.after]
         before = [(task, resource) for task in self.before]
-        return Task(self.fn, self.name, resource,
-                    requires=requires, after=after, before=before)
+        return Task(self.fn, self.name, resource, requires=requires,
+                    after=after, before=before, includes=includes)
 
     def __repr__(self):
         return '<{} {}>'.format(
