@@ -85,9 +85,7 @@ class TestSuspendServer(TestServer):
         suspend_server = server.SuspendServer(self.cloud)
         self.assertIsInstance(suspend_server, task.BaseCloudTask)
 
-        server_suspended = self.server.copy()
-        server_suspended.status = "SUSPENDED"
-        self.cloud.nova.servers.get.return_value = server_suspended
+        self.server.status = "SUSPENDED"
 
         server_info = suspend_server.execute(self.server_info)
         self.cloud.nova.servers.suspend.assert_called_once_with(
@@ -153,7 +151,6 @@ class TestReprovisionServer(TestServer):
 
     @patch("pumphouse.tasks.server.restore_floating_ips")
     @patch("pumphouse.tasks.utils.SyncPoint")
-    @patch.object(server, "ServerSuccessMigrationEvent")
     @patch.object(server, "ServerStartMigrationEvent")
     @patch.object(server, "TerminateServer")
     @patch.object(server, "BootServerFromImage")
@@ -169,7 +166,6 @@ class TestReprovisionServer(TestServer):
                                 boot_server_mock,
                                 terminate_server_mock,
                                 start_event_mock,
-                                stop_event_mock,
                                 mock_sync_point,
                                 mock_restore_floating_ips):
         floating_ips_flow = Mock()
@@ -200,8 +196,7 @@ class TestReprovisionServer(TestServer):
                           suspend_server_mock(),
                           boot_server_mock(),
                           floating_ips_flow(),
-                          terminate_server_mock(),
-                          stop_event_mock()])
+                          terminate_server_mock()])
 
 
 class TestRestoreFloatingIPs(TestServer):

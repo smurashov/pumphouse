@@ -15,15 +15,19 @@
 import argparse
 import collections
 import logging
+import os
 
 from pumphouse import exceptions
 from pumphouse import management
 from pumphouse import utils
 from pumphouse import flows
 from pumphouse import context
+from pumphouse.tasks import evacuation as evacuation_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import identity as identity_tasks
 from pumphouse.tasks import resources as resources_tasks
+from pumphouse.tasks import volume as volume_tasks
+from pumphouse.tasks import node as reassignment_tasks
 
 from taskflow.patterns import graph_flow
 
@@ -55,11 +59,9 @@ def get_parser():
                         action="store_true",
                         help="Work with FakeCloud back-end instead real "
                              "back-end from config.yaml")
-
     parser.add_argument("--dump",
                         nargs="?",
                         const="flow.dot",
-                        action="store_true",
                         help="Dump flow without execution")
 
     subparsers = parser.add_subparsers()
@@ -82,6 +84,11 @@ def get_parser():
                                 default='1',
                                 type=int,
                                 help="Number of servers per tenant to create "
+                                "on setup.")
+    migrate_parser.add_argument("--num-volumes",
+                                default='1',
+                                type=int,
+                                help="Number of volumes per tenant to create "
                                 "on setup.")
     migrate_parser.add_argument("resource",
                                 choices=RESOURCES_MIGRATIONS.keys(),
@@ -126,13 +133,35 @@ def get_parser():
                               type=int,
                               help="Number of servers per tenant to create "
                               "on setup.")
+    setup_parser.add_argument("--num-volumes",
+                              default='1',
+                              type=int,
+                              help="Number of volumes per tenant to create "
+                              "on setup.")
     evacuate_parser = subparsers.add_parser("evacuate",
                                             help="Evacuate instances from "
                                                  "the given host.")
     evacuate_parser.set_defaults(action="evacuate")
-    evacuate_parser.add_argument("host",
-                                 help="The source host of the evacuation")
+    evacuate_parser.add_argument("hostname",
+                                 help="The hostname of the host for "
+                                      "evacuation")
+    evacuate_parser = subparsers.add_parser("reassign",
+                                            help="Reassign the given host "
+                                                 "from one cloud to another.")
+    evacuate_parser.set_defaults(action="reassign")
+    evacuate_parser.add_argument("hostname",
+                                 help="The hostname of the host to reassign.")
     return parser
+
+
+def migrate_volumes(ctx, flow, ids):
+    volumes = ctx.src_cloud.cinder.volumes.list(search_opts={'all_tenants': 1})
+    for volume in volumes:
+        if volume.id in ids:
+            volume_flow = volume_tasks.migrate_detached_volume(
+                ctx, volume)
+            flow.add(volume_flow)
+    return flow
 
 
 def migrate_images(ctx, flow, ids):
@@ -158,30 +187,6 @@ def migrate_resources(ctx, flow, ids):
             ctx, tenant_id)
         flow.add(resources_flow)
     return flow
-
-
-def evacuate(cloud, host):
-    binary = "nova-compute"
-    try:
-        hypervs = cloud.nova.hypervisors.search(host, servers=True)
-    except exceptions.nova_excs.NotFound:
-        LOG.exception("Could not find hypervisors at the host %r.", host)
-    else:
-        if len(hypervs) > 1:
-            LOG.warning("More than one hypervisor found at the host: %s",
-                        host)
-        for hyperv in hypervs:
-            details = cloud.nova.hypervisors.get(hyperv.id)
-            host = details.service["host"]
-            cloud.nova.services.disable(host, binary)
-            try:
-                for server in hyperv.servers:
-                    cloud.nova.servers.live_migrate(server["uuid"], None,
-                                                    True, False)
-            except Exception:
-                LOG.exception("An error occured during evacuation servers "
-                              "from the host %r", host)
-                cloud.nova.services.enable(host, binary)
 
 
 def get_ids_by_tenant(cloud, resource_type, tenant_id):
@@ -267,12 +272,13 @@ RESOURCES_MIGRATIONS = collections.OrderedDict([
     ("images", migrate_images),
     ("identity", migrate_identity),
     ("resources", migrate_resources),
+    ("volumes", migrate_volumes),
 ])
 
 
 class Events(object):
-    def emit(self, *args, **kwargs):
-        pass
+    def emit(self, event, *args, **kwargs):
+        LOG.info("Event {!r}: {}, {}".format(args, kwargs))
 
 
 def init_client(config, name, client_class, identity_class):
@@ -287,11 +293,11 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     events = Events()
-    flow = graph_flow.Flow("migrate-resources")
     Cloud, Identity = load_cloud_driver(is_fake=args.fake)
     clouds_config = args.config["CLOUDS"]
     plugins_config = args.config["PLUGINS"]
     if args.action == "migrate":
+        flow = graph_flow.Flow("migrate-resources")
         store = {}
         src_config = clouds_config["source"]
         src = init_client(src_config,
@@ -301,7 +307,7 @@ def main():
         if args.setup:
             workloads = clouds_config["source"].get("workloads", {})
             management.setup(events, src, "source", args.num_tenants,
-                             args.num_servers, workloads)
+                             args.num_servers, args.num_volumes, workloads)
         dst_config = clouds_config["destination"]
         dst = init_client(dst_config,
                           "destination",
@@ -341,14 +347,52 @@ def main():
         management.setup(plugins_config, events, src, "source",
                          args.num_tenants,
                          args.num_servers,
+                         args.num_volumes,
                          workloads)
     elif args.action == "evacuate":
-        cloud_config = clouds_config["source"]
-        cloud = init_client(cloud_config,
-                            "source",
-                            Cloud,
-                            Identity)
-        evacuate(cloud, args.host)
+        src = init_client(clouds_config["source"],
+                          "source",
+                          Cloud,
+                          Identity)
+        dst = init_client(clouds_config["destination"],
+                          "destination",
+                          Cloud,
+                          Identity)
+        ctx = context.Context(plugins_config, src, dst)
+        flow = evacuation_tasks.evacuate_servers(ctx, args.hostname)
+        if (args.dump):
+            with open(args.dump, "w") as f:
+                utils.dump_flow(flow, f, True)
+            return
+        flows.run_flow(flow, ctx.store)
+    elif args.action == "reassign":
+        fuel_config = clouds_config["fuel"]["endpoint"]
+        os.environ["SERVER_ADDRESS"] = fuel_config["host"]
+        os.environ["LISTEN_PORT"] = str(fuel_config["port"])
+        os.environ["KEYSTONE_USER"] = fuel_config["username"]
+        os.environ["KEYSTONE_PASS"] = fuel_config["password"]
+
+        src_config = clouds_config["source"]
+        dst_config = clouds_config["destination"]
+        config = {
+            "source": src_config["environment"],
+            "destination": dst_config["environment"],
+        }
+        src = init_client(src_config,
+                          "source",
+                          Cloud,
+                          Identity)
+        dst = init_client(dst_config,
+                          "destination",
+                          Cloud,
+                          Identity)
+        ctx = context.Context(config, src, dst)
+        flow = reassignment_tasks.reassign_node(ctx, args.hostname)
+        if (args.dump):
+            with open(args.dump, "w") as f:
+                utils.dump_flow(flow, f, True)
+            return
+        flows.run_flow(flow, ctx.store)
 
 if __name__ == "__main__":
     main()

@@ -98,7 +98,7 @@ def cloud_resources(cloud):
             "data": {
                 "id": server.id,
                 "name": server.name,
-                "status": server.status.lower(),
+                "status": server.status,
                 "tenant_id": server.tenant_id,
                 "image_id": server.image["id"],
                 # TODO(akscram): Mapping of real hardware servers to
@@ -139,7 +139,7 @@ def cloud_resources(cloud):
             "cloud": cloud.name,
             "type": "floating_ip",
             "data": {
-                "id": floating_ip.address,
+                "name": floating_ip.address,
                 "server_id": floating_ip.instance_uuid,
             }
         }
@@ -226,8 +226,12 @@ def migrate_tenant(tenant_id):
         src = hooks.source.connect()
         dst = hooks.destination.connect()
         ctx = context.Context(config, src, dst)
-        events.emit("tenant migrate", {
-            "id": tenant_id
+        events.emit("update", {
+            "id": tenant_id,
+            "cloud": src.name,
+            "type": "tenant",
+            "progress": None,
+            "action": "migration",
         }, namespace="/events")
 
         try:
@@ -235,18 +239,20 @@ def migrate_tenant(tenant_id):
             LOG.debug("Migration flow: %s", flow)
             result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of migration: %s", result)
-            # TODO(akcram): All users' passwords should be restored when all
-            #               migration operations ended.
         except Exception:
-            LOG.exception("Error is occured during migration resources of "
-                          "tenant: %s", tenant_id)
-            status = "error"
-        else:
-            status = ""
+            msg = ("Error is occured during migration resources of tenant: {}"
+                   .format(tenant_id))
+            LOG.exception(msg)
+            events.emit("error", {
+                "message": msg,
+            }, namespace="/events")
 
-        events.emit("tenant migrated", {
+        events.emit("update", {
             "id": tenant_id,
-            "status": status
+            "cloud": src.name,
+            "type": "tenant",
+            "progress": None,
+            "action": None,
         }, namespace="/events")
 
     gevent.spawn(migrate)
@@ -262,8 +268,12 @@ def evacuate_host(host_id):
         src = hooks.source.connect()
         dst = hooks.destination.connect()
         ctx = context.Context(config, src, dst)
-        events.emit("host evacuate", {
+        events.emit("update", {
             "id": host_id,
+            "type": "host",
+            "cloud": src.name,
+            "progress": None,
+            "action": "evacuation",
         }, namespace="/events")
 
         try:
@@ -272,15 +282,19 @@ def evacuate_host(host_id):
             result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of evacuation: %s", result)
         except Exception:
-            LOG.exception("Error is occured during evacuating host %r",
-                          host_id)
-            status = "error"
-        else:
-            status = ""
+            msg = ("Error is occured during evacuating host {}"
+                   .format(host_id))
+            LOG.exception(msg)
+            events.emit("error", {
+                "message": msg,
+            }, namespace="/events")
 
-        events.emit("host evacuated", {
+        events.emit("update", {
             "id": host_id,
-            "status": status,
+            "type": "host",
+            "cloud": src.name,
+            "progress": None,
+            "action": None,
         }, namespace="/events")
     gevent.spawn(evacuate)
     return flask.make_response()
@@ -305,10 +319,6 @@ def reassign_host(host_id):
             "destination": dst_config["environment"],
         }
 
-        events.emit("host reassign", {
-            "id": host_id,
-        }, namespace="/events")
-
         try:
             src = hooks.source.connect()
             dst = hooks.destination.connect()
@@ -319,22 +329,13 @@ def reassign_host(host_id):
             result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of migration: %s", result)
         except Exception:
-            LOG.exception("Error is occured during reassigning host %r",
-                          host_id)
-            status = "error"
-            new_host_id = ""
-        else:
-            status = ""
-            hostname_attr = "node-assigned-hosetname-{}".format(host_id)
-            new_host_id = result[hostname_attr]
+            msg = ("Error is occured during reassigning host {}"
+                   .format(host_id))
+            LOG.exception(msg)
+            events.emit("error", {
+                "message": msg,
+            }, namespace="/events")
 
-        events.emit("host reassigned", {
-            "id": host_id,
-            "name": new_host_id,
-            "new_id": new_host_id,
-            "cloud": dst.name,
-            "status": status,
-        }, namespace="/events")
     gevent.spawn(reassign)
     return flask.make_response()
 

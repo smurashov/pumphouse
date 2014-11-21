@@ -19,6 +19,7 @@ from taskflow.patterns import graph_flow
 
 from pumphouse import task
 from pumphouse import events
+from pumphouse import exceptions
 from pumphouse.tasks import utils as task_utils
 
 
@@ -27,13 +28,16 @@ LOG = logging.getLogger(__name__)
 
 class LogReporter(task_utils.UploadReporter):
     def report(self, absolute):
-        src_image, dst_image = self.context
+        cloud_name, src_image, dst_image = self.context
         LOG.info("Image %r uploaded on %3.2f%%",
                  dst_image["id"], absolute * 100)
-        events.emit("image uploading", {
+        events.emit("update", {
             "id": dst_image["id"],
-            "source_id": src_image["id"],
-            "progress": round(absolute * 100)
+            "type": "image",
+            "cloud": cloud_name,
+            "action": None,
+            "progress": round(absolute * 100),
+            "data": dict(dst_image),
         }, namespace="/events")
 
 
@@ -77,7 +81,8 @@ class EnsureImage(task.BaseCloudsTask):
 
             data = self.src_cloud.glance.images.data(image_info["id"])
             img_data = task_utils.FileProxy(data, image_info["size"],
-                                            LogReporter((image_info,
+                                            LogReporter((dst_cloud.name,
+                                                         image_info,
                                                          image)))
             dst_cloud.glance.images.upload(image["id"], img_data)
             image = dst_cloud.glance.images.get(image["id"])
@@ -86,16 +91,23 @@ class EnsureImage(task.BaseCloudsTask):
 
     def created_event(self, image):
         LOG.info("Image created: %s", image["id"])
-        events.emit("image created", {
+        events.emit("create", {
             "id": image["id"],
-            "name": image["name"],
-            "cloud": self.dst_cloud.name
+            "type": "image",
+            "cloud": self.dst_cloud.name,
+            "action": "uploading",
+            "data": dict(image),
         }, namespace="/events")
 
     def uploaded_event(self, image):
         LOG.info("Image uploaded: %s", image["id"])
-        events.emit("image uploaded", {
-            "id": image["id"]
+        events.emit("update", {
+            "id": image["id"],
+            "type": "image",
+            "cloud": self.dst_cloud.name,
+            "progress": None,
+            "action": None,
+            "data": dict(image),
         }, namespace="/events")
 
 
@@ -115,6 +127,18 @@ class EnsureSingleImage(EnsureImage):
     def execute(self, image_id, user_info):
         return super(EnsureSingleImage, self).execute(image_id, user_info,
                                                       None, None)
+
+
+class DeleteImage(task.BaseCloudTask):
+    def execute(self, image_info):
+        image_id = image_info["id"]
+        try:
+            self.cloud.glance.images.delete(image_id)
+        except exceptions.glance_excs.BadRequest as exc:
+            LOG.exception("Error deleting: %s", str(image_info))
+            raise exc
+        else:
+            LOG.info("Deleted: %s", str(image_info))
 
 
 def migrate_image_task(context, task_class, image_id, user_id, *rebind):

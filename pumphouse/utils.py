@@ -84,11 +84,15 @@ def wait_for(resource, update_resource,
 
 counter = (chr(i) for i in range(ord('A'), ord('Z')))
 ids = defaultdict(lambda: next(counter))
+id_re = re.compile(r"""
+    [0-9a-fA-F]{8}(-?)(?:[0-9a-fA-F]{4}\1){3}[0-9a-fA-F]{12}  # UUID
+    |                                                         # or
+    pumphouse-(?:-[a-zA-Z]+)?(?:-\d+)?                        # synthetic name
+""", re.VERBOSE)
 
 
 def eat_ids(s):
-    return re.sub('(?<=-)[0-9a-f-]+(?=$|-)',
-                  lambda match: ids[match.group(0)], s)
+    return id_re.sub(lambda match: ids[match.group(0)], s)
 
 
 def dump_flow(flow, f, first=False, prev=None):
@@ -96,7 +100,8 @@ def dump_flow(flow, f, first=False, prev=None):
     import taskflow.patterns.linear_flow
     linear = isinstance(flow, taskflow.patterns.linear_flow.Flow)
     if first:
-        f.write('digraph "%s" {\n' % (eat_ids(flow.name),))
+        f.write('digraph "%s" {\n'
+                'graph[rankdir=LR]\nnode[shape=box]\n' % (eat_ids(flow.name),))
     else:
         f.write('subgraph "cluster_%s" {\n'
                 'graph[style=%s,rankdir=LR]\n' % (
