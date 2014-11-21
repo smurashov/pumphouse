@@ -26,6 +26,7 @@ from pumphouse.tasks import evacuation as evacuation_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import identity as identity_tasks
 from pumphouse.tasks import resources as resources_tasks
+from pumphouse.tasks import volume as volume_tasks
 from pumphouse.tasks import node as reassignment_tasks
 
 from taskflow.patterns import graph_flow
@@ -84,6 +85,11 @@ def get_parser():
                                 type=int,
                                 help="Number of servers per tenant to create "
                                 "on setup.")
+    migrate_parser.add_argument("--num-volumes",
+                                default='1',
+                                type=int,
+                                help="Number of volumes per tenant to create "
+                                "on setup.")
     migrate_parser.add_argument("resource",
                                 choices=RESOURCES_MIGRATIONS.keys(),
                                 nargs="?",
@@ -127,6 +133,11 @@ def get_parser():
                               type=int,
                               help="Number of servers per tenant to create "
                               "on setup.")
+    setup_parser.add_argument("--num-volumes",
+                              default='1',
+                              type=int,
+                              help="Number of volumes per tenant to create "
+                              "on setup.")
     evacuate_parser = subparsers.add_parser("evacuate",
                                             help="Evacuate instances from "
                                                  "the given host.")
@@ -141,6 +152,16 @@ def get_parser():
     evacuate_parser.add_argument("hostname",
                                  help="The hostname of the host to reassign.")
     return parser
+
+
+def migrate_volumes(ctx, flow, ids):
+    volumes = ctx.src_cloud.cinder.volumes.list(search_opts={'all_tenants': 1})
+    for volume in volumes:
+        if volume.id in ids:
+            volume_flow = volume_tasks.migrate_detached_volume(
+                ctx, volume)
+            flow.add(volume_flow)
+    return flow
 
 
 def migrate_images(ctx, flow, ids):
@@ -251,6 +272,7 @@ RESOURCES_MIGRATIONS = collections.OrderedDict([
     ("images", migrate_images),
     ("identity", migrate_identity),
     ("resources", migrate_resources),
+    ("volumes", migrate_volumes),
 ])
 
 
@@ -285,7 +307,7 @@ def main():
         if args.setup:
             workloads = clouds_config["source"].get("workloads", {})
             management.setup(events, src, "source", args.num_tenants,
-                             args.num_servers, workloads)
+                             args.num_servers, args.num_volumes, workloads)
         dst_config = clouds_config["destination"]
         dst = init_client(dst_config,
                           "destination",
@@ -325,6 +347,7 @@ def main():
         management.setup(plugins_config, events, src, "source",
                          args.num_tenants,
                          args.num_servers,
+                         args.num_volumes,
                          workloads)
     elif args.action == "evacuate":
         src = init_client(clouds_config["source"],

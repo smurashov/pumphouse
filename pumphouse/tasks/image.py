@@ -19,6 +19,7 @@ from taskflow.patterns import graph_flow
 
 from pumphouse import task
 from pumphouse import events
+from pumphouse import exceptions
 from pumphouse.tasks import utils as task_utils
 
 
@@ -126,6 +127,18 @@ class EnsureSingleImage(EnsureImage):
     def execute(self, image_id, user_info):
         return super(EnsureSingleImage, self).execute(image_id, user_info,
                                                       None, None)
+
+
+class DeleteImage(task.BaseCloudTask):
+    def execute(self, image_info):
+        image_id = image_info["id"]
+        try:
+            self.cloud.glance.images.delete(image_id)
+        except exceptions.glance_excs.BadRequest as exc:
+            LOG.exception("Error deleting: %s", str(image_info))
+            raise exc
+        else:
+            LOG.info("Deleted: %s", str(image_info))
 
 
 def migrate_image_task(context, task_class, image_id, user_id, *rebind):

@@ -17,6 +17,7 @@ from keystoneclient.openstack.common.apiclient import (exceptions  # NOQA
 from novaclient import exceptions as nova_excs  # NOQA
 # from neutronclient.common import exceptions as neutron_excs  # NOQA
 from glanceclient import exc as glance_excs  # NOQA
+from cinderclient import exceptions as cinder_excs  # NOQA
 
 
 class Error(Exception):
