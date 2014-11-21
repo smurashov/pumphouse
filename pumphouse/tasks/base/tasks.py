@@ -91,19 +91,13 @@ class BoundTask(object):
 
 
 class Task(object):
-    def __init__(self, fn, name, resource, requires, after=[], before=[]):
+    def __init__(self, fn, name, resource, requires=[], after=[], before=[]):
         self.fn = fn
         self.name = name
         self.resource = resource
         self.requires = frozenset(requires)
         self.after = set(after)
         self.before = set(before)
-
-    def get_tasks(self):
-        for task in self.requires:
-            for _task in task.get_tasks():
-                yield _task
-        yield self
 
     def __repr__(self):
         requires = ''
@@ -119,5 +113,34 @@ class Task(object):
             self.resource,
             requires,
         )
+
+
+def process_tasks(tasks):
+    def get_tasks(task):
+        for req_task in task.requires:
+            for _task in get_tasks(req_task):
+                yield _task
+        yield task
+    all_tasks = {}
+    for task in tasks:
+        for _task in get_tasks(task):
+            if _task not in all_tasks:
+                all_tasks[_task] = Task(_task.fn, _task.name, _task.resource)
+    for old_task, new_task in all_tasks.iteritems():
+        new_task.requires = set(all_tasks[task] for task in old_task.requires)
+        for pretask, resource in old_task.after:
+            real_task = pretask.get_for_resource(resource, realize=False)
+            if real_task and real_task in all_tasks:
+                new_real_task = all_tasks[real_task]
+                new_real_task.before.add(new_task)
+                new_task.after.add(new_real_task)
+        for posttask, resource in old_task.before:
+            real_task = posttask.get_for_resource(resource, realize=False)
+            if real_task and real_task in all_tasks:
+                new_real_task = all_tasks[real_task]
+                new_real_task.after.add(new_task)
+                new_task.before.add(new_real_task)
+    for task in all_tasks.itervalues():
+        yield task
 
 task = UnboundTask

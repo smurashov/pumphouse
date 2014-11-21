@@ -20,6 +20,7 @@ from taskflow.patterns import graph_flow
 import taskflow.task
 
 from . import resources
+from . import tasks
 
 __all__ = ['Runner', 'TaskflowRunner']
 
@@ -53,7 +54,7 @@ class Runner(object):
             return res
 
     def add(self, task):
-        self.tasks.update(task.get_tasks())
+        self.tasks.add(task)
 
     def run(self):
         print("Hey, I'm gonna run these tasks:")
@@ -88,31 +89,20 @@ class TaskflowRunner(Runner):
         id_ = _make_str_id(task.resource.get_id())
         return "_".join((type(task.resource).__name__, id_, task.name))
 
-    def convert_task(self, task, after):
+    def convert_task(self, task):
         name = self.get_task_name(task)
         flow_task = TaskFlowTask(
             task,
             name=name,
             provides=name,
-            rebind=[self.get_task_name(req_task)
-                    for req_task in (task.requires | set(after))],
+            rebind=map(self.get_task_name, task.requires | task.after),
         )
         return flow_task
 
     def create_flow(self):
         flow = graph_flow.Flow("main flow")
-        afters = {}
-        for task in self.tasks:
-            for pretask, resource in task.after:
-                real_task = pretask.get_for_resource(resource, realize=False)
-                if real_task:
-                    afters.setdefault(task, []).append(real_task)
-            for posttask, resource in task.before:
-                real_task = posttask.get_for_resource(resource, realize=False)
-                if real_task:
-                    afters.setdefault(real_task, []).append(task)
-        for task in self.tasks:
-            flow.add(self.convert_task(task, afters.get(task, [])))
+        for task in tasks.process_tasks(self.tasks):
+            flow.add(self.convert_task(task))
         return flow
 
     def run(self):
