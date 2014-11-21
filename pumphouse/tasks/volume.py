@@ -102,6 +102,21 @@ class CreateVolumeFromImage(task.BaseCloudTask):
         }, namespace="/events")
 
 
+class DeleteVolume(task.BaseCloudTask):
+    def execute(self, volume_info):
+        volume_id = volume_info["id"]
+        try:
+            self.cloud.cinder.volumes.delete(volume_id)
+        except exceptions.cinder_excs.NotFound as exc:
+            LOG.exception("Not found: %s", str(volume_info))
+            raise exc
+        else:
+            utils.wait_for(volume.id,
+                           self.cloud.cinder.volumes.get,
+                           stop_excs=(exceptions.cinder_excs.NotFound,))
+            LOG.info("Deleted: %s", str(volume_info))
+
+
 def migrate_detached_volume(context, volume):
     volume_binding = "volume-{}".format(volume.id)
     volume_retrieve = "{}-retrieve".format(volume_binding)
