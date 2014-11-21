@@ -142,6 +142,22 @@ class DeleteVolume(task.BaseCloudTask):
             LOG.info("Deleted: %s", str(volume._info))
 
 
+class CloneVolume(task.BaseCloudTask):
+    def execute(self, volume_info):
+        try:
+            volume = self.cloud.cinder.volumes.create(
+                volume_info["size"], source_volid=volume_info["id"])
+        except exceptions.cinder_excs.NotFound as exc:
+            LOG.exception("Source volume not found: %s", volume_info)
+            raise exc
+        else:
+            volume = utils.wait_for(volume.id, self.cloud.cinder.volumes.get,
+                                    value='available', timeout=120,
+                                    check_interval=10)
+            self.create_volume_event(volume._info)
+        return volume._info
+
+
 def migrate_detached_volume(context, volume):
     volume_binding = "volume-{}".format(volume.id)
     volume_retrieve = "{}-retrieve".format(volume_binding)
