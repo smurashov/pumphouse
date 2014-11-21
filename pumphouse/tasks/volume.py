@@ -91,8 +91,21 @@ class UploadVolume(task.BaseCloudTask):
         }, namespace="/events")
 
 
-class CreateVolumeFromImage(task.BaseCloudTask):
+class CreateVolumeTask(task.BaseCloudTask):
+    def create_volume_event(self, volume_info):
+        LOG.info("Created: %s", volume_info)
+        events.emit("volume create", {
+            "cloud": self.cloud.name,
+            "id": volume_info["id"],
+            "status": "active",
+            "display_name": volume_info["display_name"],
+            "tenant_id": volume_info.get("os-vol-tenant-attr:tenant_id"),
+            "host_id": volume_info.get("os-vol-host-attr:host"),
+            "attachment_server_ids": [],
+        }, namespace="/events")
 
+
+class CreateVolumeFromImage(CreateVolumeTask):
     def execute(self, volume_info, image_info):
         image_id = image_info["id"]
         try:
@@ -114,17 +127,21 @@ class CreateVolumeFromImage(task.BaseCloudTask):
             self.create_volume_event(volume._info)
         return volume._info
 
-    def create_volume_event(self, volume_info):
-        LOG.info("Created: %s", volume_info)
-        events.emit("volume create", {
-            "cloud": self.cloud.name,
-            "id": volume_info["id"],
-            "status": "active",
-            "display_name": volume_info["display_name"],
-            "tenant_id": volume_info.get("os-vol-tenant-attr:tenant_id"),
-            "host_id": volume_info.get("os-vol-host-attr:host"),
-            "attachment_server_ids": [],
-        }, namespace="/events")
+
+class CreateVolumeClone(CreateVolumeTask):
+    def execute(self, volume_info):
+        try:
+            volume = self.cloud.cinder.volumes.create(
+                volume_info["size"], source_volid=volume_info["id"])
+        except exceptions.cinder_excs.NotFound as exc:
+            LOG.exception("Source volume not found: %s", volume_info)
+            raise exc
+        else:
+            volume = utils.wait_for(volume.id, self.cloud.cinder.volumes.get,
+                                    value='available', timeout=120,
+                                    check_interval=10)
+            self.create_volume_event(volume._info)
+        return volume._info
 
 
 class DeleteVolume(task.BaseCloudTask):
@@ -140,22 +157,6 @@ class DeleteVolume(task.BaseCloudTask):
                                     stop_excs=(
                                         exceptions.cinder_excs.NotFound,))
             LOG.info("Deleted: %s", str(volume._info))
-
-
-class CloneVolume(task.BaseCloudTask):
-    def execute(self, volume_info):
-        try:
-            volume = self.cloud.cinder.volumes.create(
-                volume_info["size"], source_volid=volume_info["id"])
-        except exceptions.cinder_excs.NotFound as exc:
-            LOG.exception("Source volume not found: %s", volume_info)
-            raise exc
-        else:
-            volume = utils.wait_for(volume.id, self.cloud.cinder.volumes.get,
-                                    value='available', timeout=120,
-                                    check_interval=10)
-            self.create_volume_event(volume._info)
-        return volume._info
 
 
 def migrate_detached_volume(context, volume):
