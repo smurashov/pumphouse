@@ -141,6 +141,13 @@ class Collection(Resource):
     def each(self):
         return CollectionProxy(self)
 
+    def get_data(self):
+        data = []
+        for el_data in self.data:
+            res = self.runner.get_resource(self.base_cls, el_data)
+            data.append(res.get_data())
+        return data
+
     def get_id_for_runner(self, data, runner):
         elements = frozenset(
             self.base_cls.get_id_for_runner(el, runner) for el in data,
@@ -181,13 +188,13 @@ class CollectionUnboundTask(tasks.UnboundTask):
     def realize_with(self, resource):
         assert resource.bound
         runner = resource.get_runner()
-        requires = []
+        includes = []
         for data in resource.data:
             res = runner.get_resource(resource.base_cls, data)
-            requires.append(self.base_task.get_for_resource(res))
+            includes.append(self.base_task.get_for_resource(res))
         return tasks.Task(
-            None,  # Wow! We'll call this None!
+            None,
             self.name,
             resource,
-            requires=requires,
+            includes=includes,
         )

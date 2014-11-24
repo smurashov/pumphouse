@@ -61,12 +61,11 @@ class Plugin(resources.Resource):
         assert set(impl._tasks) >= cls._tasks.items
         return impl
 
-    def __new__(cls, data=None, runner=None, **kwargs):
-        kwargs.update(data=data, runner=runner)
+    def __new__(cls, data=None, runner=None):
         if data is not None:
-            return cls.get_impl(runner)(**kwargs)
+            return runner.get_resource(cls.get_impl(runner), data)
         else:
-            return super(Plugin, cls).__new__(cls, **kwargs)
+            return super(Plugin, cls).__new__(cls, data=data, runner=runner)
 
     def __getattr__(self, name):
         unbound_task = getattr(type(self), name)
