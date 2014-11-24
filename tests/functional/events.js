@@ -18,6 +18,7 @@ HandlersManager.prototype.on = function (event) {
 };
 
 HandlersManager.prototype.getKey = function (entity) {
+    console.log(entity);
     if (entity['type'] && entity['cloud'] && entity['id']) {
         return [entity['type'], entity['cloud'], entity['id']].join('-');
     } else {
@@ -89,7 +90,7 @@ function EventsListener(path) {
 
         'reset start',
         'reset completed'
-    ].map(function(name) {
+    ].map(function (name) {
         this.socket.on(name, this.handlerFactory(name))
     }, this);
 
@@ -99,12 +100,12 @@ function EventsListener(path) {
 /**
  * Forces disconnection from socket
  */
-EventsListener.prototype.disconnect = function() {
+EventsListener.prototype.disconnect = function () {
     this.socket.disconnect();
 };
 
-EventsListener.prototype.handlerFactory = function(event_name) {
-    return function(data) {
+EventsListener.prototype.handlerFactory = function (event_name) {
+    return function (data) {
         console.log('Event "' + event_name + '": ' + JSON.stringify(data));
         this.handlers.handle(event_name, data);
     }.bind(this);

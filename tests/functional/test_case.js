@@ -7,19 +7,19 @@ function TestCase(title) {
     this.context = {};
 };
 
-TestCase.prototype.addStep = function(title, f) {
+TestCase.prototype.addStep = function (title, f) {
     var s = new TestStep(title, f);
     s.test_case = this;
     this.steps.push(s);
 };
 
-TestCase.prototype.repeatStep = function(i) {
+TestCase.prototype.repeatStep = function (i) {
     if (i >= this.steps.length) return false;
     var s = this.steps[i];
     this.steps.push(s);
 };
 
-TestCase.prototype.run = function(api, events) {
+TestCase.prototype.run = function (api, events) {
     this.api = api;
     this.events = events;
 
@@ -30,7 +30,7 @@ TestCase.prototype.run = function(api, events) {
     this.next();
 };
 
-TestCase.prototype.next = function() {
+TestCase.prototype.next = function () {
     if (this.index < this.steps.length) {
         var s = this.steps[this.index++], that = this;
         console.log(s.title);
@@ -39,7 +39,7 @@ TestCase.prototype.next = function() {
     } else this.completed = true;
 };
 
-TestCase.prototype.fail = function(message) {
+TestCase.prototype.fail = function (message) {
     console.error('Test failed: ' + message);
     this.completed = true;
     process.exit(code=1);
@@ -51,12 +51,12 @@ function TestStep(title, f) {
     this.func = f;
 };
 
-TestStep.prototype.next = function() {
+TestStep.prototype.next = function () {
     setTimeout(this.test_case.next.bind(this.test_case), 10);
     return true;
 };
 
-TestStep.prototype.fail = function(msg) {
+TestStep.prototype.fail = function (msg) {
     return this.test_case.fail(msg);
 };
 
