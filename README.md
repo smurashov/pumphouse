@@ -99,40 +99,38 @@ file.
 
 ## CLI Scripts
 
-### `pumphouse` - granular migration script
-
-This script migrates resources from one instance of OpenStack to another using
-APIs of OpenStack services. You could look up a list of resources supported by
-this script using the following command:
+The pumphouse package provides CLI tool with migration, evacuation and
+reassigning features. You could look up a list of commands supported by this
+script using the following command:
 
 ```sh
 $ pumphouse --help
 ```
 
+There are major subcommands: `migrate`, `evacuate` and `reassign`.
+
+### Migration of resources (`pumphouse migrate`)
+
+This command migrates resources from one instance of OpenStack to another using
+APIs of OpenStack services
+
 To migrate resources from one cloud to another, add configuration of endpoints
 of source and destination clouds to configuration file `config.yaml`. See
 example in [`doc/samples/config.yaml`](doc/samples/config.yaml) file.
 
-Note that the format of configuration file for the script differs from one for
-the API service.
 
-### `pumphouse-bm` - host upgrade to Mirantis OpenStack
+### Evacuation instances from a hypervisor (`pumphouse evacuate`)
 
-This script upgrades a hypervisor host from the source cloud to Mirantis
-OpenStack Compute node and attaches it to the target MOS cluster.
+This command evacuates instances from the the hypervisor with a given host
+within the source cloud.
 
-Script command format is as follows:
 ```sh
-$ pumphouse-bm [-h] [-i INVENTORY] [-e ENV] hostname
+$ pumphouse config evacuate [-h] hostname
 ```
 
-`INVENTORY` is a YaML formatted file with the inventory of hardware present in
-the environment and some additional configuration information. See `doc/samples/`
-for the example of inventory file. Defaults to `./inventory.yaml`.
-`ENV` is an identifier number of the target Mirantis OpenStack cluster in
-Fuel. Defaults to `1`.
-`hostname` is a reference to host configuration in `'hosts'` section of the
-inventory YaML.
+### Reassigning (`pumphouse reassign`)
+
+This command reassignes the hypervisor host from one environment to another.
 
 ## Quick Start
 

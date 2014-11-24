@@ -43,7 +43,7 @@ CloudResources.prototype.get = function (id, type, cloud) {
     }
 };
 
-CloudResources.prototype.getAll = function(params) {
+CloudResources.prototype.getAll = function (params) {
     var s = '', result = [];
     for (k in params) s += (s ? ' && "': '"') + params[k] + '"==a.' + k;
     var f = new Function('a', 'return(' + s + ')');

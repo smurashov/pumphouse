@@ -12,7 +12,7 @@ var cases = Config.cases,
     timer;
 
 // Async tests runner
-setInterval(function() {
+setInterval(function () {
     if (completed) {
         cycles = 0;
         if (i >= cases.length) {
