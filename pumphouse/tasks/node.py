@@ -21,6 +21,7 @@ from taskflow import task
 from pumphouse import events
 from pumphouse import exceptions
 from pumphouse.tasks import service as service_tasks
+from pumphouse import task as pump_task
 from pumphouse import utils
 
 
@@ -29,9 +30,19 @@ LOG = logging.getLogger(__name__)
 
 # NOTE(akscram): Here we should transform FQDNs of nodes to
 #                hostnames of Nova hypervisors.
-def extract_hostname(fqdn):
-    hostname, _, _ = fqdn.partition(".")
+def extract_hostname(info):
+    # XXX(akscram): There is no the fqdn attribute in node with
+    #               `discover` status.
+    if info["fqdn"] is None:
+        hostname = "node-{}".format(info["id"])
+    else:
+        hostname, _, _ = info["fqdn"].partition(".")
     return hostname
+
+
+def extract_macs(info):
+    macs = set(i["mac"] for i in info["meta"]["interfaces"])
+    return tuple(macs)
 
 
 class RetrieveAllEnvironments(task.Task):
@@ -51,7 +62,7 @@ class RetrieveEnvNodes(task.Task):
     def execute(self, env_info):
         from pumphouse._vendor.fuelclient.objects import environment
         env = environment.Environment.init_with_data(env_info)
-        nodes = dict((extract_hostname(node.data["fqdn"]), node.data)
+        nodes = dict((extract_hostname(node.data), node.data)
                      for node in env.get_all_nodes())
         return nodes
 
@@ -61,16 +72,17 @@ class RetrieveNode(task.Task):
         return nodes_infos[hostname]
 
 
-class DeployChanges(task.Task):
+class DeployChanges(pump_task.BaseCloudTask):
     def execute(self, env_info, **nodes_infos):
         from pumphouse._vendor.fuelclient.objects import environment
         env = environment.Environment.init_with_data(env_info)
         task = env.deploy_changes()
-        watched_fqdns = set(node_info["fqdn"]
-                            for node_info in nodes_infos.itervalues())
+        watched_macs = set(extract_macs(node_info)
+                           for node_info in nodes_infos.itervalues())
         for progress, nodes in task:
             for node in nodes:
-                if node.data["fqdn"] in watched_fqdns:
+                node_macs = extract_macs(node.data)
+                if node_macs in watched_macs:
                     self.provisioning_event(progress, node)
         env.update()
         return env.data
@@ -81,10 +93,14 @@ class DeployChanges(task.Task):
 
     def provisioning_event(self, progress, node):
         LOG.debug("Waiting for deploy: %r, %r", progress, node)
-        events.emit("host provisioning", {
-            "id": extract_hostname(node.data["fqdn"]),
-            "status": node.data["status"],
+        events.emit("update", {
+            "id": extract_hostname(node.data),
+            "type": "host",
+            "cloud": self.cloud.name,
             "progress": node.data["progress"],
+            "data": {
+                "status": node.data["status"],
+            }
         }, namespace="/events")
 
 
@@ -183,29 +199,25 @@ class CopyNetAttributesFromNode(task.Task):
 class WaitUnassignedNode(task.Task):
     def execute(self, node_info, **requires):
         condition_check = lambda x: x is not None
-        unassigned_node_info = utils.wait_for(node_info,
-                                              self.retirieve_unassigned,
+        node_macs = extract_macs(node_info)
+        unassigned_node_info = utils.wait_for(node_macs,
+                                              self.retrieve_unassigned,
                                               attribute_getter=condition_check,
                                               value=True,
                                               timeout=360)
         return unassigned_node_info
 
-    def retirieve_unassigned(self, node_info):
-        def extract_macs(info):
-            macs = set(i["mac"] for i in info["meta"]["interfaces"])
-            return macs
-
+    def retrieve_unassigned(self, node_macs):
         from pumphouse._vendor.fuelclient.objects.node import Node
-        node_macs = extract_macs(node_info)
         for node in Node.get_all():
             if (node.data["status"] == "discover" and
-                    node_macs == extract_macs(node.data)):
+                    extract_macs(node.data) == node_macs):
                 return node.data
         # TODO(akscram): Raise an exception when status is error.
         return None
 
 
-class UnassignNode(task.Task):
+class UnassignNode(pump_task.BaseCloudTask):
     def execute(self, node_info, env_info):
         from pumphouse._vendor.fuelclient.objects import environment
         from pumphouse._vendor.fuelclient.objects.node import Node
@@ -213,10 +225,34 @@ class UnassignNode(task.Task):
         env = environment.Environment.init_with_data(env_info)
         env.unassign((node.id,))
         node.update()
+        self.unassign_start_event(node)
         return node.data
 
+    def unassign_start_event(self, node):
+        events.emit("update", {
+            "id": extract_hostname(node.data),
+            "cloud": self.cloud.name,
+            "type": "host",
+            "action": "reassignment",
+        }, namespace="/events")
 
-class AssignNode(task.Task):
+
+class HostsDeleteEvents(pump_task.BaseCloudTask):
+    def execute(self, services):
+        # XXX(akscram): Here can be emited some number of unexpected events.
+        for service in services:
+            if service["binary"] == "nova-compute":
+                self.delete_event(service)
+
+    def delete_event(self, service):
+        events.emit("delete", {
+            "id": service["host"],
+            "cloud": self.cloud.name,
+            "type": "host",
+        }, namespace="/events")
+
+
+class AssignNode(pump_task.BaseCloudTask):
     def execute(self, node_info, node_roles, env_info):
         from pumphouse._vendor.fuelclient.objects import environment
         from pumphouse._vendor.fuelclient.objects.node import Node
@@ -224,7 +260,20 @@ class AssignNode(task.Task):
         env = environment.Environment.init_with_data(env_info)
         env.assign((node,), node_roles)
         node.update()
+        self.assign_start_event(node)
         return node.data
+
+    def assign_start_event(self, node):
+        hostname = extract_hostname(node.data)
+        events.emit("create", {
+            "id": hostname,
+            "cloud": self.cloud.name,
+            "type": "host",
+            "action": "reassignment",
+            "data": {
+                "name": hostname,
+            }
+        }, namespace="/events")
 
 
 class UpdateNodeInfo(task.Task):
@@ -237,8 +286,24 @@ class UpdateNodeInfo(task.Task):
 
 class GetNodeHostname(task.Task):
     def execute(self, node_info):
-        hostname = extract_hostname(node_info["fqdn"])
+        hostname = extract_hostname(node_info)
         return hostname
+
+
+class HostsSuccessEvents(pump_task.BaseCloudTask):
+    def execute(self, services):
+        # XXX(akscram): Here can be emited some number of unexpected events.
+        for service in services:
+            self.update_event(service)
+
+    def update_event(self, service):
+        events.emit("update", {
+            "id": service["host"],
+            "cloud": self.cloud.name,
+            "type": "host",
+            "progress": None,
+            "action": None,
+        }, namespace="/events")
 
 
 def unassign_node(context, flow, env_name, hostname):
@@ -254,10 +319,12 @@ def unassign_node(context, flow, env_name, hostname):
                      provides=node,
                      rebind=[env_nodes],
                      inject={"hostname": hostname}),
-        UnassignNode(name=pending_node,
+        UnassignNode(context.src_cloud,
+                     name=pending_node,
                      provides=pending_node,
                      rebind=[node, env]),
-        DeployChanges(name=deployed_env,
+        DeployChanges(context.src_cloud,
+                      name=deployed_env,
                       provides=deployed_env,
                       rebind=[env],
                       requires=[pending_node]),
@@ -268,16 +335,28 @@ def unassign_node(context, flow, env_name, hostname):
     )
 
 
+class DeleteServicesFromNode(service_tasks.DeleteServicesSilently):
+    def execute(self, node_info, **requires):
+        hostname = extract_hostname(node_info)
+        return super(DeleteServicesFromNode, self).execute(hostname)
+
+
 def remove_computes(context, flow, env_name, hostname):
-    unassigned_node = "node-unassigned-{}".format(hostname)
+    deployed_env = "src-env-deployed-{}".format(env_name)
+    pending_node = "node-pending-{}".format(hostname)
     delete_services = "services-delete-{}".format(hostname)
+    delete_services_events = "services-delete-events-{}".format(hostname)
 
     flow.add(
-        service_tasks.DeleteServicesSilently(context.src_cloud,
-                                             name=delete_services,
-                                             provides=delete_services,
-                                             inject={"hostname": hostname},
-                                             requires=[unassigned_node]),
+        DeleteServicesFromNode(context.src_cloud,
+                               name=delete_services,
+                               provides=delete_services,
+                               rebind=[pending_node],
+                               inject={"hostname": hostname},
+                               requires=[deployed_env]),
+        HostsDeleteEvents(context.src_cloud,
+                          name=delete_services_events,
+                          rebind=[delete_services]),
     )
 
 
@@ -299,7 +378,8 @@ def assign_node(context, flow, env_name, hostname):
         ExtractRolesFromNode(name=compute_roles,
                              provides=compute_roles,
                              rebind=[compute_node]),
-        AssignNode(name=assigned_node,
+        AssignNode(context.dst_cloud,
+                   name=assigned_node,
                    provides=assigned_node,
                    rebind=[unassigned_node, compute_roles, env]),
         CopyDisksAttributesFromNode(name=node_with_disks,
@@ -308,7 +388,8 @@ def assign_node(context, flow, env_name, hostname):
         CopyNetAttributesFromNode(name=node_with_nets,
                                   provides=node_with_nets,
                                   rebind=[compute_node, assigned_node]),
-        DeployChanges(name=deployed_env,
+        DeployChanges(context.dst_cloud,
+                      name=deployed_env,
                       provides=deployed_env,
                       rebind=[env],
                       requires=[node_with_disks, node_with_nets]),
@@ -321,6 +402,7 @@ def wait_computes(context, flow, env_name, hostname):
     updated_assigned_node = "node-assigned-updated-{}".format(hostname)
     assigned_node_hostname = "node-assigned-hosetname-{}".format(hostname)
     wait_computes = "wait-computes-{}".format(hostname)
+    host_success_events = "node-success-events-{}".format(hostname)
 
     flow.add(
         UpdateNodeInfo(name=updated_assigned_node,
@@ -335,6 +417,9 @@ def wait_computes(context, flow, env_name, hostname):
                                            provides=wait_computes,
                                            rebind=[assigned_node_hostname],
                                            requires=[deployed_env]),
+        HostsSuccessEvents(context.dst_cloud,
+                           name=host_success_events,
+                           rebind=[wait_computes]),
     )
 
 

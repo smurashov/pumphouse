@@ -2,11 +2,14 @@ var Config = require('./config');
 var Listener = require('./events');
 var API = require('./api');
 
-var events = new Listener(Config.endpoint + '/events').bindHandlers();
+var events = new Listener(Config.endpoint + '/events');
 var pumphouse = new API(Config.endpoint);
 
-
-var cases = ['reset', 'migrate', 'evaculate'], limit = 120, i = 0, completed = true, c, timer;
+var cases = Config.cases,
+    i = 0,
+    completed = true,
+    c,
+    timer;
 
 // Async tests runner
 setInterval(function() {
@@ -17,10 +20,10 @@ setInterval(function() {
             process.exit(code=0);
         }
         c = require('./case_' + cases[i++]);
-        c.o.run(pumphouse, events);
+        c.testcase.run(pumphouse, events);
     }
-    completed = c.o.completed;
-    if (cycles++ > limit) {
+    completed = c.testcase.completed;
+    if (cycles++ > Config.timeout) {
         console.error('Timed out!');
         process.exit(code=1);
     }

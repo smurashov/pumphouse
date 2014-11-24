@@ -1,9 +1,6 @@
 DEBUG: false
 SERVER_NAME: 127.0.0.1:5000
 BIND_HOST: 127.0.0.1:5000
-CLOUD_DRIVER: pumphouse.fake.Cloud
-IDENTITY_DRIVER: pumphouse.fake.Identity
-CLOUD_SERVICE: pumphouse.fake.Service
 CLOUDS_RESET: true
 PLUGINS:
     provision_server: image
@@ -22,6 +19,7 @@ cmds:
 
 CLOUDS:
     source:
+        environment: source-env
         endpoint:
             auth_url:    http://127.0.0.1:5000/v2.0
             username:    admin
@@ -29,9 +27,6 @@ CLOUDS:
             tenant_name: admin
         identity:
             connection:  mysql+mysqlconnector://root:root@127.0.0.1/keystone
-        fake:
-            delays: true
-            num_hypervisors: 6
         populate:
             num_servers: 3
             num_tenants: 3
@@ -97,6 +92,7 @@ CLOUDS:
                     image:
                       <<: *image
     destination:
+        environment: source-env
         endpoint:
             auth_url: http://127.0.0.1:5000/v2.0
             username: admin
@@ -107,7 +103,9 @@ CLOUDS:
         urls:
             horizon:        http://horizon.endpoint.com/
             mos:            http://127.0.0.1:8000/
-        fake:
-            delays: true
-            num_hypervisors: 4
-
+    fuel:
+        endpoint:
+            host: 172.18.167.155
+            port: 8000
+            username: admin
+            password: admin
