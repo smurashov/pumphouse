@@ -366,6 +366,14 @@ class NovaFloatingIP(EventResource):
             pool=self.data["pool"],
         )
 
+    @task(requires=[create])
+    def associate(self):
+        self.env.cloud.nova.servers.add_floating_ip(
+            self.data["server"]["id"],
+            self.data["address"],
+            self.data["fixed_ip"]["address"],
+        )
+
     @task
     def disassociate(self):
         if self.data.get("server"):
@@ -475,7 +483,8 @@ class Server(EventResource):
             }
 
     @task(requires=[image.upload, tenant.create, flavor.create, user.create,
-                    nics.each().create, floating_ips.each().create])
+                    nics.each().create, floating_ips.each().create],
+          includes=[floating_ips.each().associate])
     def create(self):
         cloud = self.env.cloud.restrict(
             username=self.user["name"],
@@ -491,18 +500,8 @@ class Server(EventResource):
         )
         server = utils.wait_for(server.id, servers.get, value="ACTIVE")
         self.data = server = server.to_dict()
-        # FIXME(yorik-sar): Move this to FloatingIP.associate or smth
         for floating_ip in self.floating_ips:
-            self.env.cloud.nova.servers.add_floating_ip(
-                server["id"],
-                floating_ip["address"],
-                floating_ip["fixed_ip"]["address"],
-            )
-            obj = FloatingIP(runner=self.runner, data={
-                "address": floating_ip["address"],
-                "server_id": server["id"],
-            })
-            obj.post_event("associate")
+            floating_ip["server"] = server
 
     @task(before=[tenant.delete, nics.each().delete],
           requires=[floating_ips.each().disassociate])
