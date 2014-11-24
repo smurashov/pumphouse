@@ -98,7 +98,7 @@ class TasksBaseTestCase(unittest.TestCase):
         )
         self.assertItemsEqual(
             env.cloud.nova.servers.create.call_args_list,
-            map(mock.call,[
+            map(mock.call, [
                 {"tenant_id": created_tenant["id"], "name": server["name"]}
                 for server in servers
             ]),
