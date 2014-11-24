@@ -294,6 +294,55 @@ class Image(EventResource):
         self.env.cloud.glance.images.delete(self.data["id"])
 
 
+class Subnet(base.Plugin):
+    plugin_key = "network"
+    default = "nova"
+
+
+@Subnet.register("nova")
+class NovaSubnet(EventResource):
+    data_id_key = "cidr"
+    event_id_key = "cidr"
+
+    create = task(name="create")
+    delete = task(name="delete", before=[create])
+
+
+class Network(base.Plugin):
+    plugin_key = "network"
+    default = "nova"
+
+
+@Network.register("nova")
+class NovaNetwork(EventResource):
+    data_id_key = "label"
+    events_type = "network"
+
+    @Tenant()
+    def tenant(self):
+        return self.data["tenant"]
+
+    @Subnet()
+    def subnet(self):
+        cidr = self.data["cidr"]
+        if isinstance(cidr, list):
+            cidr = str(list(netaddr.IPSet(cidr).iter_cidrs())[0])
+        return {"cidr": cidr}
+
+    @task(requires=[tenant.create, subnet.create])
+    def create(self):
+        self.data = self.env.cloud.nova.networks.create(
+            label=self.data["label"],
+            cidr=self.data["cidr"],
+            project_id=self.tenant["id"],
+        ).to_dict()
+
+    @task(before=[create], includes=[subnet.delete])
+    def delete(self):
+        self.env.cloud.nova.networks.disassociate(self.data["id"])
+        self.env.cloud.nova.networks.delete(self.data["id"])
+
+
 class FloatingIP(base.Plugin):
     plugin_key = "network"
     default = "nova"
@@ -332,6 +381,62 @@ class NovaFloatingIP(EventResource):
         )
 
 
+class NovaFixedIP(EventResource):
+    @classmethod
+    def get_id_for(cls, data):
+        return (
+            NovaNetwork.get_id_for(data["network"]),
+            data["address"],
+        )
+
+    def event_id(self):
+        return "_".join(self.get_id_for(self.data))
+
+    @NovaNetwork()
+    def network(self):
+        return self.data["network"]
+
+    @task(requires=[network.create])
+    def create(self):
+        self.data = {
+            "network": self.network,
+            "address": self.data["address"],
+        }
+
+    delete = task(name="delete", before=[network.delete])
+
+
+class Nic(base.Plugin):
+    plugin_key = "network"
+    default = "nova"
+
+
+@Nic.register("nova")
+class NovaNic(EventResource):
+    @classmethod
+    def get_id_for(cls, data):
+        return NovaFixedIP.get_id_for(data["fixed_ip"])
+
+    def event_id(self):
+        return "_".join(self.get_id_for(self.data))
+
+    @NovaFixedIP()
+    def fixed_ip(self):
+        return self.data["fixed_ip"]
+
+    @task(requires=[fixed_ip.create])
+    def create(self):
+        self.data = {
+            "fixed_ip": self.data["fixed_ip"],
+            "nic": {
+                "net-id": self.fixed_ip["network"]["id"],
+                "v4-fixed-ip": self.fixed_ip["address"],
+            },
+        }
+
+    delete = task(name="delete", includes=[fixed_ip.delete])
+
+
 class Server(EventResource):
     def event_data(self):
         data = self.data.copy()
@@ -362,8 +467,15 @@ class Server(EventResource):
             floating_ip["server"] = self.data
             yield floating_ip
 
-    @task(requires=[image.upload, tenant.create, flavor.create,
-                    user.create, floating_ips.each().create])
+    @base.Collection(Nic)
+    def nics(self):
+        for fixed_ip in self.data["fixed_ips"]:
+            yield {
+                "fixed_ip": fixed_ip,
+            }
+
+    @task(requires=[image.upload, tenant.create, flavor.create, user.create,
+                    nics.each().create, floating_ips.each().create])
     def create(self):
         cloud = self.env.cloud.restrict(
             username=self.user["name"],
@@ -375,92 +487,31 @@ class Server(EventResource):
             self.data["name"],
             self.image["id"],
             self.flavor["id"],
+            nics=[nic["nic"] for nic in self.nics],
         )
         server = utils.wait_for(server.id, servers.get, value="ACTIVE")
         self.data = server = server.to_dict()
-        for net, addresses in server["addresses"].iteritems():
-            fixed_ips = [addr["addr"] for addr in addresses
-                         if addr["OS-EXT-IPS:type"] == "fixed"]
-            if fixed_ips:
-                fixed_ip = fixed_ips[0]
-                break
-        else:
-            fixed_ip = None
-        if fixed_ip:
-            # FIXME(yorik-sar): Move this to FloatingIP.associate or smth
-            for floating_ip in self.floating_ips:
-                self.env.cloud.nova.servers.add_floating_ip(
-                    server["id"],
-                    floating_ip["address"],
-                    fixed_ip,
-                )
-                obj = FloatingIP(runner=self.runner, data={
-                    "address": floating_ip["address"],
-                    "server_id": server["id"],
-                })
-                obj.post_event("associate")
+        # FIXME(yorik-sar): Move this to FloatingIP.associate or smth
+        for floating_ip in self.floating_ips:
+            self.env.cloud.nova.servers.add_floating_ip(
+                server["id"],
+                floating_ip["address"],
+                floating_ip["fixed_ip"]["address"],
+            )
+            obj = FloatingIP(runner=self.runner, data={
+                "address": floating_ip["address"],
+                "server_id": server["id"],
+            })
+            obj.post_event("associate")
 
-    @task(before=[tenant.delete],
+    @task(before=[tenant.delete, nics.each().delete],
           requires=[floating_ips.each().disassociate])
-    def delete(self):
+    def do_delete(self):
         self.env.cloud.nova.servers.delete(self.data["id"])
         utils.wait_for(self.data["id"], self.env.cloud.nova.servers.get,
                        stop_excs=(nova_excs.NotFound,))
 
-
-class Subnet(base.Plugin):
-    plugin_key = "network"
-    default = "nova"
-
-
-@Subnet.register("nova")
-class NovaSubnet(EventResource):
-    data_id_key = "cidr"
-    event_id_key = "cidr"
-
-    create = task(name="create")
-    delete = task(name="delete", before=[create])
-
-
-class Network(base.Plugin):
-    plugin_key = "network"
-    default = "nova"
-
-
-@Network.register("nova")
-class NovaNetwork(EventResource):
-    data_id_key = "label"
-    events_type = "network"
-
-    @Tenant()
-    def tenant(self):
-        return self.data["tenant"]
-
-    @Subnet()
-    def subnet(self):
-        cidr = self.data["cidr"]
-        if isinstance(cidr, list):
-            cidr = str(list(netaddr.IPSet(cidr).iter_cidrs())[0])
-        return {"cidr": cidr}
-
-    @base.Collection(Server)
-    def servers(self):
-        return self.data["servers"]
-
-    @task(requires=[tenant.create, subnet.create])
-    def create(self):
-        self.data = self.env.cloud.nova.networks.create(
-            label=self.data["label"],
-            cidr=self.data["cidr"],
-            project_id=self.tenant["id"],
-        ).to_dict()
-
-    @task(before=[create],
-          requires=[servers.each().delete],
-          includes=[subnet.delete])
-    def delete(self):
-        self.env.cloud.nova.networks.disassociate(self.data["id"])
-        self.env.cloud.nova.networks.delete(self.data["id"])
+    delete = task(name="delete", requires=[do_delete, nics.each().delete])
 
 
 class CleanupWorkload(EventResource):
@@ -491,9 +542,20 @@ class CleanupWorkload(EventResource):
             server_id = floating_ip["instance_uuid"]
             if server_id:
                 floating_ips[server_id].append(floating_ip)
+        networks = {network["label"]: network for network in self.networks}
         for server in servers:
             server["tenant"] = tenants[server["tenant_id"]]
             server["floating_ips"] = floating_ips[server["id"]]
+            fixed_ips = server["fixed_ips"] = []
+            for label, addrs in server["addresses"].iteritems():
+                if label not in networks:
+                    continue
+                for addr in addrs:
+                    if addr["OS-EXT-IPS:type"] == "fixed":
+                        fixed_ips.append({
+                            "address": addr["addr"],
+                            "network": networks[label],
+                        })
         return servers
 
     @base.Collection(Flavor)
@@ -512,13 +574,7 @@ class CleanupWorkload(EventResource):
     @base.Collection(Network)
     def networks(self):
         networks = self.env.cloud.nova.networks.list()
-        servers = collections.defaultdict(list)
-        for server in self.servers:
-            for net_label in server["addresses"]:
-                servers[net_label].append(server)
-        for network in filter_prefixed(networks, key="label"):
-            network["servers"] = servers[network["label"]]
-            yield network
+        return filter_prefixed(networks, key="label")
 
     @base.Collection(FloatingIP)
     def floating_ips(self):
@@ -645,30 +701,29 @@ class SetupWorkload(EventResource):
                 yield floating_ip
             return
         counter = itertools.count(136)
-        for server in self.servers:
-            floating_ip = {
-                "address": "127.16.0.{}".format(counter.next()),
-                "pool": TEST_RESOURCE_PREFIX + "-pool",
-            }
-            server["floating_ips"].append(floating_ip)
-            yield floating_ip
+        num_servers = self.data["populate"].get("num_servers", 2)
+        for tenant in self.tenants:
+            try:
+                num = len(tenant["servers"])
+            except KeyError:
+                num = num_servers
+            for i in xrange(num):
+                floating_ip = {
+                    "address": "127.16.0.{}".format(counter.next()),
+                    "pool": TEST_RESOURCE_PREFIX + "-pool",
+                }
+                yield floating_ip
 
     @base.Collection(Server)
     def servers(self):
-        for tenant in self.tenants:
+        num_servers = self.data["populate"].get("num_servers", 2)
+
+        def get_base_servers(tenant):
             if "servers" in tenant:
                 for server in tenant["servers"]:
-                    server.update({
-                        "tenant": tenant,
-                        "user": {
-                            "name": tenant["username"],
-                            "tenant": tenant,
-                        },
-                        "floating_ips": [],
-                    })
                     yield server
             else:
-                for i in xrange(self.data["populate"].get("num_servers", 2)):
+                for i in xrange(num_servers):
                     server_ref = str(random.randint(1, 0x7fffffff))
                     image = random.choice(self.images)
                     flavor = random.choice(self.flavors)
@@ -677,13 +732,37 @@ class SetupWorkload(EventResource):
                                                server_ref),
                         "image": image,
                         "flavor": flavor,
-                        "tenant": tenant,
-                        "user": {
-                            "name": tenant["username"],
-                            "tenant": tenant,
-                        },
-                        "floating_ips": [],
                     }
+
+        tenant_nets = {}
+        floating_ips = iter(self.floating_ips)
+        for network in self.networks:
+            addrs = iter(netaddr.IPNetwork(network["cidr"]).iter_hosts())
+            for i in xrange(42):
+                next(addrs)
+            nets = tenant_nets.setdefault(network["tenant"]["name"], [])
+            nets.append((network, addrs))
+        for tenant in self.tenants:
+            for server in get_base_servers(tenant):
+                server.update({
+                    "tenant": tenant,
+                    "user": {
+                        "name": tenant["username"],
+                        "tenant": tenant,
+                    },
+                    "floating_ips": [],
+                    "fixed_ips": [],
+                })
+                for network, addrs in tenant_nets[tenant["name"]]:
+                    fixed_ip = {
+                        "address": str(next(addrs)),
+                        "network": network,
+                    }
+                    server["fixed_ips"].append(fixed_ip)
+                    floating_ip = next(floating_ips)
+                    floating_ip["fixed_ip"] = fixed_ip
+                    server["floating_ips"].append(floating_ip)
+                yield server
 
     create = base.task(name="create", requires=[
         tenants.each().create,
