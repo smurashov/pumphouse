@@ -159,8 +159,8 @@ class DeleteVolume(task.BaseCloudTask):
             LOG.info("Deleted: %s", str(volume._info))
 
 
-def migrate_detached_volume(context, volume):
-    volume_binding = "volume-{}".format(volume.id)
+def migrate_detached_volume(context, volume_id):
+    volume_binding = "volume-{}".format(volume_id)
     volume_retrieve = "{}-retrieve".format(volume_binding)
     volume_upload = "{}-upload".format(volume_binding)
     image_ensure = "{}-image-ensure".format(volume_binding)
@@ -189,5 +189,5 @@ def migrate_detached_volume(context, volume):
                                    provides=volume_ensure,
                                    rebind=[volume_binding,
                                            image_ensure]))
-    context.store[volume_retrieve] = volume.id
+    context.store[volume_retrieve] = volume_id
     return flow
