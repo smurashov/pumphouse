@@ -145,7 +145,7 @@ class CreateVolumeClone(CreateVolumeTask):
 
 
 class DeleteVolume(task.BaseCloudTask):
-    def execute(self, volume_info):
+    def execute(self, volume_info, **requires):
         volume = self.cloud.volumes.get(volume_info["id"])
         try:
             self.cloud.cinder.volumes.delete(volume.id)
@@ -190,4 +190,46 @@ def migrate_detached_volume(context, volume_id):
                                    rebind=[volume_binding,
                                            image_ensure]))
     context.store[volume_retrieve] = volume_id
+    return flow
+
+
+def migrate_attached_volume(context, volume_id):
+    volume_binding = "volume-{}".format(volume_id)
+    volume_retrieve = "{}-retrieve".format(volume_binding)
+    volume_clone = "{}-clone".format(volume_binding)
+    volume_image = "{}-image".format(volume_binding)
+    volume_ensure = "{}-ensure".format(volume_binding)
+    volume_delete = "{}-delete".format(volume_binding)
+    image_ensure = "{}-image-ensure".format(volume_binding)
+
+    flow = graph_flow.Flow("migrate-{}".format(volume_binding))
+    flow.add(RetrieveVolume(context.src_cloud,
+                            name=volume_binding,
+                            provides=volume_binding,
+                            rebind=[volume_retrieve]),
+             CreateVolumeClone(context.src_cloud,
+                               name=volume_clone,
+                               provides=volume_clone,
+                               rebind=[volume_binding]),
+             UploadVolume(context.src_cloud,
+                          name=volume_image,
+                          provides=volume_image,
+                          rebind=[volume_clone]),
+             image_tasks.EnsureSingleImage(context.src_cloud,
+                                           context.dst_cloud,
+                                           name=image_ensure,
+                                           provides=image_ensure,
+                                           rebind=[volume_image],
+                                           inject={"user_info": None}),
+             CreateVolumeFromImage(context.dst_cloud,
+                                   name=volume_ensure,
+                                   provides=volume_ensure,
+                                   rebind=[volume_binding,
+                                           image_ensure]),
+             DeleteVolume(context.src_cloud,
+                          name=volume_delete,
+                          rebind=[volume_clone],
+                          requires=[volume_ensure]))
+    context.store[volume_retrieve] = volume_id
+
     return flow
