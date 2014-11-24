@@ -141,6 +141,13 @@ class Collection(Resource):
     def each(self):
         return CollectionProxy(self)
 
+    def get_data(self):
+        data = []
+        for el_data in self.data:
+            res = self.runner.get_resource(self.base_cls, el_data)
+            data.append(res.get_data())
+        return data
+
     def get_id_for_runner(self, data, runner):
         elements = frozenset(
             self.base_cls.get_id_for_runner(el, runner) for el in data,
