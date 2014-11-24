@@ -24,6 +24,7 @@ from pumphouse import exceptions
 from pumphouse.tasks.network.nova import floating_ip as fip_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import snapshot as snapshot_tasks
+from pumphouse.tasks import volume as volume_tasks
 from pumphouse.tasks import utils as task_utils
 from pumphouse import utils
 
@@ -223,9 +224,17 @@ def reprovision_server(context, server, server_nics):
     server_terminate = "server-{}-terminate".format(server_id)
     server_boot = "server-{}-boot".format(server_id)
     server_sync = "server-{}-sync".format(server_id)
+    server_bdm = "{}-bdm".format(server_binding)
 
     pre_suspend_tasks, pre_suspend_sync, pre_boot_tasks, image_ensure = \
         provision_server(context, server)
+
+    migrate_server_volumes = volume_tasks.migrate_server_volumes(
+        context,
+        server_id,
+        getattr(server,
+                "os-extended-volumes:volumes_attached"))
+    pre_boot_tasks = pre_boot_tasks + migrate_server_volumes
 
     flow = linear_flow.Flow("migrate-server-{}".format(server_id))
     # NOTE(akscram): The synchronization point avoids excessive downtime
@@ -253,7 +262,8 @@ def reprovision_server(context, server, server_nics):
                             provides=server_boot,
                             rebind=[server_suspend, image_ensure,
                                     flavor_ensure, user_ensure,
-                                    tenant_ensure, server_nics]),
+                                    tenant_ensure, server_nics,
+                                    server_bdm]),
     )
     subflow = restore_floating_ips(context, server.to_dict())
     if subflow:
