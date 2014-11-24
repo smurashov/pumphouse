@@ -1,5 +1,6 @@
 import unittest
-from mock import patch, Mock
+
+import mock
 
 from pumphouse import base
 
@@ -23,15 +24,15 @@ class TestBase(unittest.TestCase):
             "endpoint": self.cloud_endpoint,
         }
         self.target = "fakecloud"
-        self.driver = Mock(return_value=self.identity)
+        self.driver = mock.Mock(return_value=self.identity)
         self.driver.return_value = self.identity
         self.driver.from_dict.return_value = ()
 
         self.cloud_driver = self.driver
         self.identity_driver = self.driver
 
-        self.cloud = Mock()
-        self.events = Mock()
+        self.cloud = mock.Mock()
+        self.events = mock.Mock()
 
         self.service = base.Service(
             self.config.copy(),
@@ -71,8 +72,8 @@ class TestService(TestBase):
         self.identity_driver.from_dict.assert_called_once_with(
             self.target, self.identity2, {"endpoint": self.cloud_endpoint})
 
-    @patch("pumphouse.management.cleanup")
-    @patch("pumphouse.management.setup")
+    @mock.patch("pumphouse.management.cleanup")
+    @mock.patch("pumphouse.management.setup")
     def test_reset_with_workloads(self, mock_setup, mock_cleanup):
         self.service.reset(self.events, self.cloud)
 
@@ -88,8 +89,8 @@ class TestService(TestBase):
             num_servers=self.config["populate"]["num_servers"],
             workloads=self.config["workloads"])
 
-    @patch("pumphouse.management.cleanup")
-    @patch("pumphouse.management.setup")
+    @mock.patch("pumphouse.management.cleanup")
+    @mock.patch("pumphouse.management.setup")
     def test_reset_with_populate(self, mock_setup, mock_cleanup):
         self.service.workloads_config = None
         self.service.reset(self.events, self.cloud)
@@ -102,8 +103,8 @@ class TestService(TestBase):
             num_tenants=self.config["populate"]["num_tenants"],
             num_servers=self.config["populate"]["num_servers"])
 
-    @patch("pumphouse.management.cleanup")
-    @patch("pumphouse.management.setup")
+    @mock.patch("pumphouse.management.cleanup")
+    @mock.patch("pumphouse.management.setup")
     def test_reset_with_populate_default(self, mock_setup, mock_cleanup):
         self.service.workloads_config = None
         self.service.populate_config = {}
@@ -118,8 +119,8 @@ class TestService(TestBase):
                                            num_tenants=2,
                                            num_servers=2)
 
-    @patch("pumphouse.management.cleanup")
-    @patch("pumphouse.management.setup")
+    @mock.patch("pumphouse.management.cleanup")
+    @mock.patch("pumphouse.management.setup")
     def test_reset_without_configs(self, mock_setup, mock_cleanup):
         self.service.workloads_config = None
         self.service.populate_config = None
