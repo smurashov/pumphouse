@@ -29,7 +29,8 @@ def get_port_by(client, **port_filter):
 def get_security_groups_by(client, **sg_filter):
     try:
         LOG.debug("security_groups_filter: %s" % str(sg_filter))
-        return client.list_security_groups(**sg_filter)['security_groups'].to_dict()
+        return client.list_security_groups(
+            **sg_filter)['security_groups'].to_dict()
     except Exception as e:
         LOG.exception("Error in security_groups: %s" % e.message)
         raise

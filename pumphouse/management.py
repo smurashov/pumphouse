@@ -236,6 +236,7 @@ def generate_floating_ips_list(num):
     addr_list = [FLOATING_IP_STRING.format(136 + i) for i in xrange(num)]
     yield {pool: addr_list}
 
+
 @network_generator.add("FlatDHCP")
 def generate_flat_networks_list(num):
     yield {
@@ -254,6 +255,7 @@ def generate_vlan_networks_list(num):
             "vlan": "20{}".format(i + 3)
         }
 
+
 def generate_neutron_subnet_list():
     yield {
         'subnets': [
@@ -263,6 +265,7 @@ def generate_neutron_subnet_list():
             }
         ]
     }
+
 
 def generate_images_list(num):
     image_ref = str(random.randint(1, 0x7fffffff))
@@ -359,8 +362,8 @@ def setup_image(cloud, image_dict):
 
 def setup_neutron_network(cloud, net_name, subnet, port):
     # TODO (sryabin) try/except NetworkExists
-    network = cloud.neutron.create_network( body = {
-        'network' : {
+    network = cloud.neutron.create_network(body={
+        'network': {
             'name': net_name,
             'admin_state_up': True
         }
@@ -368,12 +371,12 @@ def setup_neutron_network(cloud, net_name, subnet, port):
 
     port['network_id'] = subnet['network_id'] = network['id']
 
-    sub_network = cloud.neutron.create_subnet( body  = {
-        'subnet': [ { subnets }  ]
+    sub_network = cloud.neutron.create_subnet(body={
+        'subnet': [{subnet}]
     })['subnet']
 
-    cloud.neutron.create_port( body = {
-        'port': { port }
+    cloud.neutron.create_port(body={
+        'port': {port}
     })
 
 
