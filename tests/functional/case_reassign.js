@@ -4,8 +4,8 @@ var Cloud = require('./cloud');
 
 var ReassignTestCase = new TestCase('Host reassignment');
 
-ReassignTestCase.addStep('Calling API to fetch resources', function() {
-    this.test_case.api.resources(function(err, res) {
+ReassignTestCase.addStep('Calling API to fetch resources', function () {
+    this.test_case.api.resources(function (err, res) {
         if (err) this.fail('Resources fetching error');
 
         this.test_case.context.state = new Cloud(res.body);
@@ -13,7 +13,7 @@ ReassignTestCase.addStep('Calling API to fetch resources', function() {
     }.bind(this))
 });
 
-ReassignTestCase.addStep('Looking for preconfigured host in source cloud', function() {
+ReassignTestCase.addStep('Looking for preconfigured host in source cloud', function () {
     var context = this.test_case.context,
         b = context.state;
 
@@ -29,53 +29,52 @@ ReassignTestCase.addStep('Looking for preconfigured host in source cloud', funct
     this.fail('Unable to find host "' + Config.host + '" in source cloud');
 });
 
-ReassignTestCase.addStep('Initiate host reassignment', function() {
-    var host = this.test_case.context.host;
+ReassignTestCase.addStep(
+    'Initiate host reassignment and listening for host reassignment start event',
+    function () {
+        var host = this.test_case.context.host;
 
-    this.test_case.api.reassignHost(host.id, function(err, res) {
-        if (err) this.fail('Host ' + host.id + ' reassignment initialization failed');
+        this.test_case.events
+            .on('update')
+            .of(Config.host)
+            .execute(
+                function (m) {
+                    if (m.action == 'reassignment') {
+                        console.log('Host ' + host.id + ' reassignment started');
+                        return this.next();
+                    }
+                    return false;
+                }.bind(this)
+            );
 
-        return this.next();
-    }.bind(this))
-});
+        this.test_case.api.reassignHost(host.id, function (err, res) {
+            if (err) this.fail('Host ' + host.id + ' reassignment initialization failed');
 
-ReassignTestCase.addStep('Listening for host reassignment start event', function() {
-    var host = this.test_case.context.host;
+            return this.next();
+        }.bind(this));
+    }
+);
 
-    this.test_case.events
-        .on('update')
-        .of(Config.host)
-        .execute(
-            function(m) {
-                if (m.action == 'reassignment') {
-                    console.log('Host ' + host.id + ' reassignment started');
-                    return this.next();
-                }
-                return false;
-            }.bind(this)
-        )
-});
-
-ReassignTestCase.addStep('Listening for host deletion event', function() {
+ReassignTestCase.addStep('Listening for host deletion event', function () {
     var host = this.test_case.context.host;
 
     this.test_case.events
         .on('delete')
         .of(Config.host)
         .execute(
-            function(m) {
+            function (m) {
                 console.log('Host ' + host.id + ' deleted');
                 return this.next();
             }.bind(this)
         )
 });
 
-ReassignTestCase.addStep('Listening for host creation event', function() {
+ReassignTestCase.addStep('Listening for host creation event', function () {
     var context = this.test_case.context;
 
     this.test_case.events
         .on('create')
-        .execute(function(m) {
+        .execute(function (m) {
             if (m.type == 'host' &&
                 m.cloud == 'destination' &&
                 m.action == 'reassignment') {
@@ -87,13 +86,13 @@ ReassignTestCase.addStep('Listening for host creation event', function() {
         }.bind(this))
 });
 
-ReassignTestCase.addStep('Listening for host reassignment completion event', function() {
+ReassignTestCase.addStep('Listening for host reassignment completion event', function () {
     var new_host = this.test_case.context.new_host;
 
     this.test_case.events
         .on('update')
         .of(new_host)
-        .execute(function(m) {
+        .execute(function (m) {
             if (m.action == '') {
                 console.log('Host ' + m.id + ' reassignment completed');
                 return this.next();
@@ -102,20 +101,20 @@ ReassignTestCase.addStep('Listening for host reassignment completion event', fun
         }.bind(this))
 });
 
-ReassignTestCase.addStep('Saving previous cloud configuration', function() {
+ReassignTestCase.addStep('Saving previous cloud configuration', function () {
     this.test_case.context.initial_state = this.test_case.context.state;
     return this.next();
 });
 
 ReassignTestCase.repeatStep(0);
 
-ReassignTestCase.normalizeHosts = function(hosts) {
+ReassignTestCase.normalizeHosts = function (hosts) {
     var result = {};
     for (var i in hosts) result[hosts[i].id] = hosts[i];
     return result;
 };
 
-ReassignTestCase.compare = function(s1, s2, cloud, exclusion) {
+ReassignTestCase.compare = function (s1, s2, cloud, exclusion) {
     var diff_found = false;
     for (var i in s1) {
         h = s1[i];
@@ -132,7 +131,7 @@ ReassignTestCase.compare = function(s1, s2, cloud, exclusion) {
     if (!diff_found) this.fail('Expected difference ' + exclusion.data.name + ' not found');
 };
 
-ReassignTestCase.addStep('Assuring host is removed from source cloud and new one added to destination', function() {
+ReassignTestCase.addStep('Assuring host is removed from source cloud and new one added to destination', function () {
     var context = this.test_case.context,
         host = context.host,
         new_host = context.new_host,
