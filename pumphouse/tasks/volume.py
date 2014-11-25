@@ -40,18 +40,20 @@ class CreateVolumeSnapshot(task.BaseCloudTask):
         volume_id = volume_info["id"]
 
         try:
-            # TODO (sryabin) check the volume has been detached
-            snapshot = utils.wait_for(
-                volume_id,
-                self.cloud.cinder.volume_snapshots.create,
-                value='available',
-                timeout=300,
-                error_status='error')
 
-        # except cinder_excs.BadRequest as e:
+            # TODO (sryabin) check the volume has been detached
+            snapshot = self.cloud.cinder.volume_snapshots.create(volume_id)
+
         except Exception as e:
             LOG.exception("Can't create snapshot from volume: %s",
                           str(volume_info))
+
+        snapshot = utils.wait_for(
+            volume_id,
+            self.cloud.cinder.volume_snapshots.get,
+            value='available',
+            timeout=300,
+            error_status='error')
 
         return snapshot._info
 
@@ -146,7 +148,8 @@ class CreateVolumeClone(CreateVolumeTask):
 
 
 class DeleteVolume(task.BaseCloudTask):
-    def execute(self, volume_info, **requires):
+
+    def do_delete(self, volume_info):
         volume = self.cloud.cinder.volumes.get(volume_info["id"])
         try:
             self.cloud.cinder.volumes.delete(volume.id)
@@ -158,6 +161,23 @@ class DeleteVolume(task.BaseCloudTask):
                                     stop_excs=(
                                         exceptions.cinder_excs.NotFound,))
             LOG.info("Deleted: %s", str(volume._info))
+
+    def execute(self, volume_info, **requires):
+        self.do_delete(volume_info)
+
+
+class DeleteSourceVolume(task.BaseCloudTask):
+    def execute(self, volume_info):
+        try:
+            volume = self.cloud.cinder.volumes.get(volume_info["id"])
+
+            # Also we need check 'delete resources from source cloud' option
+            if not len(volume.attachments):
+                self.do_delete(volume_info)
+
+        except exceptions.cinder_excs.NotFound as exc:
+            LOG.info("Volume: %s allready deleted before", str(volume._info))
+            pass
 
 
 class BlockDeviceMapping(task.Task):
