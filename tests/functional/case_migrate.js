@@ -1,5 +1,7 @@
 /*jslint node:true*/
 
+'use strict';
+
 var TestCase = require('./test_case');
 var Config = require('./config');
 var Cloud = require('./cloud');
@@ -7,7 +9,6 @@ var Cloud = require('./cloud');
 var MigrateTestCase = new TestCase('Tenant migration');
 
 MigrateTestCase.addStep('Call /resources API to fetch resources', function () {
-    'use strict';
     this.test_case.api.resources(function (err, res) {
         if (err) {
             this.fail('Resources fetching error');
@@ -19,7 +20,6 @@ MigrateTestCase.addStep('Call /resources API to fetch resources', function () {
 });
 
 MigrateTestCase.addStep('Look for preconfigured tenant in source cloud', function () {
-    'use strict';
     var context = this.test_case.context,
         b = context.state,
         t = b.get({
@@ -39,8 +39,6 @@ MigrateTestCase.addStep('Look for preconfigured tenant in source cloud', functio
 });
 
 MigrateTestCase.addStep('Initiate tenant migration', function () {
-    'use strict';
-
     var tenant = this.test_case.context.tenant;
 
     this.test_case.api.migrateTenant(tenant.id, function (err, res) {
@@ -54,8 +52,6 @@ MigrateTestCase.addStep('Initiate tenant migration', function () {
 
 
 MigrateTestCase.addStep('Handle tenant migration start event', function () {
-    'use strict';
-
     var tenant = this.test_case.context.tenant;
 
     this.test_case.events
@@ -75,7 +71,6 @@ MigrateTestCase.addStep('Handle tenant migration start event', function () {
 });
 
 MigrateTestCase.addStep('Handle tenant migration finish event', function () {
-    'use strict';
     var tenant = this.test_case.context.tenant;
 
     this.test_case.events
@@ -98,7 +93,6 @@ MigrateTestCase.addStep('Handle tenant migration finish event', function () {
 
 
 MigrateTestCase.addStep('Save previous cloud configuration', function () {
-    'use strict';
     var context = this.test_case.context;
 
     context.initial_state = context.state;
@@ -108,7 +102,6 @@ MigrateTestCase.addStep('Save previous cloud configuration', function () {
 MigrateTestCase.repeatStep(0);
 
 MigrateTestCase.addStep('Look for preconfigured tenant in destination cloud', function () {
-    'use strict';
     var context = this.test_case.context,
         tenant = context.tenant,
         b = context.state,
@@ -129,7 +122,6 @@ MigrateTestCase.addStep('Look for preconfigured tenant in destination cloud', fu
 });
 
 MigrateTestCase.getTenantServers = function (tenant_id, resources, cloud) {
-    'use strict';
     var servers = {},
         tenant_servers = resources.getAll({
             'type': 'server',
@@ -184,7 +176,6 @@ MigrateTestCase.getTenantServers = function (tenant_id, resources, cloud) {
 };
 
 MigrateTestCase.makeServerPrintable = function (s) {
-    'use strict';
     return JSON.stringify({
         'id': s.id,
         'name': s.data.name,
@@ -194,7 +185,6 @@ MigrateTestCase.makeServerPrintable = function (s) {
 };
 
 MigrateTestCase.assureServersEqual = function (s1, s2) {
-    'use strict';
     var i, s, so;
     for (i in s1) {
         if (s1.hasOwnProperty(i)) {
@@ -219,7 +209,6 @@ MigrateTestCase.assureServersEqual = function (s1, s2) {
 };
 
 MigrateTestCase.addStep('Make sure tenants are equal', function () {
-    'use strict';
     var context = this.test_case.context,
         old = context.tenant,
         now = context.new_tenant,

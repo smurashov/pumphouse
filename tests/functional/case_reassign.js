@@ -1,104 +1,135 @@
+/*jslint node:true*/
+
+'use strict';
+
 var TestCase = require('./test_case');
 var Config = require('./config');
 var Cloud = require('./cloud');
 
 var ReassignTestCase = new TestCase('Host reassignment');
 
-ReassignTestCase.addStep('Calling API to fetch resources', function () {
+ReassignTestCase.addStep('Call /resources API to fetch resources', function () {
     this.test_case.api.resources(function (err, res) {
-        if (err) this.fail('Resources fetching error');
+        if (err) {
+            this.fail('Resources fetching error');
+        }
 
         this.test_case.context.state = new Cloud(res.body);
+
         return this.next();
-    }.bind(this))
+    }.bind(this));
 });
 
-ReassignTestCase.addStep('Looking for preconfigured host in source cloud', function () {
+ReassignTestCase.addStep('Look for preconfigured host in source cloud', function () {
     var context = this.test_case.context,
-        b = context.state;
+        b = context.state,
+        h = b.get({
+            'id': Config.host_id,
+            'type': 'host',
+            'cloud': 'source'
+        });
 
     console.log('Got clouds resources', b.toString());
 
     // Looking for predefined tenant in the source cloud
-    var h = b.get(Config.host);
     if (h) {
-        console.log('Host ' + Config.host.id + ' found in source cloud');
+        console.log('Host ' + Config.host_id + ' found in source cloud');
         context.host = h;
         return this.next();
     }
-    this.fail('Unable to find host "' + Config.host + '" in source cloud');
+    this.fail('Unable to find host "' + Config.host_id + '" in source cloud');
 });
 
-ReassignTestCase.addStep(
-    'Initiate host reassignment and listening for host reassignment start event',
-    function () {
-        var host = this.test_case.context.host;
+ReassignTestCase.addStep('Initiate host reassignment [POST] /host', function () {
+    var host = this.test_case.context.host;
 
-        this.test_case.events
-            .on('update')
-            .of(Config.host)
-            .execute(
-                function (m) {
-                    if (m.action == 'reassignment') {
-                        console.log('Host ' + host.id + ' reassignment started');
-                        return this.next();
-                    }
-                    return false;
-                }.bind(this)
-            );
+    this.test_case.api.reassignHost(host.id, function (err, res) {
+        if (err) {
+            this.fail('Host ' + host.id + ' reassignment initialization failed');
+        }
 
-        this.test_case.api.reassignHost(host.id, function (err, res) {
-            if (err) this.fail('Host ' + host.id + ' reassignment initialization failed');
+        return this.next();
+    }.bind(this));
+});
 
-            return this.next();
-        }.bind(this));
-    }
-);
-
-ReassignTestCase.addStep('Listening for host deletion event', function () {
+ReassignTestCase.addStep('Listen for host reassignment start event', function () {
     var host = this.test_case.context.host;
 
     this.test_case.events
-        .on('delete')
-        .of(Config.host)
+        .listenFor('update')
+        .of({
+            'id': Config.host_id,
+            'type': 'host',
+            'cloud': 'source',
+            'action': 'reassignment'
+        })
+        .execute(
+            function (m) {
+                console.log('Host ' + host.id + ' reassignment started');
+                return this.next();
+            }.bind(this)
+        );
+
+    this.test_case.events.startListening();
+});
+
+ReassignTestCase.addStep('Listen for host deletion event', function () {
+    var host = this.test_case.context.host;
+
+    this.test_case.events
+        .listenFor('delete')
+        .of({
+            'id': Config.host_id,
+            'type': 'host',
+            'cloud': 'source'
+        })
         .execute(
             function (m) {
                 console.log('Host ' + host.id + ' deleted');
                 return this.next();
             }.bind(this)
-        )
+        );
+
+    this.test_case.events.startListening();
 });
 
-ReassignTestCase.addStep('Listening for host creation event', function () {
+ReassignTestCase.addStep('Listen for host creation event', function () {
     var context = this.test_case.context;
 
     this.test_case.events
-        .on('create')
+        .listenFor('create')
+        .of({
+            'type': 'host',
+            'cloud': 'destination',
+            'action': 'reassignment'
+        })
         .execute(function (m) {
-            if (m.type == 'host' &&
-                m.cloud == 'destination' &&
-                m.action == 'reassignment') {
-                console.log('Host ' + m.id + ' has been created in destination cloud');
-                context.new_host = m;
-                return this.next();
-            }
-            return false;
-        }.bind(this))
+            console.log('Host ' + m.entity.id + ' has been created in destination cloud');
+            context.new_host = m.entity;
+            context.new_host.data = m.data;
+            return this.next();
+        }.bind(this));
+
+    this.test_case.events.startListening();
 });
 
-ReassignTestCase.addStep('Listening for host reassignment completion event', function () {
+ReassignTestCase.addStep('Listen for host reassignment completion event', function () {
     var new_host = this.test_case.context.new_host;
 
     this.test_case.events
-        .on('update')
-        .of(new_host)
+        .listenFor('update')
+        .of({
+            'id': new_host.id,
+            'type': 'host',
+            'cloud': 'destination',
+            'action': ''
+        })
         .execute(function (m) {
-            if (m.action == '') {
-                console.log('Host ' + m.id + ' reassignment completed');
-                return this.next();
-            }
-            return false;
-        }.bind(this))
+            console.log('Host ' + m.entity.id + ' reassignment completed');
+            return this.next();
+        }.bind(this));
+
+    this.test_case.events.startListening();
 });
 
 ReassignTestCase.addStep('Saving previous cloud configuration', function () {
@@ -109,26 +140,38 @@ ReassignTestCase.addStep('Saving previous cloud configuration', function () {
 ReassignTestCase.repeatStep(0);
 
 ReassignTestCase.normalizeHosts = function (hosts) {
-    var result = {};
-    for (var i in hosts) result[hosts[i].id] = hosts[i];
+    var result = {},
+        i;
+    for (i in hosts) {
+        if (hosts.hasOwnProperty(i)) {
+            result[hosts[i].id] = hosts[i];
+        }
+    }
     return result;
 };
 
 ReassignTestCase.compare = function (s1, s2, cloud, exclusion) {
-    var diff_found = false;
-    for (var i in s1) {
-        h = s1[i];
-        if (h.cloud != cloud) continue;
-        if (!s2[i]) {
-            if (h.id != exclusion.id) {
-                this.fail('Expected difference: ' + exclusion.data.name + ', actual: ' + h.data.name);
-            } else {
-                console.log(' - Expected difference: ' + exclusion.data.name);
-                diff_found = true;
+    var diff_found = false, i, h;
+    for (i in s1) {
+        if (s1.hasOwnProperty(i)) {
+            h = s1[i];
+            if (h.cloud === cloud) {
+                if (!s2[i]) {
+                    if (h.id !== exclusion.id) {
+                        this.fail('Expected difference: ' + exclusion.data.name + ', actual: ' + h.data.name);
+                    } else {
+                        console.log(' - Expected difference: ' + exclusion.data.name);
+                        diff_found = true;
+                    }
+                } else {
+                    console.log(' - Host ' + h.data.name + ' found in both sets');
+                }
             }
-        } else console.log(' - Host ' + h.data.name + ' found in both sets');
+        }
     }
-    if (!diff_found) this.fail('Expected difference ' + exclusion.data.name + ' not found');
+    if (!diff_found) {
+        this.fail('Expected difference ' + exclusion.data.name + ' not found');
+    }
 };
 
 ReassignTestCase.addStep('Assuring host is removed from source cloud and new one added to destination', function () {
