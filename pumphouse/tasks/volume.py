@@ -285,9 +285,13 @@ def migrate_server_volumes(context, server_id, attachments):
     flow = graph_flow.Flow("migrate-server-{}-volumes".format(server_id))
     for attachment in attachments:
         volume_id = attachment["id"]
-        server_block_devices.append("volume-{}-mapping".format(volume_id))
-        volume_flow = migrate_attached_volume(context, server_id, volume_id)
-        flow.add(volume_flow)
+        volume_retrieve = "volume-{}-retrieve".format(volume_id)
+        if volume_retrieve not in context.store:
+            server_block_devices.append("volume-{}-mapping".format(volume_id))
+            volume_flow = migrate_attached_volume(context,
+                                                  server_id,
+                                                  volume_id)
+            flow.add(volume_flow)
 
     server_device_mapping = "server-{}-device-mapping".format(server_id)
     flow.add(utils_tasks.Gather(name=server_device_mapping,
