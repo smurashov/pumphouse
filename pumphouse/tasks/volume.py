@@ -15,6 +15,7 @@
 import logging
 
 from taskflow.patterns import graph_flow
+from taskflow.task import Task
 
 from pumphouse import task
 from pumphouse import events
@@ -180,7 +181,7 @@ class DeleteSourceVolume(task.BaseCloudTask):
             pass
 
 
-class BlockDeviceMapping(task.Task):
+class BlockDeviceMapping(Task):
     def execute(self, volume_src, volume_dst, server_id):
         dev_name = volume_dst["id"]
         attachments = volume_src["attachments"]
@@ -222,7 +223,7 @@ def migrate_detached_volume(context, volume_id):
                                    name=volume_ensure,
                                    provides=volume_ensure,
                                    rebind=[volume_binding,
-                                           volume_ensure]))
+                                           image_ensure]))
     context.store[volume_retrieve] = volume_id
     return flow
 
@@ -237,7 +238,7 @@ def migrate_attached_volume(context, server_id, volume_id):
     volume_mapping = "{}-mapping".format(volume_binding)
     image_ensure = "{}-image-ensure".format(volume_binding)
     server_binding = "server-{}".format(server_id)
-    server_retrieve = "{}-retrieve".format(server_id)
+    server_retrieve = "{}-retrieve".format(server_binding)
 
     flow = graph_flow.Flow("migrate-{}".format(volume_binding))
     flow.add(RetrieveVolume(context.src_cloud,
@@ -278,7 +279,7 @@ def migrate_attached_volume(context, server_id, volume_id):
 
 def migrate_server_volumes(context, server_id, attachments):
     server_block_devices = []
-    flow = graph_flow("migrate-server-{}-volumes".format(server_id))
+    flow = graph_flow.Flow("migrate-server-{}-volumes".format(server_id))
     for attachment in attachments:
         volume_id = attachment["id"]
         server_block_devices.append("volume-{}-mapping".format(volume_id))

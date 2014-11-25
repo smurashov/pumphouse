@@ -44,6 +44,10 @@ class TestServer(unittest.TestCase):
             "net-id": "456",
             "v4-fixed-ip": "1.2.3.4",
         }]
+        self.server_dm = [{
+            "device_name": "567",
+            "mapping": "/dev/vda"
+        }]
 
         self.server = Mock()
         self.server.id = self.test_server_id
@@ -122,7 +126,8 @@ class TestBootServer(TestServer):
                                           self.flavor_info,
                                           self.user_info,
                                           self.tenant_info,
-                                          self.server_nics)
+                                          self.server_nics,
+                                          self.server_dm)
         self.cloud.restrict.assert_called_once_with(
             username=self.user_info["name"],
             tenant_name=self.tenant_info["name"],
@@ -131,7 +136,8 @@ class TestBootServer(TestServer):
             self.server_info["name"],
             self.image_info["id"],
             self.flavor_info["id"],
-            nics=self.server_nics)
+            nics=self.server_nics,
+            block_device_mapping=self.server_dm)
         self.assertEqual(self.server_info, server_info)
 
 
