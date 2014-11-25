@@ -144,7 +144,12 @@ def cleanup(events, cloud, target):
             "id": floating_ip.address
         }, namespace="/events")
 
-    if (cloud.neutron):
+    net_service = False
+    try:
+        net_service = cloud.keystone.services.find(type="network")
+    except exceptions.keystone_excs.NotFound:
+        pass
+    if (net_service):
         for port in cloud.neutron.list_ports()['ports']:
             LOG.info("Deleted network: %s", port['id'])
             cloud.neutron.delete_port(port['id'])
