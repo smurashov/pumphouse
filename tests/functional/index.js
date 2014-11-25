@@ -1,3 +1,6 @@
+/*jslint node:true*/
+/*jslint plusplus:true*/
+
 var Config = require('./config');
 var Listener = require('./events');
 var API = require('./api');
@@ -9,15 +12,17 @@ var cases = Config.cases,
     i = 0,
     completed = true,
     c,
-    timer;
+    timer,
+    cycles;
 
 // Async tests runner
 setInterval(function () {
+    'use strict';
     if (completed) {
         cycles = 0;
         if (i >= cases.length) {
             console.log('Tests execution completed');
-            process.exit(code=0);
+            process.exit(0);
         }
         c = require('./case_' + cases[i++]);
         c.testcase.run(pumphouse, events);
@@ -25,7 +30,7 @@ setInterval(function () {
     completed = c.testcase.completed;
     if (cycles++ > Config.timeout) {
         console.error('Timed out!');
-        process.exit(code=1);
+        process.exit(1);
     }
     cycles++;
 }, 1000);

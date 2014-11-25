@@ -1,3 +1,26 @@
+/*jslint node:true*/
+/*jslint plusplus:true*/
+
+'use strict';
+
+
+function TestStep(title, f) {
+    this.title = title;
+    this.func = f;
+}
+
+TestStep.prototype.next = function () {
+    setTimeout(this.test_case.next.bind(this.test_case), 10);
+    return true;
+};
+
+TestStep.prototype.fail = function (msg) {
+    return this.test_case.fail(msg);
+};
+
+
+
+
 
 function TestCase(title) {
     this.steps = [];
@@ -5,7 +28,7 @@ function TestCase(title) {
     this.completed = false;
 
     this.context = {};
-};
+}
 
 TestCase.prototype.addStep = function (title, f) {
     var s = new TestStep(title, f);
@@ -14,7 +37,9 @@ TestCase.prototype.addStep = function (title, f) {
 };
 
 TestCase.prototype.repeatStep = function (i) {
-    if (i >= this.steps.length) return false;
+    if (i >= this.steps.length) {
+        return false;
+    }
     var s = this.steps[i];
     this.steps.push(s);
 };
@@ -32,33 +57,20 @@ TestCase.prototype.run = function (api, events) {
 
 TestCase.prototype.next = function () {
     if (this.index < this.steps.length) {
-        var s = this.steps[this.index++], that = this;
+        var s = this.steps[this.index++],
+            that = this;
         console.log(s.title);
         console.log(new Array(80).join('-'));
         s.func();
-    } else this.completed = true;
+    } else {
+        this.completed = true;
+    }
 };
 
 TestCase.prototype.fail = function (message) {
     console.error('Test failed: ' + message);
     this.completed = true;
-    process.exit(code=1);
+    process.exit(1);
 };
-
-
-function TestStep(title, f) {
-    this.title = title;
-    this.func = f;
-};
-
-TestStep.prototype.next = function () {
-    setTimeout(this.test_case.next.bind(this.test_case), 10);
-    return true;
-};
-
-TestStep.prototype.fail = function (msg) {
-    return this.test_case.fail(msg);
-};
-
 
 module.exports = TestCase;
