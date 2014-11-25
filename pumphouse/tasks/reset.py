@@ -503,14 +503,13 @@ class Server(EventResource):
         for floating_ip in self.floating_ips:
             floating_ip["server"] = server
 
-    @task(before=[tenant.delete, nics.each().delete],
-          requires=[floating_ips.each().disassociate])
-    def do_delete(self):
+    @task(before=[tenant.delete],
+          requires=[floating_ips.each().disassociate],
+          includes=[nics.each().delete])
+    def delete(self):
         self.env.cloud.nova.servers.delete(self.data["id"])
         utils.wait_for(self.data["id"], self.env.cloud.nova.servers.get,
                        stop_excs=(nova_excs.NotFound,))
-
-    delete = task(name="delete", requires=[do_delete, nics.each().delete])
 
 
 class CleanupWorkload(EventResource):
