@@ -1,5 +1,7 @@
 /*jslint node:true*/
 
+'use strict';
+
 var io = require('socket.io-client');
 
 
@@ -9,7 +11,6 @@ var io = require('socket.io-client');
  * @returns {EventHandler} itself for chaining
  */
 function EventHandler(event) {
-    'use strict';
     this.event = event;
     this.entity = {};
     this.data = {};
@@ -27,7 +28,6 @@ function EventHandler(event) {
  * @returns {EventHandlers} itself for chaining
  */
 EventHandler.prototype.of = function (entity, data) {
-    'use strict';
     if (!this.event) {
         console.error('Event name should be defined prior to the entity', entity);
         return null;
@@ -42,7 +42,6 @@ EventHandler.prototype.of = function (entity, data) {
  * @param {Function} f handler function
  */
 EventHandler.prototype.execute = function (f) {
-    'use strict';
     this.handler = f;
     return this;
 };
@@ -52,7 +51,6 @@ EventHandler.prototype.execute = function (f) {
  * @param {Number} times to be executed
  */
 EventHandler.prototype.repeat = function (times) {
-    'use strict';
     this.executions = times;
     return this;
 };
@@ -65,7 +63,6 @@ EventHandler.prototype.repeat = function (times) {
  * @returns {HandlersManager} returns itself for chaining
  */
 function HandlersManager() {
-    'use strict';
     this.handlers = [];
     this.events_bus = [];
     this.listener = null;
@@ -79,7 +76,6 @@ function HandlersManager() {
  * @returns {EventHandler} EventHandler object for further matching conditioning
  */
 HandlersManager.prototype.listenFor = function (event) {
-    'use strict';
     var h = new EventHandler(event);
     this.handlers.push(h);
     return h;
@@ -91,7 +87,6 @@ HandlersManager.prototype.listenFor = function (event) {
  * @param {Object} data       passed along with event
  */
 HandlersManager.prototype.intercept = function (event_name, data) {
-    'use strict';
     var entity_data = data.hasOwnProperty('data') ? data.data : {};
     delete data.data;
     this.events_bus.push({
@@ -103,8 +98,6 @@ HandlersManager.prototype.intercept = function (event_name, data) {
 };
 
 HandlersManager.prototype.match = function () {
-    'use strict';
-
     console.log('Handlers: ', JSON.stringify(this.handlers));
     if (!this.handlers.length) {
         this.startListening();
@@ -163,7 +156,6 @@ HandlersManager.prototype.match = function () {
  * Starts matching handlers to events received.
  */
 HandlersManager.prototype.startListening = function () {
-    'use strict';
     this.listener = setTimeout(this.match.bind(this), 1000);
 };
 
@@ -176,7 +168,6 @@ HandlersManager.prototype.startListening = function () {
  * @returns {EventListener} returns newly created instance for chaining
  */
 function EventsListener(path) {
-    'use strict';
     this.socket = io.connect(path);
 
     this.handlers = new HandlersManager();
@@ -201,12 +192,10 @@ function EventsListener(path) {
  * Forces disconnection from socket
  */
 EventsListener.prototype.disconnect = function () {
-    'use strict';
     this.socket.disconnect();
 };
 
 EventsListener.prototype.handlerFactory = function (event_name) {
-    'use strict';
     return function (data) {
         console.log('Event "' + event_name + '": ' + JSON.stringify(data));
         this.handlers.intercept(event_name, data);

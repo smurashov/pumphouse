@@ -1,6 +1,8 @@
 /*jslint node:true*/
 /*jslint plusplus:true*/
 
+'use strict';
+
 var Config = require('./config');
 var Listener = require('./events');
 var API = require('./api');
@@ -17,7 +19,6 @@ var cases = Config.cases,
 
 // Async tests runner
 setInterval(function () {
-    'use strict';
     if (completed) {
         cycles = 0;
         if (i >= cases.length) {
