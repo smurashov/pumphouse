@@ -148,7 +148,7 @@ class CreateVolumeClone(CreateVolumeTask):
 
 class DeleteVolume(task.BaseCloudTask):
     def execute(self, volume_info, **requires):
-        volume = self.cloud.volumes.get(volume_info["id"])
+        volume = self.cloud.cinder.volumes.get(volume_info["id"])
         try:
             self.cloud.cinder.volumes.delete(volume.id)
         except exceptions.cinder_excs.BadRequest as exc:
