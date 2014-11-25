@@ -6,6 +6,16 @@ var TestCase = require('./test_case');
 
 var ResetTestCase = new TestCase('Environments reset');
 
+ResetTestCase.addStep('Call API to reset', function () {
+    this.test_case.api.reset(function (err, res) {
+        if (err) {
+            this.fail('Resetting error');
+        }
+    }.bind(this));
+
+    this.next();
+});
+
 ResetTestCase.addStep('Handle reset started event', function () {
     this.test_case.events
         .listenFor('reset start')
@@ -13,16 +23,6 @@ ResetTestCase.addStep('Handle reset started event', function () {
             console.log('Reset started event received');
             return this.next();
         }.bind(this));
-
-    this.next();
-});
-
-ResetTestCase.addStep('Call API to reset', function () {
-    this.test_case.api.reset(function (err, res) {
-        if (err) {
-            this.fail('Resetting error');
-        }
-    }.bind(this));
 
     this.test_case.events.startListening();
 });
