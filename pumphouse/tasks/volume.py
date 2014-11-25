@@ -133,7 +133,7 @@ class CreateVolumeFromImage(CreateVolumeTask):
 
 
 class CreateVolumeClone(CreateVolumeTask):
-    def execute(self, volume_info):
+    def execute(self, volume_info, **requires):
         try:
             volume = self.cloud.cinder.volumes.create(
                 volume_info["size"], source_volid=volume_info["id"])
@@ -239,6 +239,8 @@ def migrate_attached_volume(context, server_id, volume_id):
     image_ensure = "{}-image-ensure".format(volume_binding)
     server_binding = "server-{}".format(server_id)
     server_retrieve = "{}-retrieve".format(server_binding)
+    server_suspend = "{}-suspend".format(server_binding)
+    volume_sync = "{}-sync".format(volume_binding)
 
     flow = graph_flow.Flow("migrate-{}".format(volume_binding))
     flow.add(RetrieveVolume(context.src_cloud,
@@ -248,7 +250,8 @@ def migrate_attached_volume(context, server_id, volume_id):
              CreateVolumeClone(context.src_cloud,
                                name=volume_clone,
                                provides=volume_clone,
-                               rebind=[volume_binding]),
+                               rebind=[volume_binding],
+                               requires=[server_suspend]),
              UploadVolume(context.src_cloud,
                           name=volume_image,
                           provides=volume_image,
