@@ -301,13 +301,18 @@ def generate_volumes_list(num):
 
 def _create_networks(events, cloud, networks):
     for network_dict in networks:
-        net = cloud.nova.networks.create(**network_dict)
-        LOG.info("Created: %s", net._info)
-        events.emit("network created", {
-            "id": net.id,
-            "name": net.label,
-            "cloud": "source",
-        }, namespace="/events")
+        try:
+            net = cloud.nova.networks.create(**network_dict)
+        except exceptions.nova_excs.Conflict:
+            net = cloud.nova.networks.find(cidr=network_dict["cidr"])
+            LOG.info("Already exists: %s", net._info)
+        else:
+            LOG.info("Created: %s", net._info)
+            events.emit("network created", {
+                "id": net.id,
+                "name": net.label,
+                "cloud": "source",
+            }, namespace="/events")
 
 
 @network_manager.add("FlatDHCP")
