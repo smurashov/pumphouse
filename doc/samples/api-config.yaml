@@ -53,6 +53,10 @@ CLOUDS:
               - &image
                 name: pumphouse-test-image-0001
                 url: http://download.cirros-cloud.net/0.3.2/cirros-0.3.2-x86_64-disk.img
+            volumes:
+              - &volume
+                display_name: pumphouse-test-volume-0001
+                size: 1
             tenants:
               - name: pumphouse-test-0001
                 description: "pumphouse test tenant 0001"
