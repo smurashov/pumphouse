@@ -1,10 +1,12 @@
+/*jslint node:true*/
+
 var TestCase = require('./test_case');
 var Config = require('./config');
 var Cloud = require('./cloud');
 
 var MigrateTestCase = new TestCase('Tenant migration');
 
-MigrateTestCase.addStep('Calling API to fetch resources', function () {
+MigrateTestCase.addStep('Call /resources API to fetch resources', function () {
     'use strict';
     this.test_case.api.resources(function (err, res) {
         if (err) {
@@ -16,11 +18,15 @@ MigrateTestCase.addStep('Calling API to fetch resources', function () {
     }.bind(this));
 });
 
-MigrateTestCase.addStep('Looking for preconfigured tenant in source cloud', function () {
+MigrateTestCase.addStep('Look for preconfigured tenant in source cloud', function () {
     'use strict';
     var context = this.test_case.context,
         b = context.state,
-        t = b.get(Config.tenant);
+        t = b.get({
+            'id': Config.tenant_id,
+            'type': 'tenant',
+            'cloud': 'source'
+        });
 
     console.log('Got cloud resources', b.toString());
 
@@ -29,56 +35,69 @@ MigrateTestCase.addStep('Looking for preconfigured tenant in source cloud', func
         context.tenant = t;
         return this.next();
     }
-    this.fail('Unable to find tenant "' + Config.tenant.id + '" in source cloud');
+    this.fail('Unable to find tenant "' + Config.tenant_id + '" in source cloud');
 });
 
-MigrateTestCase.addStep(
-    'Initiate tenant migration and listening for tenant migration start event',
-    function () {
-        'use strict';
+MigrateTestCase.addStep('Initiate tenant migration', function () {
+    'use strict';
 
-        var tenant = this.test_case.context.tenant;
+    var tenant = this.test_case.context.tenant;
 
-        this.test_case.events
-            .on('update')
-            .of(Config.tenant)
-            .execute(function (m) {
-                if (m.action === 'migration') {
-                    console.log('Tenant ' + tenant.id + ' migration started');
-                    return this.next();
-                }
-                return false;
-            }.bind(this));
+    this.test_case.api.migrateTenant(tenant.id, function (err, res) {
+        if (err) {
+            this.fail('Tenant (' + tenant.id + ') migration initialization failed');
+        }
+        this.next();
+    }.bind(this));
 
-        this.test_case.api.migrateTenant(tenant.id, function (err, res) {
-            if (err) {
-                this.fail('Tenant (' + tenant.id + ') migration initialization failed');
-            }
+});
 
+
+MigrateTestCase.addStep('Handle tenant migration start event', function () {
+    'use strict';
+
+    var tenant = this.test_case.context.tenant;
+
+    this.test_case.events
+        .listenFor('update')
+        .of({
+            'id': Config.tenant_id,
+            'type': 'tenant',
+            'cloud': 'source',
+            'action': 'migration'
+        })
+        .execute(function (m) {
+            console.log('Tenant ' + tenant.id + ' migration started');
             return this.next();
         }.bind(this));
-    }
-);
 
-MigrateTestCase.addStep('Listening for tenant migration finish event', function () {
+    this.test_case.events.startListening();
+});
+
+MigrateTestCase.addStep('Handle tenant migration finish event', function () {
     'use strict';
     var tenant = this.test_case.context.tenant;
 
     this.test_case.events
-        .on('update')
-        .of(Config.tenant)
+        .listenFor('update')
+        .of({
+            'id': Config.tenant_id,
+            'type': 'tenant',
+            'cloud': 'source',
+            'action': ''
+        })
         .execute(
             function (m) {
-                if (m.action === '') {
-                    console.log('Tenant ' + tenant.id + ' migration completed');
-                    return this.next();
-                }
-                return false;
+                console.log('Tenant ' + tenant.id + ' migration completed');
+                return this.next();
             }.bind(this)
         );
+
+    this.test_case.events.startListening();
 });
 
-MigrateTestCase.addStep('Saving previous cloud configuration', function () {
+
+MigrateTestCase.addStep('Save previous cloud configuration', function () {
     'use strict';
     var context = this.test_case.context;
 
@@ -88,7 +107,7 @@ MigrateTestCase.addStep('Saving previous cloud configuration', function () {
 
 MigrateTestCase.repeatStep(0);
 
-MigrateTestCase.addStep('Looking for preconfigured tenant in destination cloud', function () {
+MigrateTestCase.addStep('Look for preconfigured tenant in destination cloud', function () {
     'use strict';
     var context = this.test_case.context,
         tenant = context.tenant,
@@ -199,7 +218,7 @@ MigrateTestCase.assureServersEqual = function (s1, s2) {
     }
 };
 
-MigrateTestCase.addStep('Making sure tenants are equal', function () {
+MigrateTestCase.addStep('Make sure tenants are equal', function () {
     'use strict';
     var context = this.test_case.context,
         old = context.tenant,
