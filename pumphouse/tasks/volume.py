@@ -136,7 +136,7 @@ class DeleteVolume(task.BaseCloudTask):
             LOG.exception("Not found: %s", str(volume_info))
             raise exc
         else:
-            utils.wait_for(volume.id,
+            utils.wait_for(volume_id,
                            self.cloud.cinder.volumes.get,
                            stop_excs=(exceptions.cinder_excs.NotFound,))
             LOG.info("Deleted: %s", str(volume_info))
