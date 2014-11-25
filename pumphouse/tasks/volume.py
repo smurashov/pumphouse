@@ -167,7 +167,7 @@ class DeleteVolume(task.BaseCloudTask):
         self.do_delete(volume_info)
 
 
-class DeleteSourceVolume(task.BaseCloudTask):
+class DeleteSourceVolume(DeleteVolume):
     def execute(self, volume_info):
         try:
             volume = self.cloud.cinder.volumes.get(volume_info["id"])
