@@ -33,7 +33,7 @@ EventHandler.prototype.of = function (entity, data) {
         return null;
     }
     this.entity = entity;
-    this.data = data;
+    this.data = data || {};
     return this;
 };
 
@@ -99,13 +99,13 @@ HandlersManager.prototype.intercept = function (event_name, data) {
         'entity': data,
         'data': entity_data
     });
-    console.log('Received: ', event_name, this.events_bus);
+    console.log('Received event: ', event_name, JSON.stringify(data));
 };
 
 HandlersManager.prototype.match = function () {
     'use strict';
 
-    console.log('Handlers: ', this.handlers);
+    console.log('Handlers: ', JSON.stringify(this.handlers));
     if (!this.handlers.length) {
         this.startListening();
         return false;
@@ -116,7 +116,7 @@ HandlersManager.prototype.match = function () {
         k,
         match = true;
 
-    console.log('Looking for matches for: ', handler);
+    console.log('Looking for matches for: ', JSON.stringify(handler));
 
     while (this.events_bus.length) {
         event = this.events_bus.shift();
@@ -146,6 +146,8 @@ HandlersManager.prototype.match = function () {
             if (match) {
                 // Event matched to the handler
                 // Handling funtion is executed with the event data
+                console.log('Match found: ', JSON.stringify(event));
+
                 handler.executions -= 1;
                 if (handler.handler(event) && !handler.executions) {
                     this.handlers.shift();
