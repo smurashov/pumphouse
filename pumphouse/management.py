@@ -144,7 +144,12 @@ def cleanup(events, cloud, target):
             "id": floating_ip.address
         }, namespace="/events")
 
-    if (cloud.neutron):
+    net_service = False
+    try:
+        net_service = cloud.keystone.services.find(type="network")
+    except exceptions.keystone_excs.NotFound:
+        pass
+    if (net_service):
         for port in cloud.neutron.list_ports()['ports']:
             LOG.info("Deleted network: %s", port['id'])
             cloud.neutron.delete_port(port['id'])
@@ -256,6 +261,17 @@ def generate_vlan_networks_list(num):
         }
 
 
+def generate_neutron_subnet_list():
+    yield {
+        'subnets': [
+            {
+                'cidr': '192.168.199.0/24',
+                'ip_version': 4,
+            }
+        ]
+    }
+
+
 def generate_images_list(num):
     image_ref = str(random.randint(1, 0x7fffffff))
     yield {"name": "{}-image-{}".format(TEST_RESOURCE_PREFIX, image_ref),
@@ -285,13 +301,18 @@ def generate_volumes_list(num):
 
 def _create_networks(events, cloud, networks):
     for network_dict in networks:
-        net = cloud.nova.networks.create(**network_dict)
-        LOG.info("Created: %s", net._info)
-        events.emit("network created", {
-            "id": net.id,
-            "name": net.label,
-            "cloud": "source",
-        }, namespace="/events")
+        try:
+            net = cloud.nova.networks.create(**network_dict)
+        except exceptions.nova_excs.Conflict:
+            net = cloud.nova.networks.find(cidr=network_dict["cidr"])
+            LOG.info("Already exists: %s", net._info)
+        else:
+            LOG.info("Created: %s", net._info)
+            events.emit("network created", {
+                "id": net.id,
+                "name": net.label,
+                "cloud": "source",
+            }, namespace="/events")
 
 
 @network_manager.add("FlatDHCP")
@@ -347,6 +368,26 @@ def setup_image(cloud, image_dict):
         cloud.glance.images.upload(image.id,
                                    open(image_file, "rb"))
     return image
+
+
+def setup_neutron_network(cloud, net_name, subnet, port):
+    # TODO (sryabin) try/except NetworkExists
+    network = cloud.neutron.create_network(body={
+        'network': {
+            'name': net_name,
+            'admin_state_up': True
+        }
+    })['network']
+
+    port['network_id'] = subnet['network_id'] = network['id']
+
+    sub_network = cloud.neutron.create_subnet(body={
+        'subnet': [{subnet}]
+    })['subnet']
+
+    cloud.neutron.create_port(body={
+        'port': {port}
+    })
 
 
 def cache_image_file(url=TEST_IMAGE_URL):
