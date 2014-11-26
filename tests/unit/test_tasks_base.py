@@ -22,11 +22,11 @@ from pumphouse.tasks import base
 class Tenant(base.Resource):
     @base.task
     def create(self):
-        self.tenant = self.env.cloud.keystone.tenants.create(self.tenant)
+        self.data = self.env.cloud.keystone.tenants.create(self.data)
 
     @base.task
     def delete(self):
-        self.env.cloud.keystone.tenants.delete(self.tenant["id"])
+        self.env.cloud.keystone.tenants.delete(self.data["id"])
 
 
 class Server(base.Resource):
@@ -40,27 +40,29 @@ class Server(base.Resource):
 
     @Tenant()
     def tenant(self):
-        if "tenant_id" in self.server:
-            return {"id": self.server["tenant_id"]}
-        elif "tenant" in self.server:
-            return self.server["tenant"]
+        if "tenant_id" in self.data:
+            return {"id": self.data["tenant_id"]}
+        elif "tenant" in self.data:
+            return self.data["tenant"]
         else:
             assert False
 
     @base.task(requires=[tenant.create])
     def create(self):
-        server = self.server.copy()
+        server = self.data.copy()
         server.pop("tenant")
         server["tenant_id"] = self.tenant["id"]
-        self.server = self.env.cloud.nova.servers.create(server)
+        self.data = self.env.cloud.nova.servers.create(server)
 
     @base.task(before=[tenant.delete])
     def delete(self):
-        self.env.cloud.nova.servers.delete(self.server)
+        self.env.cloud.nova.servers.delete(self.data)
 
 
 class TenantWorkload(base.Resource):
-    tenant = Tenant()
+    @Tenant()
+    def tenant(self):
+        return self.data
 
     @base.Collection(Server)
     def servers(self):
@@ -98,7 +100,7 @@ class TasksBaseTestCase(unittest.TestCase):
         )
         self.assertItemsEqual(
             env.cloud.nova.servers.create.call_args_list,
-            map(mock.call,[
+            map(mock.call, [
                 {"tenant_id": created_tenant["id"], "name": server["name"]}
                 for server in servers
             ]),

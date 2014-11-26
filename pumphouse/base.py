@@ -65,7 +65,7 @@ class Service(object):
                 if workloads is None:
                     workloads = {}
                 setup_workload = runner.get_resource(reset.SetupWorkload, {
-                    "id": "src",
+                    "id": cloud.name,
                     "populate": populate,
                     "workloads": workloads,
                 })

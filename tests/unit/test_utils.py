@@ -82,7 +82,7 @@ class TestWaitFor(unittest.TestCase):
             value=self.value,
             timeout=self.timeout,
             check_interval=self.check_interval,
-            stop_excs=Exception
+            stop_excs=(Exception,)
         )
         self.assertEqual(result, None)
 
@@ -95,7 +95,7 @@ class TestWaitFor(unittest.TestCase):
             value=self.value,
             timeout=self.timeout,
             check_interval=self.check_interval,
-            expect_excs=Exception
+            expect_excs=(Exception,)
         )
         self.assertEqual(result, self.upd_resource)
 

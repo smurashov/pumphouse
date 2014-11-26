@@ -1,7 +1,9 @@
 import unittest
-from mock import patch, Mock
+
+import mock
 
 from pumphouse import base
+from pumphouse.tasks import reset
 
 
 class TestBase(unittest.TestCase):
@@ -23,15 +25,15 @@ class TestBase(unittest.TestCase):
             "endpoint": self.cloud_endpoint,
         }
         self.target = "fakecloud"
-        self.driver = Mock(return_value=self.identity)
+        self.driver = mock.Mock(return_value=self.identity)
         self.driver.return_value = self.identity
         self.driver.from_dict.return_value = ()
 
         self.cloud_driver = self.driver
         self.identity_driver = self.driver
 
-        self.cloud = Mock()
-        self.events = Mock()
+        self.cloud = mock.Mock()
+        self.events = mock.Mock()
 
         self.service = base.Service(
             self.config.copy(),
@@ -71,62 +73,96 @@ class TestService(TestBase):
         self.identity_driver.from_dict.assert_called_once_with(
             self.target, self.identity2, {"endpoint": self.cloud_endpoint})
 
-    @patch("pumphouse.management.cleanup")
-    @patch("pumphouse.management.setup")
-    def test_reset_with_workloads(self, mock_setup, mock_cleanup):
+    @mock.patch("pumphouse.tasks.base.TaskflowRunner")
+    def test_reset_with_workloads(self, mock_runner):
         self.service.reset(self.events, self.cloud)
 
-        mock_cleanup.assert_called_once_with(self.events,
-                                             self.cloud,
-                                             self.service.target)
-        mock_setup.assert_called_once_with(
-            {},
-            self.events,
-            self.cloud,
-            self.service.target,
-            num_tenants=self.config["populate"]["num_tenants"],
-            num_servers=self.config["populate"]["num_servers"],
-            workloads=self.config["workloads"])
+        runner = mock_runner.return_value
+        self.assertEqual(
+            runner.get_resource.call_args_list,
+            [
+                mock.call(reset.CleanupWorkload, {"id": self.cloud.name}),
+                mock.call(reset.SetupWorkload, {
+                    "id": self.cloud.name,
+                    "populate": self.config["populate"],
+                    "workloads": self.config["workloads"],
+                }),
+            ],
+        )
+        resource = runner.get_resource.return_value
+        self.assertEqual(
+            runner.add.call_args_list,
+            [mock.call(resource.delete), mock.call(resource.create)],
+        )
 
-    @patch("pumphouse.management.cleanup")
-    @patch("pumphouse.management.setup")
-    def test_reset_with_populate(self, mock_setup, mock_cleanup):
+    @mock.patch("pumphouse.tasks.base.TaskflowRunner")
+    def test_reset_with_populate(self, mock_runner):
         self.service.workloads_config = None
         self.service.reset(self.events, self.cloud)
 
-        mock_cleanup.assert_called_once_with(self.events,
-                                             self.cloud,
-                                             self.service.target)
-        mock_setup.assert_called_once_with(
-            {}, self.events, self.cloud, self.service.target,
-            num_tenants=self.config["populate"]["num_tenants"],
-            num_servers=self.config["populate"]["num_servers"])
+        runner = mock_runner.return_value
+        self.assertEqual(
+            runner.get_resource.call_args_list,
+            [
+                mock.call(reset.CleanupWorkload, {"id": self.cloud.name}),
+                mock.call(reset.SetupWorkload, {
+                    "id": self.cloud.name,
+                    "populate": self.config["populate"],
+                    "workloads": {},
+                }),
+            ],
+        )
+        resource = runner.get_resource.return_value
+        self.assertEqual(
+            runner.add.call_args_list,
+            [mock.call(resource.delete), mock.call(resource.create)],
+        )
 
-    @patch("pumphouse.management.cleanup")
-    @patch("pumphouse.management.setup")
-    def test_reset_with_populate_default(self, mock_setup, mock_cleanup):
+    @mock.patch("pumphouse.tasks.base.TaskflowRunner")
+    def test_reset_with_populate_default(self, mock_runner):
         self.service.workloads_config = None
         self.service.populate_config = {}
         self.service.reset(self.events, self.cloud)
 
         # Assuring that if there are no num_servers and num_tenants present
         # in populate_config default values are used
-        mock_setup.assert_called_once_with({},
-                                           self.events,
-                                           self.cloud,
-                                           self.service.target,
-                                           num_tenants=2,
-                                           num_servers=2)
+        runner = mock_runner.return_value
+        self.assertEqual(
+            runner.get_resource.call_args_list,
+            [
+                mock.call(reset.CleanupWorkload, {"id": self.cloud.name}),
+                mock.call(reset.SetupWorkload, {
+                    "id": self.cloud.name,
+                    "populate": {},
+                    "workloads": {},
+                }),
+            ],
+        )
+        resource = runner.get_resource.return_value
+        self.assertEqual(
+            runner.add.call_args_list,
+            [mock.call(resource.delete), mock.call(resource.create)],
+        )
 
-    @patch("pumphouse.management.cleanup")
-    @patch("pumphouse.management.setup")
-    def test_reset_without_configs(self, mock_setup, mock_cleanup):
+    @mock.patch("pumphouse.tasks.base.TaskflowRunner")
+    def test_reset_without_configs(self, mock_runner):
         self.service.workloads_config = None
         self.service.populate_config = None
         self.service.reset(self.events, self.cloud)
 
         # Case when none of workloads_config or populate_config are dicts
-        self.assertFalse(mock_setup.called)
+        runner = mock_runner.return_value
+        self.assertEqual(
+            runner.get_resource.call_args_list,
+            [
+                mock.call(reset.CleanupWorkload, {"id": self.cloud.name}),
+            ],
+        )
+        resource = runner.get_resource.return_value
+        self.assertEqual(
+            runner.add.call_args_list,
+            [mock.call(resource.delete)],
+        )
 
 
 if __name__ == '__main__':
