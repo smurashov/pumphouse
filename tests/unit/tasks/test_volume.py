@@ -31,7 +31,6 @@ class TestVolume(unittest.TestCase):
             "status": "available",
             "display_name": "testvol1",
             "display_description": None,
-            "volume_type": "test_lvm",
         }
         self.image_info = {
             "id": self.test_image_id,
@@ -134,7 +133,6 @@ class TestCreateVolumeFromImage(TestVolume):
         create_volume_dict = {
             "display_name": self.volume_info["display_name"],
             "display_description": self.volume_info["display_description"],
-            "volume_type": self.volume_info["volume_type"],
             "imageRef": self.test_image_id,
         }
 

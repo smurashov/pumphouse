@@ -44,10 +44,7 @@ class TestServer(unittest.TestCase):
             "net-id": "456",
             "v4-fixed-ip": "1.2.3.4",
         }]
-        self.server_dm = [{
-            "device_name": "567",
-            "mapping": "/dev/vda"
-        }]
+        self.server_dm = [("/dev/vda", "567")]
 
         self.server = Mock()
         self.server.id = self.test_server_id
@@ -137,7 +134,7 @@ class TestBootServer(TestServer):
             self.image_info["id"],
             self.flavor_info["id"],
             nics=self.server_nics,
-            block_device_mapping=self.server_dm)
+            block_device_mapping=dict(self.server_dm))
         self.assertEqual(self.server_info, server_info)
 
 

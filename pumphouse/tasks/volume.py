@@ -117,7 +117,6 @@ class CreateVolumeFromImage(CreateVolumeTask):
                 volume_info["size"],
                 display_name=volume_info["display_name"],
                 display_description=volume_info["display_description"],
-                volume_type=volume_info["volume_type"],
                 imageRef=image_id)
         except Exception as exc:
             LOG.exception("Cannot create: %s", volume_info)
@@ -183,15 +182,12 @@ class DeleteSourceVolume(DeleteVolume):
 
 class BlockDeviceMapping(Task):
     def execute(self, volume_src, volume_dst, server_id):
-        dev_name = volume_dst["id"]
+        dev_mapping = volume_dst["id"]
         attachments = volume_src["attachments"]
         for attachment in attachments:
             if attachment["server_id"] == server_id:
-                dev_mapping = attachment["device"]
-        return {
-            "device_name": dev_name,
-            "mapping": dev_mapping
-        }
+                dev_name = attachment["device"]
+        return (str(dev_name), str(dev_mapping))
 
 
 def migrate_detached_volume(context, volume_id):

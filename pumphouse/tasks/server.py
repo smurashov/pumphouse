@@ -170,7 +170,7 @@ class BootServerFromImage(task.BaseCloudTask):
             password="default")
         server = restrict_cloud.nova.servers.create(
             server_info["name"], image_info["id"], flavor_info["id"],
-            block_device_mapping=server_dm, nics=server_nics)
+            block_device_mapping=dict(server_dm), nics=server_nics)
         server = utils.wait_for(server, self.cloud.nova.servers.get,
                                 value="ACTIVE")
         spawn_server_info = server.to_dict()
