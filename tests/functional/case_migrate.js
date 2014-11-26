@@ -1,11 +1,14 @@
+/*jslint node:true*/
+
+'use strict';
+
 var TestCase = require('./test_case');
 var Config = require('./config');
 var Cloud = require('./cloud');
 
 var MigrateTestCase = new TestCase('Tenant migration');
 
-MigrateTestCase.addStep('Calling API to fetch resources', function () {
-    'use strict';
+MigrateTestCase.addStep('Call /resources API to fetch resources', function () {
     this.test_case.api.resources(function (err, res) {
         if (err) {
             this.fail('Resources fetching error');
@@ -16,11 +19,14 @@ MigrateTestCase.addStep('Calling API to fetch resources', function () {
     }.bind(this));
 });
 
-MigrateTestCase.addStep('Looking for preconfigured tenant in source cloud', function () {
-    'use strict';
+MigrateTestCase.addStep('Look for preconfigured tenant in source cloud', function () {
     var context = this.test_case.context,
         b = context.state,
-        t = b.get(Config.tenant);
+        t = b.get({
+            'id': Config.tenant_id,
+            'type': 'tenant',
+            'cloud': 'source'
+        });
 
     console.log('Got cloud resources', b.toString());
 
@@ -29,57 +35,64 @@ MigrateTestCase.addStep('Looking for preconfigured tenant in source cloud', func
         context.tenant = t;
         return this.next();
     }
-    this.fail('Unable to find tenant "' + Config.tenant.id + '" in source cloud');
+    this.fail('Unable to find tenant "' + Config.tenant_id + '" in source cloud');
 });
 
-MigrateTestCase.addStep(
-    'Initiate tenant migration and listening for tenant migration start event',
-    function () {
-        'use strict';
+MigrateTestCase.addStep('Initiate tenant migration', function () {
+    var tenant = this.test_case.context.tenant;
 
-        var tenant = this.test_case.context.tenant;
+    this.test_case.api.migrateTenant(tenant.id, function (err, res) {
+        if (err) {
+            this.fail('Tenant (' + tenant.id + ') migration initialization failed');
+        }
+        this.next();
+    }.bind(this));
 
-        this.test_case.events
-            .on('update')
-            .of(Config.tenant)
-            .execute(function (m) {
-                if (m.action === 'migration') {
-                    console.log('Tenant ' + tenant.id + ' migration started');
-                    return this.next();
-                }
-                return false;
-            }.bind(this));
+});
 
-        this.test_case.api.migrateTenant(tenant.id, function (err, res) {
-            if (err) {
-                this.fail('Tenant (' + tenant.id + ') migration initialization failed');
-            }
 
-            return this.next();
-        }.bind(this));
-    }
-);
-
-MigrateTestCase.addStep('Listening for tenant migration finish event', function () {
-    'use strict';
+MigrateTestCase.addStep('Handle tenant migration start event', function () {
     var tenant = this.test_case.context.tenant;
 
     this.test_case.events
-        .on('update')
-        .of(Config.tenant)
-        .execute(
-            function (m) {
-                if (m.action === '') {
-                    console.log('Tenant ' + tenant.id + ' migration completed');
-                    return this.next();
-                }
-                return false;
-            }.bind(this)
-        );
+        .listenFor('update')
+        .of({
+            'id': Config.tenant_id,
+            'type': 'tenant',
+            'cloud': 'source',
+            'action': 'migration'
+        })
+        .execute(function (m) {
+            console.log('Tenant ' + tenant.id + ' migration started');
+            return this.next();
+        }.bind(this));
+
+    this.test_case.events.startListening();
 });
 
-MigrateTestCase.addStep('Saving previous cloud configuration', function () {
-    'use strict';
+MigrateTestCase.addStep('Handle tenant migration finish event', function () {
+    var tenant = this.test_case.context.tenant;
+
+    this.test_case.events
+        .listenFor('update')
+        .of({
+            'id': Config.tenant_id,
+            'type': 'tenant',
+            'cloud': 'source',
+            'action': ''
+        })
+        .execute(
+            function (m) {
+                console.log('Tenant ' + tenant.id + ' migration completed');
+                return this.next();
+            }.bind(this)
+        );
+
+    this.test_case.events.startListening();
+});
+
+
+MigrateTestCase.addStep('Save previous cloud configuration', function () {
     var context = this.test_case.context;
 
     context.initial_state = context.state;
@@ -88,8 +101,7 @@ MigrateTestCase.addStep('Saving previous cloud configuration', function () {
 
 MigrateTestCase.repeatStep(0);
 
-MigrateTestCase.addStep('Looking for preconfigured tenant in destination cloud', function () {
-    'use strict';
+MigrateTestCase.addStep('Look for preconfigured tenant in destination cloud', function () {
     var context = this.test_case.context,
         tenant = context.tenant,
         b = context.state,
@@ -110,7 +122,6 @@ MigrateTestCase.addStep('Looking for preconfigured tenant in destination cloud',
 });
 
 MigrateTestCase.getTenantServers = function (tenant_id, resources, cloud) {
-    'use strict';
     var servers = {},
         tenant_servers = resources.getAll({
             'type': 'server',
@@ -165,7 +176,6 @@ MigrateTestCase.getTenantServers = function (tenant_id, resources, cloud) {
 };
 
 MigrateTestCase.makeServerPrintable = function (s) {
-    'use strict';
     return JSON.stringify({
         'id': s.id,
         'name': s.data.name,
@@ -175,7 +185,6 @@ MigrateTestCase.makeServerPrintable = function (s) {
 };
 
 MigrateTestCase.assureServersEqual = function (s1, s2) {
-    'use strict';
     var i, s, so;
     for (i in s1) {
         if (s1.hasOwnProperty(i)) {
@@ -199,8 +208,7 @@ MigrateTestCase.assureServersEqual = function (s1, s2) {
     }
 };
 
-MigrateTestCase.addStep('Making sure tenants are equal', function () {
-    'use strict';
+MigrateTestCase.addStep('Make sure tenants are equal', function () {
     var context = this.test_case.context,
         old = context.tenant,
         now = context.new_tenant,

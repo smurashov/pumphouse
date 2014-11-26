@@ -1,35 +1,52 @@
+/*jslint node:true*/
+
+'use strict';
+
 var TestCase = require('./test_case');
 
 var ResetTestCase = new TestCase('Environments reset');
 
-ResetTestCase.addStep('Calling API to reset and checking reset started event is sent', function () {
+ResetTestCase.addStep('Call API to reset', function () {
+    this.test_case.api.reset(function (err, res) {
+        if (err) {
+            this.fail('Resetting error');
+        }
+    }.bind(this));
+
+    this.next();
+});
+
+ResetTestCase.addStep('Handle reset started event', function () {
     this.test_case.events
-        .on('reset start')
+        .listenFor('reset start')
         .execute(function (m) {
             console.log('Reset started event received');
             return this.next();
         }.bind(this));
 
-    this.test_case.api.reset(function (err, res) {
-        if (err) this.fail('Resetting error');
-        this.next();
-    }.bind(this));
+    this.test_case.events.startListening();
 });
 
-ResetTestCase.addStep('Fetching reset completion events for both clouds', function () {
+ResetTestCase.addStep('Fetch reset completion events for both clouds', function () {
     var completed_for = {};
-    this.test_case.events
-        .on('reset completed')
-        .execute(function (m) {
-            completed_for[m.cloud] = true;
-            console.log('Reset completed for ' + m.cloud + ' cloud');
 
-            if (completed_for['source'] && completed_for['destination']) {
+    this.test_case.events
+        .listenFor('reset completed')
+        .repeat(2)
+        .execute(function (m) {
+            completed_for[m.entity.cloud] = true;
+            console.log('Reset completed for ' + m.entity.cloud + ' cloud');
+
+            if (completed_for.source && completed_for.destination) {
                 console.log('Reset completed');
                 return this.next();
+            } else {
+                this.test_case.events.startListening();
             }
             return false;
-        }.bind(this))
+        }.bind(this));
+
+    this.test_case.events.startListening();
 });
 
 exports.testcase = ResetTestCase;
