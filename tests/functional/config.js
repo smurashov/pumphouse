@@ -11,6 +11,5 @@ module.exports = {
         'evaculate',
         'reassign'
     ],
-    tenant_id: '74b06486e02347198f6ef3eb1eac82cd',
-    host_id: 'host1_id'
+    tenant_name: 'it'
 };

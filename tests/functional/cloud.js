@@ -61,7 +61,7 @@ CloudResources.prototype.getAll = function (params) {
 
     for (k in params) {
         if (params.hasOwnProperty(k)) {
-            s += (s ? ' && "' : '"') + params[k] + '"==a.' + k;
+            s += (s ? ' && "' : '"') + params[k] + '"===a.' + k;
         }
     }
 

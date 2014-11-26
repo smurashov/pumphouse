@@ -22,20 +22,20 @@ MigrateTestCase.addStep('Call /resources API to fetch resources', function () {
 MigrateTestCase.addStep('Look for preconfigured tenant in source cloud', function () {
     var context = this.test_case.context,
         b = context.state,
-        t = b.get({
-            'id': Config.tenant_id,
+        t = b.getAll({
             'type': 'tenant',
-            'cloud': 'source'
+            'cloud': 'source',
+            'data.name': Config.tenant_name
         });
 
     console.log('Got cloud resources', b.toString());
 
     // Looking for predefined tenant in the source cloud
-    if (t) {
-        context.tenant = t;
+    if (t.length) {
+        context.tenant = t[0];
         return this.next();
     }
-    this.fail('Unable to find tenant "' + Config.tenant_id + '" in source cloud');
+    this.fail('Unable to find tenant "' + Config.tenant_name + '" in source cloud');
 });
 
 MigrateTestCase.addStep('Initiate tenant migration', function () {
@@ -57,7 +57,7 @@ MigrateTestCase.addStep('Handle tenant migration start event', function () {
     this.test_case.events
         .listenFor('update')
         .of({
-            'id': Config.tenant_id,
+            'id': tenant.id,
             'type': 'tenant',
             'cloud': 'source',
             'action': 'migration'
@@ -76,7 +76,7 @@ MigrateTestCase.addStep('Handle tenant migration finish event', function () {
     this.test_case.events
         .listenFor('update')
         .of({
-            'id': Config.tenant_id,
+            'id': tenant.id,
             'type': 'tenant',
             'cloud': 'source',
             'action': ''
