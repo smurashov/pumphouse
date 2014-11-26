@@ -3,7 +3,6 @@
 'use strict';
 
 var TestCase = require('./test_case');
-var Config = require('./config');
 var Cloud = require('./cloud');
 
 var EvacuateTestCase = new TestCase('Host evacuation');
@@ -21,22 +20,36 @@ EvacuateTestCase.addStep('Call /resources API to fetch resources', function () {
 
 EvacuateTestCase.addStep('Look for preconfigured host in source cloud', function () {
     var context = this.test_case.context,
+        res = context.state.resources,
         b = context.state,
-        h = b.get({
-            'id': Config.host_id,
-            'type': 'host',
-            'cloud': 'source'
-        });
+        hosts = 0,
+        host,
+        i,
+        j;
 
     console.log('Got clouds resources', b.toString());
 
-    // Looking for predefined tenant in the source cloud
-    if (h) {
-        console.log('Host ' + Config.host_id + ' found in source cloud');
-        context.host = h;
+    // Looking for the host
+    for (i in res) {
+        if (res.hasOwnProperty(i)) {
+            j = res[i];
+            if (j.type === 'host' && j.cloud === 'source') {
+                hosts += 1;
+                host = j;
+            }
+        }
+    }
+
+    if (hosts <= 1) {
+        this.fail('Source cloud has the only ' + hosts + ' hosts. Unable to evacuate.');
+    }
+
+    if (host) {
+        console.log('Host ' + JSON.stringify(host) + ' picked randomly in source cloud');
+        context.host = host;
         return this.next();
     }
-    this.fail('Unable to find host "' + Config.host_id + '" in source cloud');
+    this.fail('Unable to find host in source cloud');
 });
 
 EvacuateTestCase.addStep('Initiate host evacuation', function () {
@@ -56,7 +69,7 @@ EvacuateTestCase.addStep('Listen for host evacuation start event', function () {
     this.test_case.events
         .listenFor('update')
         .of({
-            'id': Config.host_id,
+            'id': host.id,
             'type': 'host',
             'cloud': 'source',
             'action': 'evacuation'
@@ -77,10 +90,10 @@ EvacuateTestCase.addStep('Listen for host evacuation finish event', function () 
     this.test_case.events
         .listenFor('update')
         .of({
-            'id': Config.host_id,
+            'id': host.id,
             'type': 'host',
             'cloud': 'source',
-            'action': ''
+            'action': null
         })
         .execute(function (m) {
             console.log('Host ' + host.name + ' evacuation completed');

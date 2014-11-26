@@ -3,7 +3,6 @@
 'use strict';
 
 var TestCase = require('./test_case');
-var Config = require('./config');
 var Cloud = require('./cloud');
 
 var ReassignTestCase = new TestCase('Host reassignment');
@@ -20,24 +19,34 @@ ReassignTestCase.addStep('Call /resources API to fetch resources', function () {
     }.bind(this));
 });
 
-ReassignTestCase.addStep('Look for preconfigured host in source cloud', function () {
+ReassignTestCase.addStep('Look for BLOCKED host in source cloud', function () {
     var context = this.test_case.context,
+        res = context.state.resources,
         b = context.state,
-        h = b.get({
-            'id': Config.host_id,
-            'type': 'host',
-            'cloud': 'source'
-        });
+        host,
+        i,
+        j;
 
     console.log('Got clouds resources', b.toString());
 
-    // Looking for predefined tenant in the source cloud
-    if (h) {
-        console.log('Host ' + Config.host_id + ' found in source cloud');
-        context.host = h;
+    // Looking for the blocked host
+    for (i in res) {
+        if (res.hasOwnProperty(i)) {
+            j = res[i];
+            if (j.type === 'host' &&
+                    j.cloud === 'source' &&
+                    j.data.status === 'blocked') {
+                host = j;
+            }
+        }
+    }
+
+    if (host) {
+        console.log('Blocked host ' + JSON.stringify(host) + ' found in source cloud');
+        context.host = host;
         return this.next();
     }
-    this.fail('Unable to find host "' + Config.host_id + '" in source cloud');
+    this.fail('Unable to find blocked host in source cloud');
 });
 
 ReassignTestCase.addStep('Initiate host reassignment [POST] /host', function () {
@@ -58,7 +67,7 @@ ReassignTestCase.addStep('Listen for host reassignment start event', function ()
     this.test_case.events
         .listenFor('update')
         .of({
-            'id': Config.host_id,
+            'id': host.id,
             'type': 'host',
             'cloud': 'source',
             'action': 'reassignment'
@@ -79,7 +88,7 @@ ReassignTestCase.addStep('Listen for host deletion event', function () {
     this.test_case.events
         .listenFor('delete')
         .of({
-            'id': Config.host_id,
+            'id': host.id,
             'type': 'host',
             'cloud': 'source'
         })
@@ -122,7 +131,7 @@ ReassignTestCase.addStep('Listen for host reassignment completion event', functi
             'id': new_host.id,
             'type': 'host',
             'cloud': 'destination',
-            'action': ''
+            'action': null
         })
         .execute(function (m) {
             console.log('Host ' + m.entity.id + ' reassignment completed');

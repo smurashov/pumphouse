@@ -177,13 +177,17 @@ function EventsListener(path) {
         'update',
         'delete',
 
-        'error',
-
         'reset start',
         'reset completed'
     ].map(function (name) {
         this.socket.on(name, this.handlerFactory(name));
     }, this);
+
+    // Bind error handler separately
+    this.socket.on('error', function (event) {
+        console.log('Error event received: ', JSON.stringify(event));
+        process.exit(1);
+    });
 
     return this.handlers;
 }
