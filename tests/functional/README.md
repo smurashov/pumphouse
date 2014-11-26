@@ -1,4 +1,4 @@
-Functional tests suite for Pumphouse
+﻿Functional tests suite for Pumphouse
 ====================================
 
 This set of scripts represents simple suite for functional testing of the Pumphouse project via REST API it exposes and SocketIO bus it reports states to. It is implemented as several test-case modules and runner script implemented on node.js.
