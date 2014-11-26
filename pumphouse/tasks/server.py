@@ -232,7 +232,9 @@ def reprovision_server(context, server, server_nics):
         context,
         server_id,
         getattr(server,
-                "os-extended-volumes:volumes_attached"))
+                "os-extended-volumes:volumes_attached"),
+        server.user_id,
+        server.tenant_id)
     pre_boot_tasks = pre_boot_tasks + [migrate_server_volumes]
 
     flow = linear_flow.Flow("migrate-server-{}".format(server_id))

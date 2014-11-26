@@ -110,10 +110,14 @@ class CreateVolumeTask(task.BaseCloudTask):
 
 
 class CreateVolumeFromImage(CreateVolumeTask):
-    def execute(self, volume_info, image_info):
+    def execute(self, volume_info, image_info, user_info, tenant_info):
         image_id = image_info["id"]
+        restrict_cloud = self.cloud.restrict(
+            username=user_info["name"],
+            tenant_name=tenant_info["name"],
+            password="default")
         try:
-            volume = self.cloud.cinder.volumes.create(
+            volume = restrict_cloud.cinder.volumes.create(
                 volume_info["size"],
                 display_name=volume_info["display_name"],
                 display_description=volume_info["display_description"],
@@ -160,7 +164,7 @@ class DeleteVolume(task.BaseCloudTask):
             volume = utils.wait_for(volume.id, self.cloud.cinder.volumes.get,
                                     stop_excs=(
                                         exceptions.cinder_excs.NotFound,))
-            LOG.info("Deleted: %s", str(volume._info))
+            LOG.info("Deleted: %s", str(volume_info))
 
     def execute(self, volume_info, **requires):
         self.do_delete(volume_info)
@@ -176,7 +180,7 @@ class DeleteSourceVolume(DeleteVolume):
                 self.do_delete(volume_info)
 
         except exceptions.cinder_excs.NotFound as exc:
-            LOG.info("Volume: %s allready deleted before", str(volume._info))
+            LOG.info("Volume: %s allready deleted before", str(volume_info))
             pass
 
 
@@ -224,7 +228,8 @@ def migrate_detached_volume(context, volume_id):
     return flow
 
 
-def migrate_attached_volume(context, server_id, volume_id):
+def migrate_attached_volume(context, server_id, volume_id,
+                            user_id, tenant_id):
     volume_binding = "volume-{}".format(volume_id)
     volume_retrieve = "{}-retrieve".format(volume_binding)
     volume_clone = "{}-clone".format(volume_binding)
@@ -237,6 +242,8 @@ def migrate_attached_volume(context, server_id, volume_id):
     server_retrieve = "{}-retrieve".format(server_binding)
     server_suspend = "{}-suspend".format(server_binding)
     volume_sync = "{}-sync".format(volume_binding)
+    user_ensure = "user-{}-ensure".format(user_id)
+    tenant_ensure = "tenant-{}-ensure".format(tenant_id)
 
     flow = graph_flow.Flow("migrate-{}".format(volume_binding))
     flow.add(RetrieveVolume(context.src_cloud,
@@ -256,13 +263,15 @@ def migrate_attached_volume(context, server_id, volume_id):
                                            context.dst_cloud,
                                            name=image_ensure,
                                            provides=image_ensure,
-                                           rebind=[volume_image],
-                                           inject={"user_info": None}),
+                                           rebind=[volume_image,
+                                                   user_ensure]),
              CreateVolumeFromImage(context.dst_cloud,
                                    name=volume_ensure,
                                    provides=volume_ensure,
                                    rebind=[volume_binding,
-                                           image_ensure]),
+                                           image_ensure,
+                                           user_ensure,
+                                           tenant_ensure]),
              DeleteVolume(context.src_cloud,
                           name=volume_delete,
                           rebind=[volume_clone],
@@ -276,7 +285,8 @@ def migrate_attached_volume(context, server_id, volume_id):
     return flow
 
 
-def migrate_server_volumes(context, server_id, attachments):
+def migrate_server_volumes(context, server_id, attachments,
+                           user_id, tenant_id):
     server_block_devices = []
     flow = graph_flow.Flow("migrate-server-{}-volumes".format(server_id))
     for attachment in attachments:
@@ -286,7 +296,9 @@ def migrate_server_volumes(context, server_id, attachments):
             server_block_devices.append("volume-{}-mapping".format(volume_id))
             volume_flow = migrate_attached_volume(context,
                                                   server_id,
-                                                  volume_id)
+                                                  volume_id,
+                                                  user_id,
+                                                  tenant_id)
             flow.add(volume_flow)
 
     server_device_mapping = "server-{}-device-mapping".format(server_id)
