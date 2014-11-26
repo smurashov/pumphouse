@@ -299,6 +299,21 @@ class Subnet(base.Plugin):
     default = "nova"
 
 
+class Network(base.Plugin):
+    plugin_key = "network"
+    default = "nova"
+
+
+class FloatingIP(base.Plugin):
+    plugin_key = "network"
+    default = "nova"
+
+
+class Nic(base.Plugin):
+    plugin_key = "network"
+    default = "nova"
+
+
 @Subnet.register("nova")
 class NovaSubnet(EventResource):
     data_id_key = "cidr"
@@ -306,11 +321,6 @@ class NovaSubnet(EventResource):
 
     create = task(name="create")
     delete = task(name="delete", before=[create])
-
-
-class Network(base.Plugin):
-    plugin_key = "network"
-    default = "nova"
 
 
 @Network.register("nova")
@@ -341,11 +351,6 @@ class NovaNetwork(EventResource):
     def delete(self):
         self.env.cloud.nova.networks.disassociate(self.data["id"])
         self.env.cloud.nova.networks.delete(self.data["id"])
-
-
-class FloatingIP(base.Plugin):
-    plugin_key = "network"
-    default = "nova"
 
 
 @FloatingIP.register("nova")
@@ -412,11 +417,6 @@ class NovaFixedIP(EventResource):
         }
 
     delete = task(name="delete", before=[network.delete])
-
-
-class Nic(base.Plugin):
-    plugin_key = "network"
-    default = "nova"
 
 
 @Nic.register("nova")
