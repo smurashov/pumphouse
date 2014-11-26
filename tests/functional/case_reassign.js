@@ -131,7 +131,7 @@ ReassignTestCase.addStep('Listen for host reassignment completion event', functi
             'id': new_host.id,
             'type': 'host',
             'cloud': 'destination',
-            'action': ''
+            'action': null
         })
         .execute(function (m) {
             console.log('Host ' + m.entity.id + ' reassignment completed');

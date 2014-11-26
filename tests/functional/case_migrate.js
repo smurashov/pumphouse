@@ -94,7 +94,7 @@ MigrateTestCase.addStep('Handle tenant migration finish event', function () {
             'id': tenant.id,
             'type': 'tenant',
             'cloud': 'source',
-            'action': ''
+            'action': null
         })
         .execute(
             function (m) {

@@ -93,7 +93,7 @@ EvacuateTestCase.addStep('Listen for host evacuation finish event', function () 
             'id': host.id,
             'type': 'host',
             'cloud': 'source',
-            'action': ''
+            'action': null
         })
         .execute(function (m) {
             console.log('Host ' + host.name + ' evacuation completed');
