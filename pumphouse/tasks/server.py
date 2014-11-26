@@ -170,7 +170,7 @@ class BootServerFromImage(task.BaseCloudTask):
             password="default")
         server = restrict_cloud.nova.servers.create(
             server_info["name"], image_info["id"], flavor_info["id"],
-            boot_device_mapping=server_dm, nics=server_nics)
+            block_device_mapping=server_dm, nics=server_nics)
         server = utils.wait_for(server, self.cloud.nova.servers.get,
                                 value="ACTIVE")
         spawn_server_info = server.to_dict()
@@ -233,7 +233,7 @@ def reprovision_server(context, server, server_nics):
         server_id,
         getattr(server,
                 "os-extended-volumes:volumes_attached"))
-    pre_boot_tasks = pre_boot_tasks + migrate_server_volumes
+    pre_boot_tasks = pre_boot_tasks + [migrate_server_volumes]
 
     flow = linear_flow.Flow("migrate-server-{}".format(server_id))
     # NOTE(akscram): The synchronization point avoids excessive downtime
