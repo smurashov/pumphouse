@@ -39,6 +39,11 @@ class TestVolume(unittest.TestCase):
         }
         self.user_info = {
             "id": "345",
+            "name": "test-user-name",
+        }
+        self.tenant_info = {
+            "id": "456",
+            "name": "test-tenant-name",
         }
         self.upload_info = {
             "id": self.test_volume_id,
@@ -100,7 +105,7 @@ class TestUploadVolume(TestVolume):
         self.cloud.cinder.volumes.upload_to_image.assert_called_once_with(
             self.test_volume_id,
             False,
-            "volume-{}-image".format(self.volume_info["id"]),
+            "pumphouse-volume-{}-image".format(self.volume_info["id"]),
             'bare',
             'raw')
         self.assertEqual(len(self.cloud.glance.images.get.call_args), 2)
@@ -130,6 +135,7 @@ class TestCreateVolumeFromImage(TestVolume):
         create_volume = volume.CreateVolumeFromImage(self.cloud)
         self.assertIsInstance(create_volume, task.BaseCloudTask)
         create_volume.create_volume_event = Mock()
+        self.cloud.restrict.return_value = self.cloud
         create_volume_dict = {
             "display_name": self.volume_info["display_name"],
             "display_description": self.volume_info["display_description"],
@@ -137,7 +143,9 @@ class TestCreateVolumeFromImage(TestVolume):
         }
 
         volume_info = create_volume.execute(self.volume_info,
-                                            self.image_info)
+                                            self.image_info,
+                                            self.user_info,
+                                            self.tenant_info)
         self.cloud.cinder.volumes.create.assert_called_once_with(
             self.volume_info["size"], **create_volume_dict)
         self.assertEqual(len(self.cloud.cinder.volumes.get.call_args), 2)
@@ -145,12 +153,15 @@ class TestCreateVolumeFromImage(TestVolume):
 
     def test_execute_bad_request(self):
         create_volume = volume.CreateVolumeFromImage(self.cloud)
+        self.cloud.restrict.return_value = self.cloud
         self.cloud.cinder.volumes.create.side_effect = \
             exceptions.cinder_excs.BadRequest("400 Bad Request")
 
         with self.assertRaises(exceptions.cinder_excs.BadRequest):
             create_volume.execute(self.volume_info,
-                                  self.image_info)
+                                  self.image_info,
+                                  self.user_info,
+                                  self.tenant_info)
 
 
 class TestMigrateVolume(TestVolume):
@@ -213,4 +224,6 @@ class TestMigrateAttachedVolume(TestMigrateVolume):
     def test_migrate_attached_volume(self):
         flow = volume.migrate_attached_volume(self.context,
                                               self.test_server_id,
-                                              self.test_volume_id)
+                                              self.test_volume_id,
+                                              self.user_info,
+                                              self.tenant_info)
