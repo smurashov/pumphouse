@@ -67,7 +67,7 @@ class UploadVolume(task.BaseCloudTask):
             resp, upload_info = self.cloud.cinder.volumes.upload_to_image(
                 volume_id,
                 False,
-                "volume-{}-image".format(volume_id),
+                "pumphouse-volume-{}-image".format(volume_id),
                 'bare',
                 'raw')
         except Exception as exc:
