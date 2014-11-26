@@ -11,5 +11,5 @@ module.exports = {
         'evaculate',
         'reassign'
     ],
-    tenant_name: 'it'
+    tenant_name_mask: 'pumphouse-'
 };
