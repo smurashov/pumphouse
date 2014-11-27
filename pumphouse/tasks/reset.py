@@ -510,7 +510,7 @@ class Volume(EventResource):
                                     value="available")
             self.data = volume._info
 
-    @task(requires=[detach])
+    @task(before=[create], requires=[detach])
     def delete(self):
         self.env.cloud.cinder.volumes.delete(self.data["id"])
 
