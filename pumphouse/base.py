@@ -50,7 +50,7 @@ class Service(object):
 
     def reset(self, events, cloud):
         try:
-            env = reset.Environment(cloud, {})
+            env = reset.Environment(cloud, self.plugins)
 
             runner = base.TaskflowRunner(env)
             cleanup_workload = runner.get_resource(reset.CleanupWorkload,
