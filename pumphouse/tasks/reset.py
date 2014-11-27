@@ -590,33 +590,6 @@ class Server(EventResource):
                        stop_excs=(nova_excs.NotFound,))
 
 
-class VolumeAttachment(EventResource):
-    @Volume()
-    def volume(self):
-        return {"id": self.data["volumeId"]}
-
-    @Server()
-    def server(self):
-        return {"id": self.data["serverId"]}
-
-    @task(requires=[volume.create, server.create])
-    def create(self):
-        attachment = self.env.cloud.cinder.volumes.create_server_volume(
-            self.data["serverId"], self.data["volumeId"], "auto")
-        self.data = attachment._info
-        volume = utils.wait_for(self.data["volumeId"],
-                                self.env.cloud.nova.volumes.get,
-                                value="in-use")
-
-    @task(requires=[create])
-    def delete(self):
-        self.env.cloud.cinder.volumes.delete_server_volume(
-            self.data["serverId"][0], self.data["volumeId"])
-        utils.wait_for(self.data["id"],
-                       self.env.cloud.cinder.volumes.get,
-                       stop_excs=cinder_excs.NotFound)
-
-
 class CleanupWorkload(EventResource):
     @base.Collection(Tenant)
     def tenants(self):
