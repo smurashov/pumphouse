@@ -36,9 +36,12 @@ def is_prefixed(string):
     return string.startswith(TEST_RESOURCE_PREFIX)
 
 
-def filter_prefixed(lst, dict_=False, key="name"):
-    return [(dict(e) if dict_ else e.to_dict())
-            for e in lst if is_prefixed(getattr(e, key))]
+def filter_prefixed(lst, convert_fn=None, key="name"):
+    if convert_fn is None:
+        items = (e.to_dict() for e in lst)
+    else:
+        items = itertools.imap(convert_fn, lst)
+    return [e for e in items if is_prefixed(e[key])]
 
 
 def make_kwargs(**kwargs):
@@ -445,6 +448,182 @@ class NovaNic(EventResource):
     delete = task(name="delete", includes=[fixed_ip.delete])
 
 
+@Subnet.register("neutron")
+class NeutronSubnet(EventResource):
+    @classmethod
+    def get_id_for(cls, data):
+        return (NeutronNetwork.get_id_for(data["network"]), data["cidr"])
+
+    def event_id(self):
+        return "_".join(self.get_id_for(self.data))
+
+    @task
+    def create(self):
+        subnet = self.env.cloud.neutron.create_subnet({"subnet": {
+            "network_id": self.data["network"]["id"],
+            "cidr": self.data["cidr"],
+            "ip_version": 4,
+        }})["subnet"]
+        self.data = dict(
+            subnet,
+            network=self.data["network"],
+        )
+
+    @task(before=[create])
+    def delete(self):
+        self.env.cloud.neutron.delete_subnet(self.data["id"])
+
+
+@Network.register("neutron")
+class NeutronNetwork(EventResource):
+    events_type = "network"
+
+    @classmethod
+    def get_id_for(cls, data):
+        try:
+            return data["label"]
+        except KeyError:
+            return data["name"]
+
+    @Tenant()
+    def tenant(self):
+        return self.data["tenant"]
+
+    @Subnet()
+    def subnet(self):
+        try:
+            # FIXME(yorik-sar): multiple subnets support
+            subnet_id = self.data["subnets"][0]
+        except KeyError:
+            subnet = {"cidr": self.data["cidr"]}
+        else:
+            subnet = self.env.cloud.neutron.show_subnet(subnet_id)["subnet"]
+        subnet["network"] = self.data
+        return subnet
+
+    @task(requires=[subnet.create])
+    def save_subnet(self):
+        self.data = dict(
+            self.data,
+            subnets=[self.subnet["id"]],
+        )
+
+    @task(requires=[tenant.create], includes=[subnet.create, save_subnet])
+    def create(self):
+        cloud = self.env.cloud.restrict(
+            tenant_name=self.tenant["name"],
+        )
+        network = cloud.neutron.create_network({"network": {
+            "name": self.data["label"],
+            "tenant_id": self.tenant["id"],
+        }})["network"]
+        network["tenant"] = self.data["tenant"]
+        self.data = network
+        self.subnet["network"] = network
+
+    @task(before=[subnet.delete])
+    def clear_ports(self):
+        neutron = self.env.cloud.neutron
+        for port in neutron.list_ports(network_id=self.data["id"])["ports"]:
+            neutron.delete_port(port["id"])
+
+    @task(before=[create], requires=[clear_ports, subnet.delete])
+    def delete(self):
+        self.env.cloud.neutron.delete_network(self.data["id"])
+
+
+class NeutronPort(EventResource):
+    @classmethod
+    def get_id_for(cls, data):
+        return (
+            NeutronNetwork.get_id_for(data["network"]),
+            data["address"],
+        )
+
+    def event_id(self):
+        return "_".join(self.get_id_for(self.data))
+
+    @NeutronNetwork()
+    def network(self):
+        return self.data["network"]
+
+    @task(requires=[network.create])
+    def create(self):
+        cloud = self.env.cloud.restrict(
+            tenant_name=self.network["tenant"]["name"],
+        )
+        port = cloud.neutron.create_port(body={"port": {
+            "network_id": self.network["id"],
+            "fixed_ips": [{
+                # FIXME(yorik-sar): select proper subnet
+                "subnet_id": self.network["subnets"][0],
+                "address": self.data["address"],
+            }],
+        }})["port"]
+        self.data = dict(
+            port,
+            network=self.data["network"],
+            address=self.data["address"],
+        )
+
+    @task(before=[network.delete, create])
+    def delete(self):
+        self.env.cloud.neutron.delete_port(self.data["id"])
+
+
+@FloatingIP.register("neutron")
+class NeutronFloatingIP(EventResource):
+    data_id_key = "address"
+    event_id_key = "address"
+    events_type = "floating_ip"
+
+    def event_data(self):
+        data = self.data.copy()
+        data["name"] = data["address"]
+        return data
+
+    @task
+    def create(self):
+        pass
+
+    @task(requires=[create])
+    def associate(self):
+        pass
+
+    @task
+    def disassociate(self):
+        pass
+
+    @task(before=[create], requires=[disassociate])
+    def delete(self):
+        pass
+
+
+@Nic.register("neutron")
+class NeutronNic(EventResource):
+    @classmethod
+    def get_id_for(cls, data):
+        return NeutronPort.get_id_for(data["fixed_ip"])
+
+    def event_id(self):
+        return "_".join(self.get_id_for(self.data))
+
+    @NeutronPort()
+    def port(self):
+        return self.data["fixed_ip"]
+
+    @task(requires=[port.create])
+    def create(self):
+        self.data = {
+            "fixed_ip": self.data["fixed_ip"],
+            "nic": {
+                "port-id": self.port["id"],
+            },
+        }
+
+    delete = task(name="delete", includes=[port.delete])
+
+
 class Server(EventResource):
     def event_data(self):
         data = self.data.copy()
@@ -540,7 +719,11 @@ class CleanupWorkload(EventResource):
             server_id = floating_ip["instance_uuid"]
             if server_id:
                 floating_ips[server_id].append(floating_ip)
-        networks = {network["label"]: network for network in self.networks}
+        if self.env.plugins.get("network", "nova") == "nova":
+            name_key = "label"
+        else:
+            name_key = "name"
+        networks = {network[name_key]: network for network in self.networks}
         for server in servers:
             server["tenant"] = tenants[server["tenant_id"]]
             server["floating_ips"] = floating_ips[server["id"]]
@@ -571,8 +754,15 @@ class CleanupWorkload(EventResource):
 
     @base.Collection(Network)
     def networks(self):
-        networks = self.env.cloud.nova.networks.list()
-        return filter_prefixed(networks, key="label")
+        plugin = self.env.plugins.get("network", "nova")
+        if plugin == "nova":
+            networks = self.env.cloud.nova.networks.list()
+            return filter_prefixed(networks, key="label")
+        elif plugin == "neutron":
+            networks = self.env.cloud.neutron.list_networks()["networks"]
+            return filter_prefixed(networks, convert_fn=lambda x: x)
+        else:
+            assert False
 
     @base.Collection(FloatingIP)
     def floating_ips(self):
@@ -581,7 +771,8 @@ class CleanupWorkload(EventResource):
 
     @base.Collection(Image)
     def images(self):
-        return filter_prefixed(self.env.cloud.glance.images.list(), dict_=True)
+        return filter_prefixed(self.env.cloud.glance.images.list(),
+                               convert_fn=dict)
 
     delete = base.task(name="delete", requires=[
         tenants.each().delete,
