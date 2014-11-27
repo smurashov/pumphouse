@@ -19,7 +19,6 @@ import random
 import tempfile
 import urllib
 
-from cinderclient import exceptions as cinder_excs
 import netaddr
 from novaclient import exceptions as nova_excs
 
