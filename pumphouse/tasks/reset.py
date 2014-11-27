@@ -848,7 +848,6 @@ class SetupWorkload(EventResource):
                 next(addrs)
             nets = tenant_nets.setdefault(network["tenant"]["name"], [])
             nets.append((network, addrs))
-        volumes = {volume["id"]: volume for volume in self.volumes}
         for tenant in self.tenants:
             for server in get_base_servers(tenant):
                 volumes = list(server_volumes(tenant, server))
