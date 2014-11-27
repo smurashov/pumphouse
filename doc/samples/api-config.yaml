@@ -61,12 +61,25 @@ CLOUDS:
               - name: pumphouse-test-0001
                 description: "pumphouse test tenant 0001"
                 username: pumphouse-test-user-0001
+                volumes:
+                  - &volume-1
+                    display_name: pumphouse-volume-1
+                    size: 1
+                  - &volume-2
+                    display_name: pumphouse-volume-2
+                    size: 1
+                  - &volume-3
+                    display_name: pumphouse-volume-3
+                    size: 1
                 servers:
                   - name: pumphouse-test-instance-0001
                     flavor:
                       <<: *small
                     image:
                       <<: *image
+                    volumes:
+                      - <<: *volume-1
+                      - <<: *volume-2
                     pre-actions: &health_checks
                         -
                             - <<: *ping
@@ -90,6 +103,8 @@ CLOUDS:
                       <<: *medium
                     image:
                       <<: *image
+                    volumes:
+                      - <<: *volume-3
                   - name: pumphouse-test-instance-0003
                     flavor:
                       <<: *large

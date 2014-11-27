@@ -19,6 +19,7 @@ import random
 import tempfile
 import urllib
 
+from cinderclient import exceptions as cinder_excs
 import netaddr
 from novaclient import exceptions as nova_excs
 
@@ -454,6 +455,67 @@ class NovaNic(EventResource):
     delete = task(name="delete", includes=[fixed_ip.delete])
 
 
+class Volume(EventResource):
+    def event_data(self):
+        attachments = [attachment["server_id"]
+                       for attachment in self.data["attachments"]]
+        return {
+            "id": self.data["id"],
+            "status": self.data["status"],
+            "name": self.data["display_name"],
+            "tenant_id": self.data.get("os-vol-tenant-attr:tenant_id"),
+            "host_id": self.data.get("os-vol-host-attr:host"),
+            "server_ids": attachments,
+        }
+
+    @Tenant()
+    def tenant(self):
+        return self.data["tenant"]
+
+    @task(requires=[tenant.create])
+    def create(self):
+        cloud = self.env.cloud.restrict(
+            tenant_name=self.tenant["name"],
+        )
+        volume = cloud.cinder.volumes.create(
+            self.data["size"],
+            display_name=self.data["display_name"],
+        )
+        volume = utils.wait_for(volume.id, self.env.cloud.cinder.volumes.get,
+                                value="available")
+        self.data = dict(volume._info,
+                         **make_kwargs(
+                             server=self.data.get("server"),
+                         ))
+
+    @task(requires=[create])
+    def attach(self):
+        if self.data.get("server"):
+            device = None
+            self.env.cloud.nova.volumes.create_server_volume(
+                self.data["server"]["id"], self.data["id"], device)
+            volume = utils.wait_for(self.data["id"],
+                                    self.env.cloud.cinder.volumes.get,
+                                    value="in-use")
+            self.data = volume._info
+
+    @task
+    def detach(self):
+        for attachment in self.data["attachments"]:
+            server_id = attachment["server_id"]
+            self.env.cloud.nova.volumes.delete_server_volume(server_id,
+                                                             self.data["id"])
+        if self.data["attachments"]:
+            volume = utils.wait_for(self.data["id"],
+                                    self.env.cloud.cinder.volumes.get,
+                                    value="available")
+            self.data = volume._info
+
+    @task(requires=[detach])
+    def delete(self):
+        self.env.cloud.cinder.volumes.delete(self.data["id"])
+
+
 class Server(EventResource):
     def event_data(self):
         data = self.data.copy()
@@ -491,9 +553,14 @@ class Server(EventResource):
                 "fixed_ip": fixed_ip,
             }
 
+    @base.Collection(Volume)
+    def volumes(self):
+        return self.data["os-extended-volumes:volumes_attached"]
+
     @task(requires=[image.upload, tenant.create, flavor.create, user.create,
-                    nics.each().create, floating_ips.each().create],
-          includes=[floating_ips.each().associate])
+                    nics.each().create, floating_ips.each().create,
+                    volumes.each().create],
+          includes=[floating_ips.each().associate, volumes.each().attach])
     def create(self):
         cloud = self.env.cloud.restrict(
             username=self.user["name"],
@@ -511,14 +578,43 @@ class Server(EventResource):
         self.data = server = server.to_dict()
         for floating_ip in self.floating_ips:
             floating_ip["server"] = server
+        for volume in self.volumes:
+            volume["server"] = server
 
     @task(before=[tenant.delete],
-          requires=[floating_ips.each().disassociate],
+          requires=[floating_ips.each().disassociate, volumes.each().detach],
           includes=[nics.each().delete])
     def delete(self):
         self.env.cloud.nova.servers.delete(self.data["id"])
         utils.wait_for(self.data["id"], self.env.cloud.nova.servers.get,
                        stop_excs=(nova_excs.NotFound,))
+
+
+class VolumeAttachment(EventResource):
+    @Volume()
+    def volume(self):
+        return {"id": self.data["volumeId"]}
+
+    @Server()
+    def server(self):
+        return {"id": self.data["serverId"]}
+
+    @task(requires=[volume.create, server.create])
+    def create(self):
+        attachment = self.env.cloud.cinder.volumes.create_server_volume(
+            self.data["serverId"], self.data["volumeId"], "auto")
+        self.data = attachment._info
+        volume = utils.wait_for(self.data["volumeId"],
+                                self.env.cloud.nova.volumes.get,
+                                value="in-use")
+
+    @task(requires=[create])
+    def delete(self):
+        self.env.cloud.cinder.volumes.delete_server_volume(
+            self.data["serverId"][0], self.data["volumeId"])
+        utils.wait_for(self.data["id"],
+                       self.env.cloud.cinder.volumes.get,
+                       stop_excs=cinder_excs.NotFound)
 
 
 class CleanupWorkload(EventResource):
@@ -592,6 +688,15 @@ class CleanupWorkload(EventResource):
     def images(self):
         return filter_prefixed(self.env.cloud.glance.images.list(), dict_=True)
 
+    @base.Collection(Volume)
+    def volumes(self):
+        volumes = self.env.cloud.cinder.volumes.list(
+            search_opts={"all_tenants": 1})
+        for volume in volumes:
+            volume_info = volume._info
+            if is_prefixed(volume_info.get("display_name", "")):
+                yield volume_info
+
     delete = base.task(name="delete", requires=[
         tenants.each().delete,
         roles.each().delete,
@@ -602,6 +707,7 @@ class CleanupWorkload(EventResource):
         networks.each().delete,
         floating_ips.each().delete,
         images.each().delete,
+        volumes.each().delete,
     ])
 
 
@@ -749,8 +855,11 @@ class SetupWorkload(EventResource):
                 next(addrs)
             nets = tenant_nets.setdefault(network["tenant"]["name"], [])
             nets.append((network, addrs))
+        volumes = {volume["id"]: volume for volume in self.volumes}
         for tenant in self.tenants:
             for server in get_base_servers(tenant):
+                server_volumes = [dict(volume, id=volume["display_name"])
+                                  for volume in server.get("volumes", [])]
                 server.update({
                     "tenant": tenant,
                     "user": {
@@ -759,6 +868,7 @@ class SetupWorkload(EventResource):
                     },
                     "floating_ips": [],
                     "fixed_ips": [],
+                    "os-extended-volumes:volumes_attached": server_volumes,
                 })
                 for network, addrs in tenant_nets[tenant["name"]]:
                     fixed_ip = {
@@ -771,6 +881,14 @@ class SetupWorkload(EventResource):
                     server["floating_ips"].append(floating_ip)
                 yield server
 
+    @base.Collection(Volume)
+    def volumes(self):
+        for tenant in self.tenants:
+            for volume in tenant.get("volumes", ()):
+                volume["id"] = volume["display_name"]
+                volume["tenant"] = {"name": tenant["name"]}
+                yield volume
+
     create = base.task(name="create", requires=[
         tenants.each().create,
         users.each().create,
@@ -779,6 +897,7 @@ class SetupWorkload(EventResource):
         security_groups.each().create,
         networks.each().create,
         floating_ips.each().create,
+        volumes.each().create,
         servers.each().create,
     ])
 
