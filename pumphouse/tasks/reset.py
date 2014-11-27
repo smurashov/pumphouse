@@ -877,7 +877,7 @@ class SetupWorkload(EventResource):
         for tenant in self.tenants:
             for volume in tenant.get("volumes", ()):
                 volume["id"] = volume["display_name"]
-                volume["tenant"] = {"name": tenant["name"]}
+                volume["tenant"] = tenant
                 yield volume
 
     create = base.task(name="create", requires=[
