@@ -14,6 +14,7 @@
 
 import logging
 import operator
+import string
 import sys
 import time
 import traceback
@@ -82,7 +83,9 @@ def wait_for(resource, update_resource,
         if time.time() - start > timeout:
             raise exceptions.TimeoutException()
 
-counter = (chr(i) for i in range(ord('A'), ord('Z')))
+counter = (x + y
+           for x in [""] + list(string.uppercase)
+           for y in string.uppercase)
 ids = defaultdict(lambda: next(counter))
 id_re = re.compile(r"""
     [0-9a-fA-F]{8}(-?)(?:[0-9a-fA-F]{4}\1){3}[0-9a-fA-F]{12}  # UUID
@@ -101,7 +104,8 @@ def dump_flow(flow, f, first=False, prev=None):
     linear = isinstance(flow, taskflow.patterns.linear_flow.Flow)
     if first:
         f.write('digraph "%s" {\n'
-                'graph[rankdir=LR]\nnode[shape=box]\n' % (eat_ids(flow.name),))
+                'graph[rankdir=LR]\nnode[shape=box]\n'
+                'edge[style=dashed]' % (eat_ids(flow.name),))
     else:
         f.write('subgraph "cluster_%s" {\n'
                 'graph[style=%s,rankdir=LR]\n' % (

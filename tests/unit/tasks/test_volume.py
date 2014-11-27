@@ -155,7 +155,19 @@ class TestCreateVolumeFromImage(TestVolume):
                                   self.image_info)
 
 
-class TestMigrateDetachedVolume(TestVolume):
+class TestMigrateVolume(TestVolume):
+    def setUp(self):
+        super(TestMigrateVolume, self).setUp()
+        self.volume_binding = "volume-{}".format(self.test_volume_id)
+        self.volume_retrieve = "{}-retrieve".format(self.volume_binding)
+        self.volume_upload = "{}-upload".format(self.volume_binding)
+        self.image_ensure = "{}-image-ensure".format(self.volume_binding)
+        self.user_id = "none"
+        self.user_ensure = "user-{}-ensure".format(self.user_id)
+        self.volume_ensure = "{}-ensure".format(self.volume_binding)
+
+
+class TestMigrateDetachedVolume(TestMigrateVolume):
     @patch("pumphouse.tasks.image.EnsureSingleImage")
     @patch.object(volume, "CreateVolumeFromImage")
     @patch.object(volume, "UploadVolume")
@@ -166,40 +178,41 @@ class TestMigrateDetachedVolume(TestVolume):
                                      upload_vol_mock,
                                      create_vol_mock,
                                      ensure_img_mock):
-        volume_binding = "volume-{}".format(self.test_volume_id)
-        volume_retrieve = "{}-retrieve".format(volume_binding)
-        volume_upload = "{}-upload".format(volume_binding)
-        image_ensure = "{}-image-ensure".format(volume_binding)
-        user_id = "none"
-        user_ensure = "user-{}-ensure".format(user_id)
-        volume_ensure = "{}-ensure".format(volume_binding)
-        expected_store_dict = {volume_retrieve: self.test_volume_id,
-                               user_ensure: None}
-        flow = volume.migrate_detached_volume(self.context, self.volume)
+        expected_store_dict = {self.volume_retrieve: self.test_volume_id,
+                               self.user_ensure: None}
+        flow = volume.migrate_detached_volume(self.context,
+                                              self.test_volume_id)
 
-        retrieve_vol_mock.assert_called_once_with(self.context.src_cloud,
-                                                  name=volume_binding,
-                                                  provides=volume_binding,
-                                                  rebind=[volume_retrieve])
-        upload_vol_mock.assert_called_once_with(self.context.src_cloud,
-                                                name=volume_upload,
-                                                provides=volume_upload,
-                                                rebind=[volume_binding])
-        create_vol_mock.assert_called_once_with(self.context.dst_cloud,
-                                                name=volume_ensure,
-                                                provides=volume_ensure,
-                                                rebind=[volume_binding,
-                                                        image_ensure])
-        ensure_img_mock.assert_called_once_with(self.context.src_cloud,
-                                                self.context.dst_cloud,
-                                                name=image_ensure,
-                                                provides=image_ensure,
-                                                rebind=[volume_upload,
-                                                        user_ensure])
-        flow_mock.assert_called_once_with("migrate-{}".format(volume_binding))
+        retrieve_vol_mock.assert_called_once_with(
+            self.context.src_cloud, name=self.volume_binding,
+            provides=self.volume_binding, rebind=[self.volume_retrieve])
+        upload_vol_mock.assert_called_once_with(
+            self.context.src_cloud, name=self.volume_upload,
+            provides=self.volume_upload, rebind=[self.volume_binding])
+        create_vol_mock.assert_called_once_with(
+            self.context.dst_cloud, name=self.volume_ensure,
+            provides=self.volume_ensure,
+            rebind=[self.volume_binding, self.image_ensure])
+        ensure_img_mock.assert_called_once_with(
+            self.context.src_cloud, self.context.dst_cloud,
+            name=self.image_ensure, provides=self.image_ensure,
+            rebind=[self.volume_upload, self.user_ensure])
+        flow_mock.assert_called_once_with(
+            "migrate-{}".format(self.volume_binding))
         self.assertEqual(self.context.store, expected_store_dict)
         self.assertEqual(flow.add.call_args_list,
                          [call(retrieve_vol_mock()),
                           call(upload_vol_mock()),
                           call(ensure_img_mock()),
                           call(create_vol_mock())])
+
+
+class TestMigrateAttachedVolume(TestMigrateVolume):
+    def setUp(self):
+        super(TestMigrateVolume, self).setUp()
+        self.test_server_id = "456"
+
+    def test_migrate_attached_volume(self):
+        flow = volume.migrate_attached_volume(self.context,
+                                              self.test_server_id,
+                                              self.test_volume_id)
