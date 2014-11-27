@@ -355,9 +355,13 @@ class NovaFloatingIP(EventResource):
     events_type = "floating_ip"
 
     def event_data(self):
-        data = self.data.copy()
-        data["name"] = data["address"]
-        return data
+        return {
+            "name": self.data["address"],
+            "address": self.data["address"],
+            "interface": self.data.get("interface"),
+            "server_id": self.data.get("instance_uuid"),
+            "tenant_id": self.data.get("project_id"),
+        }
 
     @task
     def create(self):
@@ -427,6 +431,11 @@ class NovaNic(EventResource):
 
     def event_id(self):
         return "_".join(self.get_id_for(self.data))
+
+    def event_data(self):
+        return {
+            "address": self.fixed_ip["address"],
+        }
 
     @NovaFixedIP()
     def fixed_ip(self):
