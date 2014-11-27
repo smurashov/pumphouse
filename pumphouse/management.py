@@ -440,6 +440,22 @@ def setup_server_floating_ip(cloud, server):
         return server, floating_ip
 
 
+def setup_server_volume(cloud, server_id, volume_id):
+    try:
+        vol = cloud.nova.volumes.create_server_volume(
+            server_id, volume_id, None)
+    except nova_excs.NotFound:
+        LOG.exception("Resource not found: server %s, volume %s",
+                      server_id, volume_id)
+        raise
+    else:
+        vol = utils.wait_for(vol.id,
+                             cloud.cinder.volumes.get,
+                             value='in-use',
+                             timeout=120)
+        return vol
+
+
 def setup(plugins, events, cloud, target,
           num_tenants=0, num_servers=0, num_volumes=0, workloads={}):
 
@@ -526,6 +542,8 @@ def setup(plugins, events, cloud, target,
         become_admin_in_tenant(cloud, cloud.keystone.auth_ref.user_id, tenant)
         tenant_cloud = cloud.restrict(tenant_name=tenant.name)
         test_tenant_clouds[tenant.id] = tenant_cloud
+        test_servers = []
+        test_volumes = []
         setup_secgroup(tenant_cloud)
         user = cloud.keystone.users.create(
             name=tenant_dict["username"],
@@ -557,6 +575,7 @@ def setup(plugins, events, cloud, target,
                     LOG.exception("Volume not available in time: %s",
                                   str(volume._info))
                     raise exceptions.TimeoutException()
+            test_volumes.append(volume)
             LOG.info("Created: %s", str(volume._info))
             events.emit("volume create", {
                 "cloud": target,
@@ -571,6 +590,7 @@ def setup(plugins, events, cloud, target,
         for server_dict in tenant_dict["servers"]:
             server = setup_server(user_cloud, server_dict)
             LOG.info("Created server: %s", server._info)
+            test_servers.append(server)
             server, floating_ip = setup_server_floating_ip(cloud,
                                                            server)
             LOG.info("Assigned floating ip %s to server: %s",
@@ -592,4 +612,19 @@ def setup(plugins, events, cloud, target,
                 "id": floating_ip.address,
                 "server_id": server.id,
                 "cloud": target
+            }, namespace="/events")
+
+        for server, volume in zip(test_servers, test_volumes):
+            volume = setup_server_volume(user_cloud,
+                                         server.id,
+                                         volume.id)
+            LOG.info("Attached: %s", str(volume._info))
+            events.emit("volume attach", {
+                "cloud": target,
+                "id": volume._info["id"],
+                "status": "active",
+                "display_name": volume._info["display_name"],
+                "tenant_id": volume._info["os-vol-tenant-attr:tenant_id"],
+                "host_id": volume._info.get("os-vol-host-attr:host"),
+                "attachment_server_ids": [],
             }, namespace="/events")
