@@ -557,8 +557,7 @@ class Server(EventResource):
         return self.data["os-extended-volumes:volumes_attached"]
 
     @task(requires=[image.upload, tenant.create, flavor.create, user.create,
-                    nics.each().create, floating_ips.each().create,
-                    volumes.each().create],
+                    nics.each().create, floating_ips.each().create],
           includes=[floating_ips.each().associate, volumes.each().attach])
     def create(self):
         cloud = self.env.cloud.restrict(
