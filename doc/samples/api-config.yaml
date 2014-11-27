@@ -28,8 +28,10 @@ CLOUDS:
         identity:
             connection:  mysql+mysqlconnector://root:root@127.0.0.1/keystone
         populate:
+            num_tenants: 4
             num_servers: 3
-            num_tenants: 3
+            num_volumes: 2
+            volume_size: 1
         urls:
             horizon:        http://10.0.0.1/
         workloads:

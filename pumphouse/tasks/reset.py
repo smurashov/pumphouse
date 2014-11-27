@@ -802,6 +802,8 @@ class SetupWorkload(EventResource):
     @base.Collection(Server)
     def servers(self):
         num_servers = self.data["populate"].get("num_servers", 2)
+        num_volumes = self.data["populate"].get("num_volumes", 0)
+        volume_size = self.data["populate"].get("volume_size", 1)  # GB
 
         def get_base_servers(tenant):
             if "servers" in tenant:
@@ -819,6 +821,26 @@ class SetupWorkload(EventResource):
                         "flavor": flavor,
                     }
 
+        def server_volumes(tenant, server):
+            if "volumes" in server:
+                for volume in server["volumes"]:
+                    yield dict(volume,
+                               id=volume["display_name"])
+            elif num_volumes:
+                for _ in xrange(num_volumes):
+                    ref = str(random.randint(1, 0x7fffffff))
+                    name = "{}-{}".format(TEST_RESOURCE_PREFIX, ref)
+                    volume = {
+                        "id": name,
+                        "display_name": name,
+                        "size": volume_size,
+                        "tenant": tenant,
+                    }
+                    tenant.setdefault("volumes", []).append(volume)
+                    yield volume
+            else:
+                return
+
         tenant_nets = {}
         floating_ips = iter(self.floating_ips)
         for network in self.networks:
@@ -830,8 +852,7 @@ class SetupWorkload(EventResource):
         volumes = {volume["id"]: volume for volume in self.volumes}
         for tenant in self.tenants:
             for server in get_base_servers(tenant):
-                server_volumes = [dict(volume, id=volume["display_name"])
-                                  for volume in server.get("volumes", [])]
+                volumes = list(server_volumes(tenant, server))
                 server.update({
                     "tenant": tenant,
                     "user": {
@@ -840,7 +861,7 @@ class SetupWorkload(EventResource):
                     },
                     "floating_ips": [],
                     "fixed_ips": [],
-                    "os-extended-volumes:volumes_attached": server_volumes,
+                    "os-extended-volumes:volumes_attached": volumes,
                 })
                 for network, addrs in tenant_nets[tenant["name"]]:
                     fixed_ip = {
