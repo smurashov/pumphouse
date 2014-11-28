@@ -31,6 +31,7 @@ class TestVolume(unittest.TestCase):
             "status": "available",
             "display_name": "testvol1",
             "display_description": None,
+            "os-vol-tenant-attr:tenant_id": "456",
         }
         self.image_info = {
             "id": self.test_image_id,
@@ -51,6 +52,11 @@ class TestVolume(unittest.TestCase):
                 "image_id": self.test_image_id,
             }
         }
+        self.snapshot_info = {
+            "id": "567",
+            "status": "available",
+            "volume_id": self.test_volume_id
+        }
 
         self.volume = Mock()
         self.volume.id = self.test_volume_id
@@ -60,6 +66,11 @@ class TestVolume(unittest.TestCase):
         self.image = MagicMock(**self.image_info)
         self.image.__getitem__.side_effect = self.image_info.__getitem__
         self.image.keys.side_effect = self.image_info.keys
+
+        self.snapshot = Mock()
+        self.snapshot.id = "567"
+        self.snapshot.status = "available"
+        self.snapshot._info = self.snapshot_info
 
         self.resp = Mock()
         self.resp.ok = True
@@ -162,6 +173,64 @@ class TestCreateVolumeFromImage(TestVolume):
                                   self.image_info,
                                   self.user_info,
                                   self.tenant_info)
+
+
+class TestCreateVolumeSnapshot(TestVolume):
+    def test_execute(self):
+        create_volume = volume.CreateVolumeSnapshot(self.cloud)
+        self.cloud.cinder.volume_snapshots.create.return_value = self.snapshot
+        self.cloud.cinder.volume_snapshots.get.return_value = self.snapshot
+
+        snapshot_info = create_volume.execute(self.volume_info)
+        self.assertIsInstance(create_volume, task.BaseCloudTask)
+        self.cloud.cinder.volume_snapshots.create.assume_called_once_with(
+            self.test_volume_id)
+        self.assertEqual(snapshot_info, self.snapshot_info)
+
+
+class TestCreateVolumeClone(TestVolume):
+    def test_execute(self):
+        self.volume_info.update({"source_volid": self.test_volume_id})
+        create_volume = volume.CreateVolumeClone(self.cloud)
+
+        volume_info = create_volume.execute(self.volume_info)
+        self.assertIsInstance(create_volume, task.BaseCloudTask)
+        self.cloud.cinder.volumes.create.assert_called_once_with(
+            self.volume_info["size"],
+            source_volid=self.test_volume_id)
+        self.assertEqual(volume_info, self.volume_info)
+
+
+class TestDeleteVolume(TestVolume):
+    def test_do_delete(self):
+        delete_volume = volume.DeleteVolume(self.cloud)
+
+
+class TestCreateVolumeTask(TestVolume):
+    @patch("pumphouse.events.emit")
+    def test_create_volume_event(self, mock_emit):
+        expected_dict = {
+            "cloud": self.cloud.name,
+            "id": self.test_volume_id,
+            "status": "active",
+            "name": self.volume_info["display_name"],
+            "tenant_id": self.volume_info["os-vol-tenant-attr:tenant_id"],
+            "host_id": None,
+            "server_ids": []
+        }
+
+        class TestCreateVolumeClass(volume.CreateVolumeTask):
+            def execute(self):
+                pass
+
+        create_volume = TestCreateVolumeClass(self.cloud)
+        create_volume.create_volume_event(self.volume_info)
+
+        self.assertIsInstance(create_volume, volume.CreateVolumeTask)
+        self.assertIsInstance(create_volume, task.BaseCloudTask)
+        mock_emit.assume_called_once_with("volume create",
+                                          expected_dict,
+                                          namespace="/events")
 
 
 class TestMigrateVolume(TestVolume):
