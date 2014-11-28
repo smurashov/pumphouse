@@ -50,11 +50,11 @@ class CreateVolumeSnapshot(task.BaseCloudTask):
                           str(volume_info))
 
         snapshot = utils.wait_for(
-            volume_id,
+            snapshot.id,
             self.cloud.cinder.volume_snapshots.get,
             value='available',
             timeout=300,
-            error_status='error')
+            error_value='error')
 
         return snapshot._info
 
