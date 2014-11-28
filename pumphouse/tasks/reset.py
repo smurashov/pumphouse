@@ -643,6 +643,8 @@ class Volume(EventResource):
             "name": self.data["display_name"],
             "tenant_id": self.data.get("os-vol-tenant-attr:tenant_id"),
             "host_id": self.data.get("os-vol-host-attr:host"),
+            "size": self.data["size"],
+            "type": self.data.get("volume_type"),
             "server_ids": attachments,
         }
 

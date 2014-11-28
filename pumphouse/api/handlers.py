@@ -121,6 +121,8 @@ def cloud_resources(cloud):
                 "tenant_id": getattr(volume, "os-vol-tenant-attr:tenant_id",
                                      None),
                 "host_id": getattr(volume, "os-vol-host-attr:host", None),
+                "size": volume.size,
+                "type": getattr(volume, "volume_type", None),
                 "server_ids": attachments,
             },
         }
