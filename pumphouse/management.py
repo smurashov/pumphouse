@@ -16,6 +16,7 @@ import logging
 import random
 import urllib
 import tempfile
+import time
 
 from keystoneclient.openstack.common.apiclient import exceptions \
     as keystone_excs
@@ -581,6 +582,7 @@ def setup(plugins, events, cloud, target,
             while volume.status != 'available':
                 volume = user_cloud.cinder.volumes.get(volume.id)
                 tries.append(volume)
+                time.sleep(2)
                 if len(tries) > 30:
                     LOG.exception("Volume not available in time: %s",
                                   str(volume._info))
@@ -601,7 +603,9 @@ def setup(plugins, events, cloud, target,
             server = setup_server(user_cloud, server_dict)
             LOG.info("Created server: %s", server._info)
             test_servers.append(server.id)
-            for volume in server_dict.get("volumes", []):
+            for volume_dict in server_dict.get("volumes", []):
+                volume = user_cloud.cinder.volumes.find(
+                    display_name=volume_dict["display_name"])
                 volume = setup_server_volume(events,
                                              user_cloud,
                                              server.id,
