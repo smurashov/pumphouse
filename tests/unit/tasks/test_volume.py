@@ -25,6 +25,7 @@ class TestVolume(unittest.TestCase):
     def setUp(self):
         self.test_volume_id = "123"
         self.test_image_id = "234"
+        self.test_server_id = "111"
         self.volume_info = {
             "id": self.test_volume_id,
             "size": 1,
@@ -32,6 +33,9 @@ class TestVolume(unittest.TestCase):
             "display_name": "testvol1",
             "display_description": None,
             "os-vol-tenant-attr:tenant_id": "456",
+            "attachments": [{
+                "server_id": self.test_server_id,
+            }]
         }
         self.image_info = {
             "id": self.test_image_id,
