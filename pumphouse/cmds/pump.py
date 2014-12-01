@@ -159,7 +159,7 @@ def migrate_volumes(ctx, flow, ids):
     for volume in volumes:
         if volume.id in ids:
             volume_flow = volume_tasks.migrate_detached_volume(
-                ctx, volume)
+                ctx, volume.id)
             flow.add(volume_flow)
     return flow
 

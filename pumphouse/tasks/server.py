@@ -24,6 +24,7 @@ from pumphouse import exceptions
 from pumphouse.tasks.network.nova import floating_ip as fip_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import snapshot as snapshot_tasks
+from pumphouse.tasks import volume as volume_tasks
 from pumphouse.tasks import utils as task_utils
 from pumphouse import utils
 
@@ -161,16 +162,15 @@ class SuspendServer(task.BaseCloudTask):
 
 class BootServerFromImage(task.BaseCloudTask):
     def execute(self, server_info, image_info, flavor_info, user_info,
-                tenant_info, server_nics):
+                tenant_info, server_nics, server_dm):
         # TODO(akscram): Network information doesn't saved.
         restrict_cloud = self.cloud.restrict(
             username=user_info["name"],
             tenant_name=tenant_info["name"],
             password="default")
-        server = restrict_cloud.nova.servers.create(server_info["name"],
-                                                    image_info["id"],
-                                                    flavor_info["id"],
-                                                    nics=server_nics)
+        server = restrict_cloud.nova.servers.create(
+            server_info["name"], image_info["id"], flavor_info["id"],
+            block_device_mapping=dict(server_dm), nics=server_nics)
         server = utils.wait_for(server, self.cloud.nova.servers.get,
                                 value="ACTIVE")
         spawn_server_info = server.to_dict()
@@ -223,9 +223,19 @@ def reprovision_server(context, server, server_nics):
     server_terminate = "server-{}-terminate".format(server_id)
     server_boot = "server-{}-boot".format(server_id)
     server_sync = "server-{}-sync".format(server_id)
+    server_dm = "{}-device-mapping".format(server_binding)
 
     pre_suspend_tasks, pre_suspend_sync, pre_boot_tasks, image_ensure = \
         provision_server(context, server)
+
+    migrate_server_volumes = volume_tasks.migrate_server_volumes(
+        context,
+        server_id,
+        getattr(server,
+                "os-extended-volumes:volumes_attached"),
+        server.user_id,
+        server.tenant_id)
+    pre_boot_tasks = pre_boot_tasks + [migrate_server_volumes]
 
     flow = linear_flow.Flow("migrate-server-{}".format(server_id))
     # NOTE(akscram): The synchronization point avoids excessive downtime
@@ -253,7 +263,8 @@ def reprovision_server(context, server, server_nics):
                             provides=server_boot,
                             rebind=[server_suspend, image_ensure,
                                     flavor_ensure, user_ensure,
-                                    tenant_ensure, server_nics]),
+                                    tenant_ensure, server_nics,
+                                    server_dm]),
     )
     subflow = restore_floating_ips(context, server.to_dict())
     if subflow:

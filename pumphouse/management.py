@@ -414,9 +414,28 @@ def cache_image_file(url=TEST_IMAGE_URL):
     return path
 
 
-def setup_volume(cloud, volume_dict):
+def setup_volume(events, cloud, volume_dict):
     LOG.info("Create volume: %s", str(volume_dict))
-    return cloud.cinder.volumes.create(**volume_dict)
+    try:
+        volume = cloud.cinder.volumes.create(**volume_dict)
+    except exceptions.cinder_excs.BadRequest:
+        LOG.exception("Cannot create: %s", str(volume_dict))
+        raise
+    else:
+        volume = utils.wait_for(volume.id,
+                                cloud.cinder.volumes.get,
+                                value="available")
+        LOG.info("Created: %s", str(volume._info))
+        events.emit("volume create", {
+            "cloud": cloud.name,
+            "id": volume._info["id"],
+            "status": "active",
+            "display_name": volume._info["display_name"],
+            "tenant_id": volume._info["os-vol-tenant-attr:tenant_id"],
+            "host_id": volume._info.get("os-vol-host-attr:host"),
+            "attachment_server_ids": [],
+        }, namespace="/events")
+        return volume
 
 
 def setup_server(cloud, server_dict):
@@ -457,6 +476,32 @@ def setup_server_floating_ip(cloud, server):
         return server, floating_ip
 
 
+def setup_server_volume(events, cloud, server_id, volume_id):
+    try:
+        volume = cloud.nova.volumes.create_server_volume(
+            server_id, volume_id, None)
+    except nova_excs.NotFound:
+        LOG.exception("Resource not found: server %s, volume %s",
+                      server_id, volume_id)
+        raise
+    else:
+        volume = utils.wait_for(volume.id,
+                                cloud.cinder.volumes.get,
+                                value='in-use',
+                                timeout=120)
+        LOG.info("Attached: %s", str(volume._info))
+        events.emit("volume attach", {
+            "cloud": cloud.name,
+            "id": volume._info["id"],
+            "status": "active",
+            "display_name": volume._info["display_name"],
+            "tenant_id": volume._info["os-vol-tenant-attr:tenant_id"],
+            "host_id": volume._info.get("os-vol-host-attr:host"),
+            "attachment_server_ids": [],
+        }, namespace="/events")
+        return volume
+
+
 def setup(plugins, events, cloud, target,
           num_tenants=0, num_servers=0, num_volumes=0, workloads={}):
 
@@ -488,8 +533,8 @@ def setup(plugins, events, cloud, target,
                                                              images,
                                                              flavors)))
         tenant_dict["servers"] = servers
-        volumes = workloads.get("volumes",
-                                list(generate_volumes_list(num_volumes)))
+        volumes = tenant_dict.get("volumes",
+                                  list(generate_volumes_list(num_volumes)))
         tenant_dict["volumes"] = volumes
 
     floating_ips = workloads.get(
@@ -543,6 +588,8 @@ def setup(plugins, events, cloud, target,
         become_admin_in_tenant(cloud, cloud.keystone.auth_ref.user_id, tenant)
         tenant_cloud = cloud.restrict(tenant_name=tenant.name)
         test_tenant_clouds[tenant.id] = tenant_cloud
+        test_servers = []
+        test_volumes = []
         setup_secgroup(tenant_cloud)
         user = cloud.keystone.users.create(
             name=tenant_dict["username"],
@@ -561,33 +608,21 @@ def setup(plugins, events, cloud, target,
         }, namespace="/events")
 
         for volume_dict in tenant_dict["volumes"]:
-            try:
-                volume = setup_volume(user_cloud, volume_dict)
-            except Exception as exc:
-                LOG.exception("Exception: %s", exc.message)
-                raise exc
-            tries = []
-            while volume.status != 'available':
-                volume = user_cloud.cinder.volumes.get(volume.id)
-                tries.append(volume)
-                if len(tries) > 30:
-                    LOG.exception("Volume not available in time: %s",
-                                  str(volume._info))
-                    raise exceptions.TimeoutException()
-            LOG.info("Created: %s", str(volume._info))
-            events.emit("volume create", {
-                "cloud": target,
-                "id": volume._info["id"],
-                "status": "active",
-                "display_name": volume._info["display_name"],
-                "tenant_id": volume._info["os-vol-tenant-attr:tenant_id"],
-                "host_id": volume._info.get("os-vol-host-attr:host"),
-                "attachment_server_ids": [],
-            }, namespace="/events")
+            volume = setup_volume(events, user_cloud, volume_dict)
+            test_volumes.append(volume.id)
 
         for server_dict in tenant_dict["servers"]:
             server = setup_server(user_cloud, server_dict)
             LOG.info("Created server: %s", server._info)
+            test_servers.append(server.id)
+            for volume_dict in server_dict.get("volumes", []):
+                volume = user_cloud.cinder.volumes.find(
+                    display_name=volume_dict["display_name"])
+                volume = setup_server_volume(events,
+                                             user_cloud,
+                                             server.id,
+                                             volume.id)
+                test_volumes.remove(volume.id)
             server, floating_ip = setup_server_floating_ip(cloud,
                                                            server)
             LOG.info("Assigned floating ip %s to server: %s",
@@ -610,3 +645,9 @@ def setup(plugins, events, cloud, target,
                 "server_id": server.id,
                 "cloud": target
             }, namespace="/events")
+
+        for server_id, volume_id in zip(test_servers, test_volumes):
+            volume = setup_server_volume(events,
+                                         user_cloud,
+                                         server_id,
+                                         volume_id)

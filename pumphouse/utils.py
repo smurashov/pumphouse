@@ -95,7 +95,8 @@ def dump_flow(flow, f, first=False, prev=None):
     linear = isinstance(flow, taskflow.patterns.linear_flow.Flow)
     if first:
         f.write('digraph "%s" {\n'
-                'graph[rankdir=LR]\nnode[shape=box]\n' % (eat_ids(flow.name),))
+                'graph[rankdir=LR]\nnode[shape=box]\n'
+                'edge[style=dashed]' % (eat_ids(flow.name),))
     else:
         f.write('subgraph "cluster_%s" {\n'
                 'graph[style=%s,rankdir=LR]\n' % (
