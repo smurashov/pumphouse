@@ -172,9 +172,10 @@ class DeleteVolume(task.BaseCloudTask):
     def delete_volume_event(self, volume_info):
         events.emit("delete", {
             "cloud": self.cloud.name,
-            "type": "volume"
+            "type": "volume",
             "id": volume_info["id"]
         }, namespace="/events")
+
 
 class DeleteSourceVolume(DeleteVolume):
     def execute(self, volume_info):
