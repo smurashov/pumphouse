@@ -430,10 +430,12 @@ def setup_volume(events, cloud, volume_dict):
             "cloud": cloud.name,
             "id": volume._info["id"],
             "status": "active",
-            "display_name": volume._info["display_name"],
+            "size": volume._info["size"],
+            "name": volume._info["display_name"],
             "tenant_id": volume._info["os-vol-tenant-attr:tenant_id"],
             "host_id": volume._info.get("os-vol-host-attr:host"),
-            "attachment_server_ids": [],
+            "server_ids": [],
+            "type": volume._info.get("volume_type"),
         }, namespace="/events")
         return volume
 
