@@ -150,6 +150,23 @@ def cleanup(events, cloud, target):
     except exceptions.keystone_excs.NotFound:
         pass
     if (net_service):
+        networks = cloud.neutron.list_networks()['networks']
+        routers = cloud.neutron.list_routers()['routers']
+
+        for net in networks:
+            for router in routers:
+                subnets = cloud.neutron.list_subnets(
+                    network_id=net['id'])['subnets']
+                for subnet in subnets:
+                    try:
+                        cloud.neutron.remove_interface_router(
+                            router['id'], {'subnet_id': subnet['id']})
+                    except:
+                        pass
+
+                cloud.neutron.remove_gateway_router(router['id'])
+                cloud.neutron.delete_router(router['id'])
+
         for port in cloud.neutron.list_ports()['ports']:
             LOG.info("Deleted network: %s", port['id'])
             cloud.neutron.delete_port(port['id'])
