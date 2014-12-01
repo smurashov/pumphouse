@@ -45,7 +45,7 @@ class Service(object):
         return cloud
 
     def check(self, cloud):
-        return cloud.ping()
+        return cloud.ping(self.plugins)
 
     def reset(self, events, cloud):
         try:
