@@ -16,7 +16,6 @@ import logging
 import random
 import urllib
 import tempfile
-import time
 
 from keystoneclient.openstack.common.apiclient import exceptions \
     as keystone_excs
@@ -398,9 +397,28 @@ def cache_image_file(url=TEST_IMAGE_URL):
     return path
 
 
-def setup_volume(cloud, volume_dict):
+def setup_volume(events, cloud, volume_dict):
     LOG.info("Create volume: %s", str(volume_dict))
-    return cloud.cinder.volumes.create(**volume_dict)
+    try:
+        volume = cloud.cinder.volumes.create(**volume_dict)
+    except exceptions.cinder_excs.BadRequest:
+        LOG.exception("Cannot create: %s", str(volume_dict))
+        raise
+    else:
+        volume = utils.wait_for(volume.id,
+                                cloud.cinder.volumes.get,
+                                value="available")
+        LOG.info("Created: %s", str(volume._info))
+        events.emit("volume create", {
+            "cloud": cloud.name,
+            "id": volume._info["id"],
+            "status": "active",
+            "display_name": volume._info["display_name"],
+            "tenant_id": volume._info["os-vol-tenant-attr:tenant_id"],
+            "host_id": volume._info.get("os-vol-host-attr:host"),
+            "attachment_server_ids": [],
+        }, namespace="/events")
+        return volume
 
 
 def setup_server(cloud, server_dict):
@@ -573,31 +591,8 @@ def setup(plugins, events, cloud, target,
         }, namespace="/events")
 
         for volume_dict in tenant_dict["volumes"]:
-            try:
-                volume = setup_volume(user_cloud, volume_dict)
-            except Exception as exc:
-                LOG.exception("Exception: %s", exc.message)
-                raise exc
-            tries = []
-            while volume.status != 'available':
-                volume = user_cloud.cinder.volumes.get(volume.id)
-                tries.append(volume)
-                time.sleep(2)
-                if len(tries) > 30:
-                    LOG.exception("Volume not available in time: %s",
-                                  str(volume._info))
-                    raise exceptions.TimeoutException()
+            volume = setup_volume(user_cloud, volume_dict)
             test_volumes.append(volume.id)
-            LOG.info("Created: %s", str(volume._info))
-            events.emit("volume create", {
-                "cloud": target,
-                "id": volume._info["id"],
-                "status": "active",
-                "display_name": volume._info["display_name"],
-                "tenant_id": volume._info["os-vol-tenant-attr:tenant_id"],
-                "host_id": volume._info.get("os-vol-host-attr:host"),
-                "attachment_server_ids": [],
-            }, namespace="/events")
 
         for server_dict in tenant_dict["servers"]:
             server = setup_server(user_cloud, server_dict)
