@@ -87,25 +87,24 @@ class UploadVolume(task.BaseCloudTask):
 
     def upload_to_glance_event(self, image_info):
         LOG.info("Created: %s", image_info)
-        events.emit("volume snapshot create", {
-            "cloud": self.cloud.name,
+        events.emit("create", {
             "id": image_info["id"],
-            "name": image_info["name"],
-            "status": "active",
+            "cloud": self.cloud.name,
+            "type": "image",
+            "data": dict(image_info)
         }, namespace="/events")
 
 
 class CreateVolumeTask(task.BaseCloudTask):
     def create_volume_event(self, volume_info):
         LOG.info("Created: %s", volume_info)
-        events.emit("volume create", {
-            "cloud": self.cloud.name,
+        events.emit("create", {
             "id": volume_info["id"],
-            "status": "active",
-            "display_name": volume_info["display_name"],
-            "tenant_id": volume_info.get("os-vol-tenant-attr:tenant_id"),
-            "host_id": volume_info.get("os-vol-host-attr:host"),
-            "attachment_server_ids": [],
+            "cloud": self.cloud.name,
+            "type": "volume",
+            "data": dict(volume_info,
+                         server_ids=[att["server_id"]
+                                     for att in volume_info["attachments"]]),
         }, namespace="/events")
 
 
@@ -165,10 +164,17 @@ class DeleteVolume(task.BaseCloudTask):
                                     stop_excs=(
                                         exceptions.cinder_excs.NotFound,))
             LOG.info("Deleted: %s", str(volume_info))
+            self.delete_volume_event(volume_info)
 
     def execute(self, volume_info, **requires):
         self.do_delete(volume_info)
 
+    def delete_volume_event(self, volume_info):
+        events.emit("delete", {
+            "cloud": self.cloud.name,
+            "type": "volume"
+            "id": volume_info["id"]
+        }, namespace="/events")
 
 class DeleteSourceVolume(DeleteVolume):
     def execute(self, volume_info):
