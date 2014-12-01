@@ -608,7 +608,7 @@ def setup(plugins, events, cloud, target,
         }, namespace="/events")
 
         for volume_dict in tenant_dict["volumes"]:
-            volume = setup_volume(user_cloud, volume_dict)
+            volume = setup_volume(events, user_cloud, volume_dict)
             test_volumes.append(volume.id)
 
         for server_dict in tenant_dict["servers"]:
