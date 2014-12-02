@@ -260,10 +260,15 @@ class TestMigrateDetachedVolume(TestMigrateVolume):
                                      upload_vol_mock,
                                      create_vol_mock,
                                      ensure_img_mock):
+        self.test_tenant_id = "1111"
+        self.tenant_ensure = "tenant-{}-ensure".format(self.test_tenant_id)
+        self.user_ensure = "user-none-ensure"
         expected_store_dict = {self.volume_retrieve: self.test_volume_id,
                                self.user_ensure: None}
         flow = volume.migrate_detached_volume(self.context,
-                                              self.test_volume_id)
+                                              self.test_volume_id,
+                                              None,
+                                              self.test_tenant_id)
 
         retrieve_vol_mock.assert_called_once_with(
             self.context.src_cloud, name=self.volume_binding,
@@ -274,7 +279,8 @@ class TestMigrateDetachedVolume(TestMigrateVolume):
         create_vol_mock.assert_called_once_with(
             self.context.dst_cloud, name=self.volume_ensure,
             provides=self.volume_ensure,
-            rebind=[self.volume_binding, self.image_ensure])
+            rebind=[self.volume_binding, self.image_ensure,
+                    self.user_ensure, self.tenant_ensure])
         ensure_img_mock.assert_called_once_with(
             self.context.src_cloud, self.context.dst_cloud,
             name=self.image_ensure, provides=self.image_ensure,
