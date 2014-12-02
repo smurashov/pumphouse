@@ -111,10 +111,14 @@ class CreateVolumeTask(task.BaseCloudTask):
 class CreateVolumeFromImage(CreateVolumeTask):
     def execute(self, volume_info, image_info, user_info, tenant_info):
         image_id = image_info["id"]
-        restrict_cloud = self.cloud.restrict(
-            username=user_info["name"],
-            tenant_name=tenant_info["name"],
-            password="default")
+        if user_info:
+            restrict_cloud = self.cloud.restrict(
+                username=user_info["name"],
+                tenant_name=tenant_info["name"],
+                password="default")
+        else:
+            restrict_cloud = self.cloud.restrict(
+                tenant_name=tenant_info["name"])
         try:
             volume = restrict_cloud.cinder.volumes.create(
                 volume_info["size"],
@@ -201,14 +205,17 @@ class BlockDeviceMapping(Task):
         return (str(dev_name), str(dev_mapping))
 
 
-def migrate_detached_volume(context, volume_id):
+def migrate_detached_volume(context, volume_id, user_id, tenant_id):
     volume_binding = "volume-{}".format(volume_id)
     volume_retrieve = "{}-retrieve".format(volume_binding)
     volume_upload = "{}-upload".format(volume_binding)
     image_ensure = "{}-image-ensure".format(volume_binding)
-    user_id = "none"
-    user_ensure = "user-{}-ensure".format(user_id)
-    context.store[user_ensure] = None
+    tenant_ensure = "tenant-{}-ensure".format(tenant_id)
+    if user_id:
+        user_ensure = "user-{}-ensure".format(user_id)
+    else:
+        user_ensure = "user-none-ensure"
+        context.store[user_ensure] = None
     volume_ensure = "{}-ensure".format(volume_binding)
 
     flow = graph_flow.Flow("migrate-{}".format(volume_binding))
@@ -230,7 +237,9 @@ def migrate_detached_volume(context, volume_id):
                                    name=volume_ensure,
                                    provides=volume_ensure,
                                    rebind=[volume_binding,
-                                           image_ensure]))
+                                           image_ensure,
+                                           user_ensure,
+                                           tenant_ensure]))
     context.store[volume_retrieve] = volume_id
     return flow
 
