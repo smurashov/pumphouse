@@ -106,7 +106,8 @@ class ServerStartMigrationEvent(task.BaseCloudTask):
         msg = ("Migration of server {} failed by reason {}"
                .format(server_id, result))
         LOG.warning(msg)
-        events.emit("error", {
+        events.emit("log", {
+            "level": "error",
             "message": msg,
         }, namespace="/events")
         events.emit("update", {

@@ -65,7 +65,8 @@ class EnsureFloatingIPBulk(task.BaseCloudTask):
         }, namespace="/events")
 
     def not_added_event(self, address):
-        events.emit("error", {
+        events.emit("log", {
+            "level": "error",
             "message": "FloatingIpsBulk {} was not created, next attempt"
                        .format(address),
         }, namespace="/events")
@@ -126,7 +127,8 @@ class EnsureFloatingIP(task.BaseCloudTask):
         }, namespace="/events")
 
     def assigning_error_event(self, address, server_id):
-        events.emit("error", {
+        events.emit("log", {
+            "level": "error",
             "message": "Couldn't assign FloatingIp {} to Server {}"
                        .format(address, server_id),
         }, namespace="/events")
