@@ -26,10 +26,11 @@ from pumphouse.tasks import evacuation as evacuation_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import identity as identity_tasks
 from pumphouse.tasks import resources as resources_tasks
-from pumphouse.tasks import volume as volume_tasks
+from pumphouse.tasks import volume_resources as volume_tasks
 from pumphouse.tasks import node as reassignment_tasks
 
 from taskflow.patterns import graph_flow
+from taskflow.patterns import unordered_flow
 
 
 LOG = logging.getLogger(__name__)
@@ -155,12 +156,17 @@ def get_parser():
 
 
 def migrate_volumes(ctx, flow, ids):
-    volumes = ctx.src_cloud.cinder.volumes.list(search_opts={'all_tenants': 1})
+    volume_resources = []
+    volumes_flow = unordered_flow.Flow("migrate-detached-volumes")
+    volumes = ctx.src_cloud.cinder.volumes.list(
+        search_opts={'all_tenants': 1, 'status': 'available'})
     for volume in volumes:
         if volume.id in ids:
-            volume_flow = volume_tasks.migrate_detached_volume(
+            resources, volume_flow = volume_tasks.migrate_volume(
                 ctx, volume.id)
-            flow.add(volume_flow)
+            flow.add(*resources)
+            volumes_flow.add(volume_flow)
+    flow.add(volumes_flow)
     return flow
 
 
