@@ -28,7 +28,6 @@ def migrate_volume(context, volume_id):
     volume_id = volume.id
     tenant_id = volume._info["os-vol-tenant-attr:tenant_id"]
     tenant_retrieve = "tenant-{}-retrieve".format(tenant_id)
-    import pdb; pdb.set_trace()
     try:
         users = context.src_cloud.keystone.tenants.list_users(
             tenant_id)
