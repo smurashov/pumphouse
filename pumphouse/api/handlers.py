@@ -19,6 +19,7 @@ import os
 import logging
 
 import flask
+from taskflow import exceptions as taskflow_excs
 
 from . import hooks
 
@@ -243,11 +244,20 @@ def migrate_tenant(tenant_id):
             LOG.debug("Migration flow: %s", flow)
             result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of migration: %s", result)
+        except taskflow_excs.Empty:
+            msg = ("There aren't any resources for migration in the {} tenant"
+                   .format(tenant_id))
+            LOG.warning(msg)
+            events.emit("log", {
+                "level": "warning",
+                "message": msg,
+            }, namespace="/events")
         except Exception:
             msg = ("Error is occured during migration resources of tenant: {}"
                    .format(tenant_id))
             LOG.exception(msg)
-            events.emit("error", {
+            events.emit("log", {
+                "level": "error",
                 "message": msg,
             }, namespace="/events")
 
@@ -289,7 +299,8 @@ def evacuate_host(host_id):
             msg = ("Error is occured during evacuating host {}"
                    .format(host_id))
             LOG.exception(msg)
-            events.emit("error", {
+            events.emit("log", {
+                "level": "error",
                 "message": msg,
             }, namespace="/events")
 
@@ -336,7 +347,8 @@ def reassign_host(host_id):
             msg = ("Error is occured during reassigning host {}"
                    .format(host_id))
             LOG.exception(msg)
-            events.emit("error", {
+            events.emit("log", {
+                "level": "error",
                 "message": msg,
             }, namespace="/events")
 
