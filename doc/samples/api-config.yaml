@@ -28,8 +28,10 @@ CLOUDS:
         identity:
             connection:  mysql+mysqlconnector://root:root@127.0.0.1/keystone
         populate:
+            num_tenants: 4
             num_servers: 3
-            num_tenants: 3
+            num_volumes: 2
+            volume_size: 1
         urls:
             horizon:        http://10.0.0.1/
         workloads:
@@ -53,16 +55,33 @@ CLOUDS:
               - &image
                 name: pumphouse-test-image-0001
                 url: http://download.cirros-cloud.net/0.3.2/cirros-0.3.2-x86_64-disk.img
+            volumes:
+              - &volume
+                display_name: pumphouse-test-volume-0001
+                size: 1
             tenants:
               - name: pumphouse-test-0001
                 description: "pumphouse test tenant 0001"
                 username: pumphouse-test-user-0001
+                volumes:
+                  - &volume-1
+                    display_name: pumphouse-volume-1
+                    size: 1
+                  - &volume-2
+                    display_name: pumphouse-volume-2
+                    size: 1
+                  - &volume-3
+                    display_name: pumphouse-volume-3
+                    size: 1
                 servers:
                   - name: pumphouse-test-instance-0001
                     flavor:
                       <<: *small
                     image:
                       <<: *image
+                    volumes:
+                      - <<: *volume-1
+                      - <<: *volume-2
                     pre-actions: &health_checks
                         -
                             - <<: *ping
@@ -86,6 +105,8 @@ CLOUDS:
                       <<: *medium
                     image:
                       <<: *image
+                    volumes:
+                      - <<: *volume-3
                   - name: pumphouse-test-instance-0003
                     flavor:
                       <<: *large

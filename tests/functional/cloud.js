@@ -1,3 +1,9 @@
+/*jslint node:true*/
+/*jslint plusplus:true*/
+/*jslint evil: true*/
+
+'use strict';
+
 function CloudResources(data) {
     this.resources = {};
     this.length = 0;
@@ -6,33 +12,37 @@ function CloudResources(data) {
     this.parseCloud('destination', data);
 
     //console.log(JSON.stringify(this.resources));
-};
+}
 
 CloudResources.prototype.toString = function () {
     return '{CloudResources[' + this.length + ']}';
 };
 
 CloudResources.prototype.getKey = function (data) {
-    return [data['type'], data['cloud'], data['id']].join('-');
+    return [data.type, data.cloud, data.id].join('-');
 };
 
 CloudResources.prototype.parseCloud = function (name, data) {
-    var i, o;
-    for (i in data[name]['resources']) {
-        try {
-            o = data[name]['resources'][i];
-            o['cloud'] = name;
-            this.resources[this.getKey(o)] = o;
-            this.length++;
-        }
-        catch (e) {
-            console.error('Unable to parse object', o);
+    var i,
+        o,
+        r = data[name].resources;
+
+    for (i in r) {
+        if (r.hasOwnProperty(i)) {
+            try {
+                o = r[i];
+                o.cloud = name;
+                this.resources[this.getKey(o)] = o;
+                this.length++;
+            } catch (e) {
+                console.error('Unable to parse object', o);
+            }
         }
     }
 };
 
 CloudResources.prototype.get = function (id, type, cloud) {
-    if (arguments.length == 3) {
+    if (arguments.length === 3) {
         return this.resources[this.getKey({
             'id': id,
             'type': type,
@@ -43,14 +53,27 @@ CloudResources.prototype.get = function (id, type, cloud) {
     }
 };
 
-CloudResources.prototype.getAll = function(params) {
-    var s = '', result = [];
-    for (k in params) s += (s ? ' && "': '"') + params[k] + '"==a.' + k;
-    var f = new Function('a', 'return(' + s + ')');
+CloudResources.prototype.getAll = function (params) {
+    var s = '',
+        result = [],
+        k,
+        f;
 
-    for (var j in this.resources)
-        if (f(this.resources[j]))
-            result.push(this.resources[j]);
+    for (k in params) {
+        if (params.hasOwnProperty(k)) {
+            s += (s ? ' && "' : '"') + params[k] + '"==a.' + k;
+        }
+    }
+
+    f = new Function('a', 'return(' + s + ')');
+
+    for (k in this.resources) {
+        if (this.resources.hasOwnProperty(k)) {
+            if (f(this.resources[k])) {
+                result.push(this.resources[k]);
+            }
+        }
+    }
     return result;
 };
 

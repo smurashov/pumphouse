@@ -29,7 +29,8 @@ def get_port_by(client, **port_filter):
 def get_security_groups_by(client, **sg_filter):
     try:
         LOG.debug("security_groups_filter: %s" % str(sg_filter))
-        return client.list_security_groups(**sg_filter)
+        return client.list_security_groups(
+            **sg_filter)['security_groups'].to_dict()
     except Exception as e:
         LOG.exception("Error in security_groups: %s" % e.message)
         raise
@@ -38,7 +39,7 @@ def get_security_groups_by(client, **sg_filter):
 def get_subnet_by(client, **subnet_filter):
     try:
         LOG.debug("subnet filter: %s" % str(subnet_filter))
-        return client.list_subnets(**subnet_filter)
+        return client.list_subnets(**subnet_filter)['subnets']
     except Exception as e:
         LOG.exception("Error in subnet: %s" % e.message)
 
@@ -129,7 +130,7 @@ def create_security_group(client, **sg_params):
 
 def list_subnets(client, net_id):
     try:
-        return get_subnet_by(client, network_id=net_id)['subnets']
+        return get_subnet_by(client, network_id=net_id)
     except Exception as e:
         LOG.exception("Error in list subnets: %s" % e.message)
         raise
