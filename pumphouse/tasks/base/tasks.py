@@ -32,10 +32,10 @@ class UnboundTask(object):
             self.name = fn.__name__
         else:
             self.name = name
-        self.requires = frozenset(requires)
-        self.after = frozenset(after)
-        self.before = frozenset(before)
-        self.includes = frozenset(includes)
+        self.requires = tuple(requires)
+        self.after = tuple(after)
+        self.before = tuple(before)
+        self.includes = tuple(includes)
 
     def __call__(self, fn):
         assert self.fn is None and self.name is None

@@ -20,6 +20,7 @@ import tempfile
 import urllib
 
 import netaddr
+from neutronclient.common import exceptions as neutron_excs
 from novaclient import exceptions as nova_excs
 
 from pumphouse import events
@@ -471,6 +472,10 @@ class NeutronSubnet(EventResource):
             subnet,
             network=self.data["network"],
         )
+        self.env.cloud.neutron.add_interface_router(
+            self.data["network"]["router"]["id"],
+            {"subnet_id": subnet["id"]},
+        )
 
     @task(before=[create])
     def delete(self):
@@ -524,6 +529,12 @@ class NeutronNetwork(EventResource):
             "tenant_id": self.tenant["id"],
         }})["network"]
         network["tenant"] = self.data["tenant"]
+        public_net = self.env.cloud.neutron.list_networks(**{
+            "router:external": True,
+        })["networks"][0]
+        network["router"] = cloud.neutron.create_router({"router": {
+            "external_gateway_info": {"network_id": public_net["id"]},
+        }})["router"]
         self.data = network
         self.subnet["network"] = network
 
@@ -531,7 +542,13 @@ class NeutronNetwork(EventResource):
     def clear_ports(self):
         neutron = self.env.cloud.neutron
         for port in neutron.list_ports(network_id=self.data["id"])["ports"]:
-            neutron.delete_port(port["id"])
+            if port["device_owner"] == "network:router_interface":
+                neutron.remove_interface_router(
+                    port["device_id"],
+                    {"subnet_id": port["fixed_ips"][0]["subnet_id"]},
+                )
+            else:
+                neutron.delete_port(port["id"])
 
     @task(before=[create], requires=[clear_ports, subnet.delete])
     def delete(self):
@@ -574,35 +591,85 @@ class NeutronPort(EventResource):
 
     @task(before=[network.delete, create])
     def delete(self):
-        self.env.cloud.neutron.delete_port(self.data["id"])
+        try:
+            self.env.cloud.neutron.delete_port(self.data["id"])
+        # KeyError can be raised if we came here through Server
+        except (neutron_excs.PortNotFoundClient, KeyError):
+            pass
 
 
 @FloatingIP.register("neutron")
 class NeutronFloatingIP(EventResource):
-    data_id_key = "address"
-    event_id_key = "address"
     events_type = "floating_ip"
+
+    @classmethod
+    def get_id_for(self, data):
+        try:
+            return data["address"]
+        except KeyError:
+            return data["floating_ip_address"]
+
+    def event_id(self):
+        return self.get_id_for(self.data)
 
     def event_data(self):
         data = self.data.copy()
-        data["name"] = data["address"]
+        try:
+            data["name"] = data["address"]
+        except KeyError:
+            data["name"] = data["floating_ip_address"]
         return data
 
-    @task
+    @NeutronNetwork()
+    def public_network(self):
+        nets = self.env.cloud.neutron.list_networks(**{
+            "router:external": True,
+        })
+        return nets["networks"][0]
+
+    @NeutronPort()
+    def port(self):
+        return self.data["fixed_ip"]
+
+    @Tenant()
+    def tenant(self):
+        return self.data["fixed_ip"]["network"]["tenant"]
+
+    @task(requires=[tenant.create])
     def create(self):
-        pass
+        cloud = self.env.cloud.restrict(tenant_name=self.tenant["name"])
+        self.data = cloud.neutron.create_floatingip({"floatingip": {
+            "floating_network_id": self.public_network["id"],
+        }})["floatingip"]
 
-    @task(requires=[create])
+    @task(requires=[create, port.create])
     def associate(self):
-        pass
+        self.data = self.env.cloud.neutron.update_floatingip(
+            self.data["id"],
+            {
+                "floatingip": {
+                    "port_id": self.port["id"],
+                }
+            },
+        )["floatingip"]
 
-    @task
+    @task(before=[port.delete])
     def disassociate(self):
-        pass
+        try:
+            self.data = self.env.cloud.neutron.update_floatingip(
+                self.data["id"],
+                {
+                    "floatingip": {
+                        "port_id": None,
+                    }
+                },
+            )["floatingip"]
+        except neutron_excs.PortNotFoundClient:
+            pass
 
     @task(before=[create], requires=[disassociate])
     def delete(self):
-        pass
+        self.env.cloud.neutron.delete_floatingip(self.data["id"])
 
 
 @Nic.register("neutron")
@@ -721,10 +788,17 @@ class CleanupWorkload(EventResource):
         # FIXME(yorik-sar): workaroud for missing resource lookup by id
         tenants = {tenant["id"]: tenant for tenant in self.tenants}
         floating_ips = collections.defaultdict(list)
-        for floating_ip in self.floating_ips:
-            server_id = floating_ip["instance_uuid"]
-            if server_id:
-                floating_ips[server_id].append(floating_ip)
+        # NOTE(yorik-sar): Neutron does this through ports
+        if self.env.plugins["network"] == "nova":
+            for floating_ip in self.floating_ips:
+                server_id = floating_ip["instance_uuid"]
+                if server_id:
+                    floating_ips[server_id].append(floating_ip)
+        elif self.env.plugins["network"] == "neutron":
+            for floating_ip in self.floating_ips:
+                server_id = floating_ip["fixed_ip"].get("device_id")
+                if server_id is not None:
+                    floating_ips[server_id].append(floating_ip)
         if self.env.plugins.get("network", "nova") == "nova":
             name_key = "label"
         else:
@@ -772,8 +846,30 @@ class CleanupWorkload(EventResource):
 
     @base.Collection(FloatingIP)
     def floating_ips(self):
-        floating_ips = self.env.cloud.nova.floating_ips_bulk.list()
-        return [f.to_dict() for f in floating_ips]
+        plugin = self.env.plugins["network"]
+        if plugin == "nova":
+            floating_ips = self.env.cloud.nova.floating_ips_bulk.list()
+            for f in floating_ips:
+                yield f.to_dict()
+        elif plugin == "neutron":
+            networks = {network["id"]: network for network in self.networks}
+            fips =  self.env.cloud.neutron.list_floatingips()["floatingips"]
+            for floating_ip in fips:
+                port_id = floating_ip["port_id"]
+                if port_id is not None:
+                    port = self.env.cloud.neutron.show_port(port_id)["port"]
+                    floating_ip["fixed_ip"] = {
+                        "id": port_id,
+                        "address": floating_ip["fixed_ip_address"],
+                        "network": networks[port["network_id"]],
+                        "device_id": port["device_id"],
+                    }
+                else:
+                    floating_ip["fixed_ip"] = {
+                        "address": None,
+                        "network": {"name": None},
+                    }
+                yield floating_ip
 
     @base.Collection(Image)
     def images(self):
@@ -966,8 +1062,8 @@ class SetupWorkload(EventResource):
         flavors.each().create,
         security_groups.each().create,
         networks.each().create,
-        floating_ips.each().create,
         servers.each().create,
+        floating_ips.each().create,
     ])
 
 
