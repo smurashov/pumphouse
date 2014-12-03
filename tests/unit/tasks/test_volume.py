@@ -25,13 +25,17 @@ class TestVolume(unittest.TestCase):
     def setUp(self):
         self.test_volume_id = "123"
         self.test_image_id = "234"
+        self.test_server_id = "111"
         self.volume_info = {
             "id": self.test_volume_id,
             "size": 1,
             "status": "available",
             "display_name": "testvol1",
             "display_description": None,
-            "volume_type": "test_lvm",
+            "os-vol-tenant-attr:tenant_id": "456",
+            "attachments": [{
+                "server_id": self.test_server_id,
+            }]
         }
         self.image_info = {
             "id": self.test_image_id,
@@ -40,12 +44,22 @@ class TestVolume(unittest.TestCase):
         }
         self.user_info = {
             "id": "345",
+            "name": "test-user-name",
+        }
+        self.tenant_info = {
+            "id": "456",
+            "name": "test-tenant-name",
         }
         self.upload_info = {
             "id": self.test_volume_id,
             "os-volume_upload_image": {
                 "image_id": self.test_image_id,
             }
+        }
+        self.snapshot_info = {
+            "id": "567",
+            "status": "available",
+            "volume_id": self.test_volume_id
         }
 
         self.volume = Mock()
@@ -56,6 +70,11 @@ class TestVolume(unittest.TestCase):
         self.image = MagicMock(**self.image_info)
         self.image.__getitem__.side_effect = self.image_info.__getitem__
         self.image.keys.side_effect = self.image_info.keys
+
+        self.snapshot = Mock()
+        self.snapshot.id = "567"
+        self.snapshot.status = "available"
+        self.snapshot._info = self.snapshot_info
 
         self.resp = Mock()
         self.resp.ok = True
@@ -101,9 +120,9 @@ class TestUploadVolume(TestVolume):
         self.cloud.cinder.volumes.upload_to_image.assert_called_once_with(
             self.test_volume_id,
             False,
-            "volume-{}-image".format(self.volume_info["id"]),
+            "pumphouse-volume-{}-image".format(self.volume_info["id"]),
             'bare',
-            'raw')
+            'qcow2')
         self.assertEqual(len(self.cloud.glance.images.get.call_args), 2)
         self.assertEqual(self.test_image_id, image_id)
         upload_volume.upload_to_glance_event.assert_called_once_with(
@@ -131,15 +150,17 @@ class TestCreateVolumeFromImage(TestVolume):
         create_volume = volume.CreateVolumeFromImage(self.cloud)
         self.assertIsInstance(create_volume, task.BaseCloudTask)
         create_volume.create_volume_event = Mock()
+        self.cloud.restrict.return_value = self.cloud
         create_volume_dict = {
             "display_name": self.volume_info["display_name"],
             "display_description": self.volume_info["display_description"],
-            "volume_type": self.volume_info["volume_type"],
             "imageRef": self.test_image_id,
         }
 
         volume_info = create_volume.execute(self.volume_info,
-                                            self.image_info)
+                                            self.image_info,
+                                            self.user_info,
+                                            self.tenant_info)
         self.cloud.cinder.volumes.create.assert_called_once_with(
             self.volume_info["size"], **create_volume_dict)
         self.assertEqual(len(self.cloud.cinder.volumes.get.call_args), 2)
@@ -147,12 +168,73 @@ class TestCreateVolumeFromImage(TestVolume):
 
     def test_execute_bad_request(self):
         create_volume = volume.CreateVolumeFromImage(self.cloud)
+        self.cloud.restrict.return_value = self.cloud
         self.cloud.cinder.volumes.create.side_effect = \
             exceptions.cinder_excs.BadRequest("400 Bad Request")
 
         with self.assertRaises(exceptions.cinder_excs.BadRequest):
             create_volume.execute(self.volume_info,
-                                  self.image_info)
+                                  self.image_info,
+                                  self.user_info,
+                                  self.tenant_info)
+
+
+class TestCreateVolumeSnapshot(TestVolume):
+    def test_execute(self):
+        create_volume = volume.CreateVolumeSnapshot(self.cloud)
+        self.cloud.cinder.volume_snapshots.create.return_value = self.snapshot
+        self.cloud.cinder.volume_snapshots.get.return_value = self.snapshot
+
+        snapshot_info = create_volume.execute(self.volume_info)
+        self.assertIsInstance(create_volume, task.BaseCloudTask)
+        self.cloud.cinder.volume_snapshots.create.assume_called_once_with(
+            self.test_volume_id)
+        self.assertEqual(snapshot_info, self.snapshot_info)
+
+
+class TestCreateVolumeClone(TestVolume):
+    def test_execute(self):
+        self.volume_info.update({"source_volid": self.test_volume_id})
+        create_volume = volume.CreateVolumeClone(self.cloud)
+
+        volume_info = create_volume.execute(self.volume_info)
+        self.assertIsInstance(create_volume, task.BaseCloudTask)
+        self.cloud.cinder.volumes.create.assert_called_once_with(
+            self.volume_info["size"],
+            source_volid=self.test_volume_id)
+        self.assertEqual(volume_info, self.volume_info)
+
+
+class TestDeleteVolume(TestVolume):
+    def test_do_delete(self):
+        delete_volume = volume.DeleteVolume(self.cloud)
+
+
+class TestCreateVolumeTask(TestVolume):
+    @patch("pumphouse.events.emit")
+    def test_create_volume_event(self, mock_emit):
+        expected_dict = {
+            "cloud": self.cloud.name,
+            "id": self.test_volume_id,
+            "status": "active",
+            "name": self.volume_info["display_name"],
+            "tenant_id": self.volume_info["os-vol-tenant-attr:tenant_id"],
+            "host_id": None,
+            "server_ids": []
+        }
+
+        class TestCreateVolumeClass(volume.CreateVolumeTask):
+            def execute(self):
+                pass
+
+        create_volume = TestCreateVolumeClass(self.cloud)
+        create_volume.create_volume_event(self.volume_info)
+
+        self.assertIsInstance(create_volume, volume.CreateVolumeTask)
+        self.assertIsInstance(create_volume, task.BaseCloudTask)
+        mock_emit.assume_called_once_with("volume create",
+                                          expected_dict,
+                                          namespace="/events")
 
 
 class TestMigrateVolume(TestVolume):
@@ -178,10 +260,15 @@ class TestMigrateDetachedVolume(TestMigrateVolume):
                                      upload_vol_mock,
                                      create_vol_mock,
                                      ensure_img_mock):
+        self.test_tenant_id = "1111"
+        self.tenant_ensure = "tenant-{}-ensure".format(self.test_tenant_id)
+        self.user_ensure = "user-none-ensure"
         expected_store_dict = {self.volume_retrieve: self.test_volume_id,
                                self.user_ensure: None}
         flow = volume.migrate_detached_volume(self.context,
-                                              self.test_volume_id)
+                                              self.test_volume_id,
+                                              None,
+                                              self.test_tenant_id)
 
         retrieve_vol_mock.assert_called_once_with(
             self.context.src_cloud, name=self.volume_binding,
@@ -192,7 +279,8 @@ class TestMigrateDetachedVolume(TestMigrateVolume):
         create_vol_mock.assert_called_once_with(
             self.context.dst_cloud, name=self.volume_ensure,
             provides=self.volume_ensure,
-            rebind=[self.volume_binding, self.image_ensure])
+            rebind=[self.volume_binding, self.image_ensure,
+                    self.user_ensure, self.tenant_ensure])
         ensure_img_mock.assert_called_once_with(
             self.context.src_cloud, self.context.dst_cloud,
             name=self.image_ensure, provides=self.image_ensure,
@@ -215,4 +303,6 @@ class TestMigrateAttachedVolume(TestMigrateVolume):
     def test_migrate_attached_volume(self):
         flow = volume.migrate_attached_volume(self.context,
                                               self.test_server_id,
-                                              self.test_volume_id)
+                                              self.test_volume_id,
+                                              self.user_info,
+                                              self.tenant_info)

@@ -60,7 +60,7 @@ class TestService(TestBase):
 
     def test_check(self):
         self.service.check(self.cloud)
-        self.cloud.ping.assert_called_once_with()
+        self.cloud.ping.assert_called_once_with({})
 
     def test_make_with_none(self):
         self.service.make(identity=None)

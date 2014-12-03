@@ -135,12 +135,13 @@ class Cloud(object):
                                     self.namespace.auth_url)
         self.neutron = neutron_client.Client("2.0", **self.namespace.to_dict())
 
-    def ping(self):
+    def ping(self, plugins):
         try:
             self.keystone.users.list(limit=1)
             self.nova.servers.list(limit=1)
             iter(self.glance.images.list(limit=1)).next()
-            self.neutron.list_networks(limit=1)
+            if plugins["network"] == "neutron":
+                self.neutron.list_networks(limit=1)
         except Exception:
             LOG.exception("The client check is failed for cloud %r", self)
             return False

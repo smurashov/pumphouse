@@ -19,24 +19,39 @@ MigrateTestCase.addStep('Call /resources API to fetch resources', function () {
     }.bind(this));
 });
 
-MigrateTestCase.addStep('Look for preconfigured tenant in source cloud', function () {
-    var context = this.test_case.context,
-        b = context.state,
-        t = b.get({
-            'id': Config.tenant_id,
-            'type': 'tenant',
-            'cloud': 'source'
-        });
+MigrateTestCase.addStep(
+    'Look for tenant matched to "' + Config.tenant_name_mask + '" in source cloud',
+    function () {
+        var context = this.test_case.context,
+            res = context.state.resources,
+            b = context.state,
+            tenant,
+            i,
+            j;
 
-    console.log('Got cloud resources', b.toString());
+        console.log('Got clouds resources', b.toString());
 
-    // Looking for predefined tenant in the source cloud
-    if (t) {
-        context.tenant = t;
-        return this.next();
+        // Looking for the tenant
+        for (i in res) {
+            if (res.hasOwnProperty(i)) {
+                j = res[i];
+                if (j.type === 'tenant' &&
+                        j.cloud === 'source' &&
+                        j.data.name.indexOf(Config.tenant_name_mask) === 0) {
+                    tenant = j;
+                }
+            }
+        }
+
+        // Looking for predefined tenant in the source cloud
+        if (tenant) {
+            context.tenant = tenant;
+            console.log('Tenant ' + JSON.stringify(tenant) + ' is matching the mask');
+            return this.next();
+        }
+        this.fail('Unable to find tenant by mask "' + Config.tenant_name_mask + '" in source cloud');
     }
-    this.fail('Unable to find tenant "' + Config.tenant_id + '" in source cloud');
-});
+);
 
 MigrateTestCase.addStep('Initiate tenant migration', function () {
     var tenant = this.test_case.context.tenant;
@@ -57,7 +72,7 @@ MigrateTestCase.addStep('Handle tenant migration start event', function () {
     this.test_case.events
         .listenFor('update')
         .of({
-            'id': Config.tenant_id,
+            'id': tenant.id,
             'type': 'tenant',
             'cloud': 'source',
             'action': 'migration'
@@ -76,10 +91,10 @@ MigrateTestCase.addStep('Handle tenant migration finish event', function () {
     this.test_case.events
         .listenFor('update')
         .of({
-            'id': Config.tenant_id,
+            'id': tenant.id,
             'type': 'tenant',
             'cloud': 'source',
-            'action': ''
+            'action': null
         })
         .execute(
             function (m) {

@@ -106,7 +106,8 @@ class ServerStartMigrationEvent(task.BaseCloudTask):
         msg = ("Migration of server {} failed by reason {}"
                .format(server_id, result))
         LOG.warning(msg)
-        events.emit("error", {
+        events.emit("log", {
+            "level": "error",
             "message": msg,
         }, namespace="/events")
         events.emit("update", {
@@ -170,7 +171,7 @@ class BootServerFromImage(task.BaseCloudTask):
             password="default")
         server = restrict_cloud.nova.servers.create(
             server_info["name"], image_info["id"], flavor_info["id"],
-            block_device_mapping=server_dm, nics=server_nics)
+            block_device_mapping=dict(server_dm), nics=server_nics)
         server = utils.wait_for(server, self.cloud.nova.servers.get,
                                 value="ACTIVE")
         spawn_server_info = server.to_dict()
@@ -232,7 +233,9 @@ def reprovision_server(context, server, server_nics):
         context,
         server_id,
         getattr(server,
-                "os-extended-volumes:volumes_attached"))
+                "os-extended-volumes:volumes_attached"),
+        server.user_id,
+        server.tenant_id)
     pre_boot_tasks = pre_boot_tasks + [migrate_server_volumes]
 
     flow = linear_flow.Flow("migrate-server-{}".format(server_id))
