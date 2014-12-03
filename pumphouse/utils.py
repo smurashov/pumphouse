@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and#
 # limitations under the License.
 
+import itertools
 import logging
 import operator
 import sys
@@ -76,7 +77,11 @@ def wait_for(resource, update_resource,
         if time.time() - start > timeout:
             raise exceptions.TimeoutException()
 
-counter = (chr(i) for i in range(ord('A'), ord('Z')))
+alphabet = map(chr, xrange(ord('A'), ord('Z')))
+chain = lambda g: (e for i in g for e in i)
+_tuples = (itertools.combinations_with_replacement(alphabet, l)
+           for l in itertools.count(1))
+counter = itertools.imap(''.join, chain(_tuples))
 ids = defaultdict(lambda: next(counter))
 id_re = re.compile(r"""
     [0-9a-fA-F]{8}(-?)(?:[0-9a-fA-F]{4}\1){3}[0-9a-fA-F]{12}  # UUID
