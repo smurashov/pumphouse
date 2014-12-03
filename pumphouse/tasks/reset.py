@@ -452,7 +452,10 @@ class NovaNic(EventResource):
 class NeutronSubnet(EventResource):
     @classmethod
     def get_id_for(cls, data):
-        return (NeutronNetwork.get_id_for(data["network"]), data["cidr"])
+        cidr = data["cidr"]
+        if cidr is None:
+            cidr = ""
+        return (NeutronNetwork.get_id_for(data["network"]), cidr)
 
     def event_id(self):
         return "_".join(self.get_id_for(self.data))
@@ -471,7 +474,8 @@ class NeutronSubnet(EventResource):
 
     @task(before=[create])
     def delete(self):
-        self.env.cloud.neutron.delete_subnet(self.data["id"])
+        if self.data["cidr"] is not None:
+            self.env.cloud.neutron.delete_subnet(self.data["id"])
 
 
 @Network.register("neutron")
@@ -496,6 +500,8 @@ class NeutronNetwork(EventResource):
             subnet_id = self.data["subnets"][0]
         except KeyError:
             subnet = {"cidr": self.data["cidr"]}
+        except IndexError:
+            subnet = {"cidr": None}
         else:
             subnet = self.env.cloud.neutron.show_subnet(subnet_id)["subnet"]
         subnet["network"] = self.data

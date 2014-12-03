@@ -80,6 +80,8 @@ def _make_str_id(id_):
         return "+".join(map(_make_str_id, sorted(id_)))
     elif isinstance(id_, type):
         return id_.__name__
+    elif id_ is None:
+        return "__NULL__"
     else:
         return id_
 
