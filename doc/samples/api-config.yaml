@@ -33,6 +33,8 @@ LOGGING:
         handlers:
           - console
           - file
+PARAMETERS:
+    volume_tasks_timeout: 300
 PLUGINS:
     provision_server: image
 cmds:

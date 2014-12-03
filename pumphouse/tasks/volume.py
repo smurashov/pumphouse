@@ -37,7 +37,7 @@ class RetrieveVolume(task.BaseCloudTask):
 
 class CreateVolumeSnapshot(task.BaseCloudTask):
 
-    def execute(self, volume_info):
+    def execute(self, volume_info, timeout):
         volume_id = volume_info["id"]
 
         try:
@@ -53,7 +53,7 @@ class CreateVolumeSnapshot(task.BaseCloudTask):
             snapshot.id,
             self.cloud.cinder.volume_snapshots.get,
             value='available',
-            timeout=300,
+            timeout=timeout,
             error_value='error')
 
         return snapshot._info
@@ -61,7 +61,7 @@ class CreateVolumeSnapshot(task.BaseCloudTask):
 
 class UploadVolume(task.BaseCloudTask):
 
-    def execute(self, volume_info):
+    def execute(self, volume_info, timeout):
         volume_id = volume_info["id"]
         try:
             resp, upload_info = self.cloud.cinder.volumes.upload_to_image(
@@ -81,7 +81,8 @@ class UploadVolume(task.BaseCloudTask):
             raise exceptions.NotFound()
         image = utils.wait_for(image.id,
                                self.cloud.glance.images.get,
-                               value="active")
+                               value="active",
+                               timeout=timeout)
         self.upload_to_glance_event(dict(image))
         return image.id
 
@@ -109,7 +110,8 @@ class CreateVolumeTask(task.BaseCloudTask):
 
 
 class CreateVolumeFromImage(CreateVolumeTask):
-    def execute(self, volume_info, image_info, user_info, tenant_info):
+    def execute(self, volume_info, image_info,
+                user_info, tenant_info, timeout):
         image_id = image_info["id"]
         if user_info:
             restrict_cloud = self.cloud.restrict(
@@ -132,14 +134,14 @@ class CreateVolumeFromImage(CreateVolumeTask):
             volume = utils.wait_for(volume.id,
                                     self.cloud.cinder.volumes.get,
                                     value="available",
-                                    timeout=120,
-                                    check_interval=10)
+                                    timeout=timeout,
+                                    check_interval=3)
             self.create_volume_event(volume._info)
         return volume._info
 
 
 class CreateVolumeClone(CreateVolumeTask):
-    def execute(self, volume_info, **requires):
+    def execute(self, volume_info, timeout, **requires):
         try:
             volume = self.cloud.cinder.volumes.create(
                 volume_info["size"], source_volid=volume_info["id"])
@@ -148,8 +150,8 @@ class CreateVolumeClone(CreateVolumeTask):
             raise exc
         else:
             volume = utils.wait_for(volume.id, self.cloud.cinder.volumes.get,
-                                    value='available', timeout=120,
-                                    check_interval=10)
+                                    value='available', timeout=timeout,
+                                    check_interval=3)
             self.create_volume_event(volume._info)
         return volume._info
 
@@ -217,6 +219,7 @@ def migrate_detached_volume(context, volume_id, user_id, tenant_id):
         user_ensure = "user-none-ensure"
         context.store[user_ensure] = None
     volume_ensure = "{}-ensure".format(volume_binding)
+    timeout = context.config.get("volume_tasks_timeout", 120)
 
     flow = graph_flow.Flow("migrate-{}".format(volume_binding))
     flow.add(RetrieveVolume(context.src_cloud,
@@ -226,7 +229,8 @@ def migrate_detached_volume(context, volume_id, user_id, tenant_id):
     flow.add(UploadVolume(context.src_cloud,
                           name=volume_upload,
                           provides=volume_upload,
-                          rebind=[volume_binding]))
+                          rebind=[volume_binding],
+                          inject={"timeout": int(timeout)})),
     flow.add(image_tasks.EnsureSingleImage(context.src_cloud,
                                            context.dst_cloud,
                                            name=image_ensure,
@@ -239,7 +243,8 @@ def migrate_detached_volume(context, volume_id, user_id, tenant_id):
                                    rebind=[volume_binding,
                                            image_ensure,
                                            user_ensure,
-                                           tenant_ensure]))
+                                           tenant_ensure],
+                                   inject={"timeout": int(timeout)})),
     context.store[volume_retrieve] = volume_id
     return flow
 
@@ -260,6 +265,7 @@ def migrate_attached_volume(context, server_id, volume_id,
     volume_sync = "{}-sync".format(volume_binding)
     user_ensure = "user-{}-ensure".format(user_id)
     tenant_ensure = "tenant-{}-ensure".format(tenant_id)
+    timeout = context.config.get("volume_tasks_timeout", 120)
 
     flow = graph_flow.Flow("migrate-{}".format(volume_binding))
     flow.add(RetrieveVolume(context.src_cloud,
@@ -270,11 +276,13 @@ def migrate_attached_volume(context, server_id, volume_id,
                                name=volume_clone,
                                provides=volume_clone,
                                rebind=[volume_binding],
-                               requires=[server_suspend]),
+                               requires=[server_suspend],
+                               inject={"timeout": int(timeout)}),
              UploadVolume(context.src_cloud,
                           name=volume_image,
                           provides=volume_image,
-                          rebind=[volume_clone]),
+                          rebind=[volume_clone],
+                          inject={"timeout": int(timeout)}),
              image_tasks.EnsureSingleImage(context.src_cloud,
                                            context.dst_cloud,
                                            name=image_ensure,
@@ -287,7 +295,8 @@ def migrate_attached_volume(context, server_id, volume_id,
                                    rebind=[volume_binding,
                                            image_ensure,
                                            user_ensure,
-                                           tenant_ensure]),
+                                           tenant_ensure],
+                                   inject={"timeout": int(timeout)}),
              DeleteVolume(context.src_cloud,
                           name=volume_delete,
                           rebind=[volume_clone],

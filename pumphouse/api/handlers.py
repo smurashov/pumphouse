@@ -228,6 +228,7 @@ def migrate_tenant(tenant_id):
     @flask.copy_current_request_context
     def migrate():
         config = flask.current_app.config.get("PLUGINS") or {}
+        config.update(flask.current_app.config.get("PARAMETERS", {}))
         src = hooks.source.connect()
         dst = hooks.destination.connect()
         ctx = context.Context(config, src, dst)

@@ -23,6 +23,7 @@ from pumphouse import exceptions
 
 class TestVolume(unittest.TestCase):
     def setUp(self):
+        self.timeout = 10
         self.test_volume_id = "123"
         self.test_image_id = "234"
         self.test_server_id = "111"
@@ -116,7 +117,7 @@ class TestUploadVolume(TestVolume):
         self.assertIsInstance(upload_volume, task.BaseCloudTask)
         upload_volume.upload_to_glance_event = Mock()
 
-        image_id = upload_volume.execute(self.volume_info)
+        image_id = upload_volume.execute(self.volume_info, self.timeout)
         self.cloud.cinder.volumes.upload_to_image.assert_called_once_with(
             self.test_volume_id,
             False,
@@ -134,7 +135,7 @@ class TestUploadVolume(TestVolume):
             exceptions.cinder_excs.BadRequest("400 Bad Request")
 
         with self.assertRaises(exceptions.cinder_excs.BadRequest):
-            upload_volume.execute(self.volume_info)
+            upload_volume.execute(self.volume_info, self.timeout)
 
     def test_execute_image_not_found(self):
         upload_volume = volume.UploadVolume(self.cloud)
@@ -142,7 +143,7 @@ class TestUploadVolume(TestVolume):
             exceptions.glance_excs.NotFound("404 Not Found")
 
         with self.assertRaises(exceptions.NotFound):
-            upload_volume.execute(self.volume_info)
+            upload_volume.execute(self.volume_info, self.timeout)
 
 
 class TestCreateVolumeFromImage(TestVolume):
@@ -160,7 +161,8 @@ class TestCreateVolumeFromImage(TestVolume):
         volume_info = create_volume.execute(self.volume_info,
                                             self.image_info,
                                             self.user_info,
-                                            self.tenant_info)
+                                            self.tenant_info,
+                                            self.timeout)
         self.cloud.cinder.volumes.create.assert_called_once_with(
             self.volume_info["size"], **create_volume_dict)
         self.assertEqual(len(self.cloud.cinder.volumes.get.call_args), 2)
@@ -176,7 +178,8 @@ class TestCreateVolumeFromImage(TestVolume):
             create_volume.execute(self.volume_info,
                                   self.image_info,
                                   self.user_info,
-                                  self.tenant_info)
+                                  self.tenant_info,
+                                  self.timeout)
 
 
 class TestCreateVolumeSnapshot(TestVolume):
@@ -185,7 +188,7 @@ class TestCreateVolumeSnapshot(TestVolume):
         self.cloud.cinder.volume_snapshots.create.return_value = self.snapshot
         self.cloud.cinder.volume_snapshots.get.return_value = self.snapshot
 
-        snapshot_info = create_volume.execute(self.volume_info)
+        snapshot_info = create_volume.execute(self.volume_info, self.timeout)
         self.assertIsInstance(create_volume, task.BaseCloudTask)
         self.cloud.cinder.volume_snapshots.create.assume_called_once_with(
             self.test_volume_id)
@@ -197,7 +200,7 @@ class TestCreateVolumeClone(TestVolume):
         self.volume_info.update({"source_volid": self.test_volume_id})
         create_volume = volume.CreateVolumeClone(self.cloud)
 
-        volume_info = create_volume.execute(self.volume_info)
+        volume_info = create_volume.execute(self.volume_info, self.timeout)
         self.assertIsInstance(create_volume, task.BaseCloudTask)
         self.cloud.cinder.volumes.create.assert_called_once_with(
             self.volume_info["size"],
@@ -247,6 +250,7 @@ class TestMigrateVolume(TestVolume):
         self.user_id = "none"
         self.user_ensure = "user-{}-ensure".format(self.user_id)
         self.volume_ensure = "{}-ensure".format(self.volume_binding)
+        self.context.config = {"volume_tasks_timeout": self.timeout}
 
 
 class TestMigrateDetachedVolume(TestMigrateVolume):
@@ -275,12 +279,14 @@ class TestMigrateDetachedVolume(TestMigrateVolume):
             provides=self.volume_binding, rebind=[self.volume_retrieve])
         upload_vol_mock.assert_called_once_with(
             self.context.src_cloud, name=self.volume_upload,
-            provides=self.volume_upload, rebind=[self.volume_binding])
+            provides=self.volume_upload, rebind=[self.volume_binding],
+            inject={"timeout": int(self.timeout)})
         create_vol_mock.assert_called_once_with(
             self.context.dst_cloud, name=self.volume_ensure,
             provides=self.volume_ensure,
             rebind=[self.volume_binding, self.image_ensure,
-                    self.user_ensure, self.tenant_ensure])
+                    self.user_ensure, self.tenant_ensure],
+            inject={"timeout": int(self.timeout)})
         ensure_img_mock.assert_called_once_with(
             self.context.src_cloud, self.context.dst_cloud,
             name=self.image_ensure, provides=self.image_ensure,
@@ -297,7 +303,7 @@ class TestMigrateDetachedVolume(TestMigrateVolume):
 
 class TestMigrateAttachedVolume(TestMigrateVolume):
     def setUp(self):
-        super(TestMigrateVolume, self).setUp()
+        super(TestMigrateAttachedVolume, self).setUp()
         self.test_server_id = "456"
 
     def test_migrate_attached_volume(self):
