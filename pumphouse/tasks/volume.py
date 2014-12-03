@@ -69,7 +69,7 @@ class UploadVolume(task.BaseCloudTask):
                 False,
                 "pumphouse-volume-{}-image".format(volume_id),
                 'bare',
-                'raw')
+                'qcow2')
         except Exception as exc:
             LOG.exception("Upload failed: %s", exc.message)
             raise exc

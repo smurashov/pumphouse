@@ -122,7 +122,7 @@ class TestUploadVolume(TestVolume):
             False,
             "pumphouse-volume-{}-image".format(self.volume_info["id"]),
             'bare',
-            'raw')
+            'qcow2')
         self.assertEqual(len(self.cloud.glance.images.get.call_args), 2)
         self.assertEqual(self.test_image_id, image_id)
         upload_volume.upload_to_glance_event.assert_called_once_with(
