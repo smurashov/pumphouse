@@ -18,16 +18,17 @@ import logging
 import os
 
 from pumphouse import exceptions
-from pumphouse import management
 from pumphouse import utils
 from pumphouse import flows
 from pumphouse import context
+from pumphouse.tasks import base as tasks_base
 from pumphouse.tasks import evacuation as evacuation_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import identity as identity_tasks
 from pumphouse.tasks import resources as resources_tasks
 from pumphouse.tasks import volume_resources as volume_tasks
 from pumphouse.tasks import node as reassignment_tasks
+from pumphouse.tasks import reset as reset_tasks
 
 from taskflow.patterns import graph_flow
 from taskflow.patterns import unordered_flow
@@ -293,6 +294,32 @@ def init_client(config, name, client_class, identity_class):
     return client
 
 
+def setup(plugins, events, cloud, target,
+          num_tenants, num_servers, num_volumes, workloads):
+    env = reset_tasks.Environment(cloud, plugins)
+    runner = tasks_base.TaskflowRunner(env)
+    setup_workload = runner.get_resource(reset_tasks.SetupWorkload, {
+        "id": cloud.name,
+        "populate": {
+            "num_tenants": num_tenants,
+            "num_servers": num_servers,
+            "num_volumes": num_volumes,
+        },
+        "workloads": workloads,
+    })
+    runner.add(setup_workload.create)
+    runner.run()
+
+
+def cleanup(plugins, events, cloud, target):
+    env = reset_tasks.Environment(cloud, plugins)
+    runner = tasks_base.TaskflowRunner(env)
+    cleanup_workload = runner.get_resource(reset_tasks.CleanupWorkload,
+                                           {"id": cloud.name})
+    runner.add(cleanup_workload.delete)
+    runner.run()
+
+
 def main():
     args = get_parser().parse_args()
 
@@ -312,8 +339,9 @@ def main():
                           Identity)
         if args.setup:
             workloads = clouds_config["source"].get("workloads", {})
-            management.setup(events, src, "source", args.num_tenants,
-                             args.num_servers, args.num_volumes, workloads)
+            setup(plugins_config, events, src, "source",
+                  args.num_tenants, args.num_servers, args.num_volumes,
+                  workloads)
         dst_config = clouds_config["destination"]
         dst = init_client(dst_config,
                           "destination",
@@ -342,7 +370,7 @@ def main():
                             args.target,
                             Cloud,
                             Identity)
-        management.cleanup(events, cloud, args.target)
+        cleanup(plugins_config, events, cloud, args.target)
     elif args.action == "setup":
         src_config = clouds_config["source"]
         src = init_client(src_config,
@@ -350,11 +378,9 @@ def main():
                           Cloud,
                           Identity)
         workloads = clouds_config["source"].get("workloads", {})
-        management.setup(plugins_config, events, src, "source",
-                         args.num_tenants,
-                         args.num_servers,
-                         args.num_volumes,
-                         workloads)
+        setup(plugins_config, events, src, "source",
+              args.num_tenants, args.num_servers, args.num_volumes,
+              workloads)
     elif args.action == "evacuate":
         src = init_client(clouds_config["source"],
                           "source",

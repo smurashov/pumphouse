@@ -15,12 +15,15 @@
 import itertools
 import logging
 import operator
+import string
 import sys
 import time
 import traceback
 import yaml
 import re
 from collections import defaultdict
+
+from requests import exceptions as req_excs
 
 from . import exceptions
 
@@ -50,6 +53,10 @@ status_attr = operator.attrgetter("status")
 def wait_for(resource, update_resource,
              attribute_getter=status_attr, value=None, error_value=None,
              timeout=60, check_interval=1, expect_excs=None, stop_excs=None):
+    if expect_excs:
+        expect_excs = tuple(expect_excs) + (req_excs.ConnectionError,)
+    else:
+        expect_excs = (req_excs.ConnectionError,)
     if stop_excs is None:
         if value is None:
             value = "ACTIVE"
@@ -77,9 +84,8 @@ def wait_for(resource, update_resource,
         if time.time() - start > timeout:
             raise exceptions.TimeoutException()
 
-alphabet = map(chr, xrange(ord('A'), ord('Z')))
 chain = lambda g: (e for i in g for e in i)
-_tuples = (itertools.combinations_with_replacement(alphabet, l)
+_tuples = (itertools.combinations_with_replacement(string.uppercase, l)
            for l in itertools.count(1))
 counter = itertools.imap(''.join, chain(_tuples))
 ids = defaultdict(lambda: next(counter))

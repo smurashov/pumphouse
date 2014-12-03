@@ -117,14 +117,14 @@ def cloud_resources(cloud):
             "type": "volume",
             "data": {
                 "id": volume.id,
-                "status": volume.status.lower(),
+                "status": volume.status,
                 "name": volume.display_name,
                 "tenant_id": getattr(volume, "os-vol-tenant-attr:tenant_id",
                                      None),
                 "host_id": getattr(volume, "os-vol-host-attr:host", None),
-                "server_ids": attachments,
                 "size": volume.size,
-                "type": getattr(volume, "volume_type", None)
+                "type": getattr(volume, "volume_type", None),
+                "server_ids": attachments,
             },
         }
     for image in cloud.glance.images.list():

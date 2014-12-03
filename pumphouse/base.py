@@ -14,7 +14,8 @@
 
 import logging
 
-from . import management
+from pumphouse.tasks import base
+from pumphouse.tasks import reset
 
 
 LOG = logging.getLogger(__name__)
@@ -49,18 +50,27 @@ class Service(object):
 
     def reset(self, events, cloud):
         try:
-            management.cleanup(events, cloud, self.target)
-            kwargs = {}
-            if isinstance(self.workloads_config, dict):
-                kwargs['workloads'] = self.workloads_config
-            if isinstance(self.populate_config, dict):
-                kwargs['num_tenants'] = self.populate_config.get(
-                    "num_tenants", self.default_num_tenants)
-                kwargs['num_servers'] = self.populate_config.get(
-                    "num_servers", self.default_num_servers)
-            if kwargs:
-                management.setup(self.plugins, events,
-                                 cloud, self.target, **kwargs)
+            env = reset.Environment(cloud, self.plugins)
+
+            runner = base.TaskflowRunner(env)
+            cleanup_workload = runner.get_resource(reset.CleanupWorkload,
+                                                   {"id": cloud.name})
+            runner.add(cleanup_workload.delete)
+
+            populate = self.populate_config
+            workloads = self.workloads_config
+            if populate is not None or workloads is not None:
+                if populate is None:
+                    populate = {}
+                if workloads is None:
+                    workloads = {}
+                setup_workload = runner.get_resource(reset.SetupWorkload, {
+                    "id": cloud.name,
+                    "populate": populate,
+                    "workloads": workloads,
+                })
+                runner.add(setup_workload.create)
+            runner.run()
         except Exception:
             LOG.exception("Unexpected exception during cloud reset")
 

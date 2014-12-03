@@ -28,8 +28,10 @@ CLOUDS:
         identity:
             connection:  mysql+mysqlconnector://root:root@127.0.0.1/keystone
         populate:
+            num_tenants: 4
             num_servers: 3
-            num_tenants: 3
+            num_volumes: 2
+            volume_size: 1
         urls:
             horizon:        http://10.0.0.1/
         workloads:
@@ -37,17 +39,17 @@ CLOUDS:
               - &small
                 name: pumphouse-flavor-0001-small
                 ram: 1024
-                vcpu: 1
+                vcpus: 1
                 disk: 10
               - &medium
                 name: pumphouse-flavor-0001-medium
                 ram: 4096
-                vcpu: 2
+                vcpus: 2
                 disk: 40
               - &large
                 name: pumphouse-flavor-0001-large
                 ram: 8192
-                vcpu: 4
+                vcpus: 4
                 disk: 80
             images:
               - &image
@@ -61,12 +63,25 @@ CLOUDS:
               - name: pumphouse-test-0001
                 description: "pumphouse test tenant 0001"
                 username: pumphouse-test-user-0001
+                volumes:
+                  - &volume-1
+                    display_name: pumphouse-volume-1
+                    size: 1
+                  - &volume-2
+                    display_name: pumphouse-volume-2
+                    size: 1
+                  - &volume-3
+                    display_name: pumphouse-volume-3
+                    size: 1
                 servers:
                   - name: pumphouse-test-instance-0001
                     flavor:
                       <<: *small
                     image:
                       <<: *image
+                    volumes:
+                      - <<: *volume-1
+                      - <<: *volume-2
                     pre-actions: &health_checks
                         -
                             - <<: *ping
@@ -90,6 +105,8 @@ CLOUDS:
                       <<: *medium
                     image:
                       <<: *image
+                    volumes:
+                      - <<: *volume-3
                   - name: pumphouse-test-instance-0003
                     flavor:
                       <<: *large
