@@ -10,3 +10,7 @@ pumphouse/api/static
 .coverage
 .testrepository/
 htmlcov/
+
+# pdb leftovers
+AUTHORS
+ChangeLog
