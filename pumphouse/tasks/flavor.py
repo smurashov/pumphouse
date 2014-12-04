@@ -32,24 +32,38 @@ class RetrieveFlavor(task.BaseCloudTask):
 
 class EnsureFlavor(task.BaseCloudTask):
     def execute(self, flavor_info):
-        try:
-            # TODO(akscram): Ensure that the flavor with the same ID is
-            #                equal to the source flavor.
-            flavor = self.cloud.nova.flavors.get(flavor_info["id"])
-        except exceptions.nova_excs.NotFound:
-            flavor = self.cloud.nova.flavors.create(
-                flavor_info["name"],
-                flavor_info["ram"],
-                flavor_info["vcpus"],
-                flavor_info["disk"],
-                flavorid=flavor_info["id"],
-                ephemeral=flavor_info["OS-FLV-EXT-DATA:ephemeral"],
-                swap=flavor_info["swap"] or 0,
-                rxtx_factor=flavor_info["rxtx_factor"],
-                is_public=flavor_info["os-flavor-access:is_public"]
-            )
-            self.created_event(flavor)
+        flavors = self.cloud.nova.flavors.list()
+        for flavor in flavors:
+            if flavor.name == flavor_info["name"]:
+                return self.verify(flavor.to_dict(), flavor_info)
+        flavor = self.create_flavor(flavor_info)
         return flavor.to_dict()
+
+    def verify(self, flavor, flavor_info):
+        for k, v in flavor.items():
+            if k in ("links", "id"):
+                continue
+            if v != flavor_info[k]:
+                raise exceptions.Conflict("Flavor {!r} have got different "
+                                          "field {}"
+                                          .format(flavor_info["name"], k))
+        return flavor
+
+    def create_flavor(self, flavor_info, preserv_id=False):
+        flavorid = flavor_info["id"] if preserv_id else "auto"
+        flavor = self.cloud.nova.flavors.create(
+            flavor_info["name"],
+            flavor_info["ram"],
+            flavor_info["vcpus"],
+            flavor_info["disk"],
+            flavorid=flavorid,
+            ephemeral=flavor_info["OS-FLV-EXT-DATA:ephemeral"],
+            swap=flavor_info["swap"] or 0,
+            rxtx_factor=flavor_info["rxtx_factor"],
+            is_public=flavor_info["os-flavor-access:is_public"]
+        )
+        self.created_event(flavor)
+        return flavor
 
     def created_event(self, flavor):
         LOG.info("Flavor created: %s", flavor.id)
