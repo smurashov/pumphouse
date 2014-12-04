@@ -14,6 +14,8 @@
 
 import functools
 import logging
+import pdb
+import traceback
 
 import taskflow.engines
 from taskflow.patterns import graph_flow
@@ -62,15 +64,22 @@ class Runner(object):
 
 
 class TaskFlowTask(taskflow.task.Task):
-    def __init__(self, task, **kwargs):
+    def __init__(self, task, post_mortem, **kwargs):
         super(TaskFlowTask, self).__init__(**kwargs)
         self.task = task
+        self.post_mortem = post_mortem
 
     def execute(self, **dependencies):
         logargs = self.task.name, self.task.resource
         if self.task.fn is not None:
             LOG.debug("Starting task %s of %s", *logargs)
-            self.task.fn(self.task.resource)
+            try:
+                self.task.fn(self.task.resource)
+            except Exception:
+                if self.post_mortem:
+                    traceback.print_exc()
+                    pdb.post_mortem()
+                raise
             LOG.debug("Finished task %s of %s", *logargs)
         else:
             LOG.debug("Passed empty task %s of %s", *logargs)
@@ -90,6 +99,13 @@ def _make_str_id(id_):
 
 
 class TaskflowRunner(Runner):
+    def __init__(self, env):
+        super(TaskflowRunner, self).__init__(env)
+        try:
+            self.post_mortem = env.plugins["post_mortem"]
+        except (AttributeError, KeyError):
+            self.post_mortem = False
+
     def get_task_name(self, task):
         id_ = _make_str_id(task.resource.get_id())
         return "_".join((type(task.resource).__name__, id_, task.name))
@@ -98,6 +114,7 @@ class TaskflowRunner(Runner):
         name = self.get_task_name(task)
         flow_task = TaskFlowTask(
             task,
+            post_mortem=self.post_mortem,
             name=name,
             provides=name,
             rebind=map(self.get_task_name, task.requires | task.after),
