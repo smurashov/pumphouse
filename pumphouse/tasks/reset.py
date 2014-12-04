@@ -936,7 +936,7 @@ class CleanupWorkload(EventResource):
                 yield f.to_dict()
         elif plugin == "neutron":
             networks = {network["id"]: network for network in self.networks}
-            fips =  self.env.cloud.neutron.list_floatingips()["floatingips"]
+            fips = self.env.cloud.neutron.list_floatingips()["floatingips"]
             for floating_ip in fips:
                 port_id = floating_ip["port_id"]
                 if port_id is not None:
