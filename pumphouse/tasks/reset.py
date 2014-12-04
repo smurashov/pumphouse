@@ -965,20 +965,21 @@ class CleanupWorkload(EventResource):
             search_opts={"all_tenants": 1})
         for volume in volumes:
             volume_info = volume._info
-            if is_prefixed(volume_info.get("display_name", "")):
+            display_name = volume_info.get("display_name", "") or ""
+            if is_prefixed(display_name):
                 yield volume_info
 
     delete = base.task(name="delete", requires=[
         tenants.each().delete,
         roles.each().delete,
         users.each().delete,
+        volumes.each().delete,
         servers.each().delete,
         flavors.each().delete,
         security_groups.each().delete,
         networks.each().delete,
         floating_ips.each().delete,
         images.each().delete,
-        volumes.each().delete,
     ])
 
 
