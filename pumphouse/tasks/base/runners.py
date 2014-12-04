@@ -67,10 +67,13 @@ class TaskFlowTask(taskflow.task.Task):
         self.task = task
 
     def execute(self, **dependencies):
-        LOG.debug("Starting task %s of %s", self.task.name, self.task.resource)
+        logargs = self.task.name, self.task.resource
         if self.task.fn is not None:
+            LOG.debug("Starting task %s of %s", *logargs)
             self.task.fn(self.task.resource)
-        LOG.debug("Finished task %s of %s", self.task.name, self.task.resource)
+            LOG.debug("Finished task %s of %s", *logargs)
+        else:
+            LOG.debug("Passed empty task %s of %s", *logargs)
 
 
 def _make_str_id(id_):
