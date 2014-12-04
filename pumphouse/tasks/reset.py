@@ -813,7 +813,9 @@ class Server(EventResource):
 
     @base.Collection(Volume)
     def volumes(self):
-        return self.data["os-extended-volumes:volumes_attached"]
+        if self.data.get("status", "").lower() == "active":
+            return self.data["os-extended-volumes:volumes_attached"]
+        return []
 
     @task(requires=[image.upload, tenant.create, flavor.create, user.create,
                     nics.each().create, floating_ips.each().create],
