@@ -771,9 +771,14 @@ class Volume(EventResource):
 
 class Server(EventResource):
     def event_data(self):
-        data = self.data.copy()
-        data["image_id"] = data["image"]["id"]
-        return data
+        return {
+            "id": self.data["id"],
+            "name": self.data["name"],
+            "status": self.data["status"],
+            "tenant_id": self.data["tenant_id"],
+            "image_id": self.data["image"]["id"],
+            "host_id": self.data.get("OS-EXT-SRV-ATTR:hypervisor_hostname"),
+        }
 
     @Tenant()
     def tenant(self):
