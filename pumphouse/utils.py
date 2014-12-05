@@ -14,6 +14,7 @@
 
 import itertools
 import logging
+import logging.config
 import operator
 import string
 import sys
@@ -135,3 +136,12 @@ def dump_task(task, f, prev=None):
         f.write('"%s" -> "%s" [style=bold]\n' % (eat_ids(prev.name),
                                                  eat_ids(task.name)))
     return task
+
+
+def configure_logging(config):
+    log_config = config.get("LOGGING")
+    if log_config is None:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        log_config.update(version=1, disable_existing_loggers=False)
+        logging.config.dictConfig(log_config)

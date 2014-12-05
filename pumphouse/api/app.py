@@ -20,6 +20,7 @@ from . import handlers
 from . import hooks
 
 from pumphouse import events
+from pumphouse import utils
 
 
 def create_app():
@@ -50,7 +51,7 @@ def start_app(config=None, **kwargs):
             return (host, port)
         return (None, None)
 
-    logging.basicConfig(level=logging.DEBUG)
+    utils.configure_logging(config)
     app = create_app()
     app.config.setdefault("CLOUDS_RESET", False)
     app.config.setdefault("BIND_HOST", None)

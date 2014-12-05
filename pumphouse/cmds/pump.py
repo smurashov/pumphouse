@@ -323,7 +323,7 @@ def cleanup(plugins, events, cloud, target):
 def main():
     args = get_parser().parse_args()
 
-    logging.basicConfig(level=logging.INFO)
+    utils.configure_logging(args.config)
 
     events = Events()
     Cloud, Identity = load_cloud_driver(is_fake=args.fake)

@@ -2,6 +2,32 @@ DEBUG: false
 SERVER_NAME: 127.0.0.1:5000
 BIND_HOST: 127.0.0.1:5000
 CLOUDS_RESET: true
+LOGGING:
+    formatters:
+        default:
+            format: '%(asctime)s %(levelname)-8s %(name)-15s %(message)s'
+            datefmt: '%Y-%m-%d %H:%M:%S'
+    handlers:
+        console:
+            class: logging.StreamHandler
+            level: DEBUG
+            formatter: default
+        file:
+            class: logging.handlers.TimedRotatingFileHandler
+            level: DEBUG
+            formatter: default
+            filename: pumphouse.log
+            when: D
+            interval: 1
+            backupCount: 10
+    loggers:
+        iso8601:
+            level: INFO
+    root:
+        level: DEBUG
+        handlers:
+          - console
+          - file
 PLUGINS:
     provision_server: image
 cmds:
