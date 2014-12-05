@@ -1190,9 +1190,9 @@ class SetupWorkload(EventResource):
         flavors.each().create,
         security_groups.each().create,
         networks.each().create,
-        volumes.each().create,
         servers.each().create,
         floating_ips.each().create,
+        volumes.each().create,
     ])
 
 
