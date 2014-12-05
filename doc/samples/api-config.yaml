@@ -4,14 +4,17 @@ BIND_HOST: 127.0.0.1:5000
 CLOUDS_RESET: true
 LOGGING:
     formatters:
-        default:
+        default: &default_formatter
             format: '%(asctime)s %(levelname)-8s %(name)-15s %(message)s'
             datefmt: '%Y-%m-%d %H:%M:%S'
+        color:
+            <<: *default_formatter
+            (): pumphouse.utils.ColorFormatter
     handlers:
         console:
             class: logging.StreamHandler
             level: DEBUG
-            formatter: default
+            formatter: color
         file:
             class: logging.handlers.TimedRotatingFileHandler
             level: DEBUG

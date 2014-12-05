@@ -145,3 +145,17 @@ def configure_logging(config):
     else:
         log_config.update(version=1, disable_existing_loggers=False)
         logging.config.dictConfig(log_config)
+
+
+class ColorFormatter(logging.Formatter):
+    LEVEL_COLORS = {
+        logging.DEBUG: '\033[00;32m',  # GREEN
+        logging.INFO: '\033[00;36m',  # CYAN
+        logging.WARN: '\033[01;33m',  # BOLD YELLOW
+        logging.ERROR: '\033[01;31m',  # BOLD RED
+        logging.CRITICAL: '\033[01;31m',  # BOLD RED
+    }
+
+    def format(self, record):
+        res = super(ColorFormatter, self).format(record)
+        return self.LEVEL_COLORS[record.levelno] + res + '\033[m'
