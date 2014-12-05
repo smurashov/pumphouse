@@ -813,9 +813,9 @@ class Server(EventResource):
 
     @base.Collection(Volume)
     def volumes(self):
-        if self.data.get("status", "").lower() == "active":
-            return self.data["os-extended-volumes:volumes_attached"]
-        return []
+        if "status" in self.data and self.data["status"] != "active":
+            return []
+        return self.data.get("os-extended-volumes:volumes_attached")
 
     @task(requires=[image.upload, tenant.create, flavor.create, user.create,
                     nics.each().create, floating_ips.each().create],
@@ -1190,9 +1190,9 @@ class SetupWorkload(EventResource):
         flavors.each().create,
         security_groups.each().create,
         networks.each().create,
-        volumes.each().create,
         servers.each().create,
         floating_ips.each().create,
+        volumes.each().create,
     ])
 
 
