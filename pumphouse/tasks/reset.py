@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and#
 # limitations under the License.
 
+from __future__ import division
+
 import collections
 import functools
 import itertools
+import logging
 import random
+import time
 import tempfile
 import urllib
 
@@ -27,6 +31,7 @@ from pumphouse import events
 from pumphouse.tasks import base
 from pumphouse import utils
 
+LOG = logging.getLogger(__name__)
 
 TEST_IMAGE_URL = ("http://download.cirros-cloud.net/0.3.2/"
                   "cirros-0.3.2-x86_64-disk.img")
@@ -92,8 +97,8 @@ class EventResource(base.Resource):
     def pre_event(self, name):
         pass
 
-    def post_event(self, name):
-        event = {
+    def get_base_event_body(self):
+        return {
             "id": self.event_id(),
             "type": self.events_type,
             "cloud": self.env.cloud.name,
@@ -101,6 +106,9 @@ class EventResource(base.Resource):
             "progress": None,
             "data": self.event_data(),
         }
+
+    def post_event(self, name):
+        event = self.get_base_event_body()
         if name == "create":
             events.emit(name, event, namespace="/events")
         elif name == "delete":
@@ -108,6 +116,11 @@ class EventResource(base.Resource):
             events.emit(name, event, namespace="/events")
         else:
             events.emit("update", event, namespace="/events")
+
+    def progress_event(self, progress):
+        event = self.get_base_event_body()
+        event["progress"] = int(progress)
+        events.emit("update", event, namespace="/events")
 
 
 class Tenant(EventResource):
@@ -234,6 +247,31 @@ class SecurityGroup(EventResource):
                 self.env.cloud.nova.security_group_rules.delete(rule["id"])
 
 
+class FileReadProgress(object):
+    def __init__(self, f, size, resource, action="Reading"):
+        self.f = f
+        self.size = size
+        self.resource = resource
+        self.action = action
+        self.reported = self.read_size = 0
+        self.reported_time = time.time()
+
+    def read(self, sz):
+        res = self.f.read(sz)
+        self.read_size += len(res)
+        now = time.time()
+        progress_since = (self.read_size - self.reported) / self.size
+        if progress_since > 0.1 or\
+                (now - self.reported_time) > 1 and progress_since > 0.01:
+            progress = (self.read_size / self.size) * 100
+            self.resource.progress_event(progress)
+            LOG.debug("%s %s progress %3.2f%%", self.action, self.resource,
+                      progress)
+            self.reported = self.read_size
+            self.reported_time = now
+        return res
+
+
 class CachedImage(EventResource):
     data_id_key = "url"
 
@@ -241,6 +279,9 @@ class CachedImage(EventResource):
         pass
 
     def post_event(self, name):
+        pass
+
+    def progress_event(self, progress):
         pass
 
     @task
@@ -255,8 +296,11 @@ class CachedImage(EventResource):
             read = 0
             if "content-length" in headers:
                 size = int(headers["Content-Length"])
+                p_img = FileReadProgress(img, size, self, "Caching")
+            else:
+                p_img = img
             while 1:
-                block = img.read(bs)
+                block = p_img.read(bs)
                 if block == "":
                     break
                 read += len(block)
@@ -269,7 +313,7 @@ class CachedImage(EventResource):
                     read, size), (None, headers))
 
         f.flush()
-        self.data = {"url": self.data["url"], "file": f}
+        self.data = {"url": self.data["url"], "file": f, "size": read}
 
 
 class Image(EventResource):
@@ -289,6 +333,8 @@ class Image(EventResource):
     def upload(self):
         # upload starts here
         with open(self.cached_image["file"].name, 'rb') as f:
+            f = FileReadProgress(f, self.cached_image["size"], self,
+                                 "Uploading")
             self.env.cloud.glance.images.upload(self.data["id"], f)
         image = self.env.cloud.glance.images.get(self.data["id"])
         self.data = dict(image)
