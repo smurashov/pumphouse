@@ -118,7 +118,7 @@ HandlersManager.prototype.match = function () {
             for (k in handler.entity) {
                 if (handler.entity.hasOwnProperty(k)) {
                     if (!event.entity.hasOwnProperty(k) || handler.entity[k] !== event.entity[k]) {
-                        console.log('Property ' + k + ' differs');
+                        console.log('Property ' + k + ' differs: ' + handler.entity[k] + ' vs ' + event.entity[k]);
                         match = false;
                     }
                 }
@@ -130,7 +130,7 @@ HandlersManager.prototype.match = function () {
                     for (k in handler.data) {
                         if (handler.data.hasOwnProperty(k)) {
                             if (!event.data.hasOwnProperty(k) || handler.data[k] !== event.data[k]) {
-                                console.log('Property ' + k + ' in data differs');
+                                console.log('Property ' + k + ' in data differs: ' + handler.data[k] + ' vs ' + event.data[k]);
                                 match = false;
                             }
                         }
