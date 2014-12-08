@@ -86,6 +86,7 @@ class EventResource(base.Resource):
             return base.Resource.__metaclass__.__new__(mcs, name, bases,
                                                        cls_vars)
 
+    mute_events = False
     event_id_key = "id"
 
     def event_id(self):
@@ -108,6 +109,8 @@ class EventResource(base.Resource):
         }
 
     def post_event(self, name):
+        if self.mute_events:
+            return
         event = self.get_base_event_body()
         if name == "create":
             events.emit(name, event, namespace="/events")
@@ -118,6 +121,8 @@ class EventResource(base.Resource):
             events.emit("update", event, namespace="/events")
 
     def progress_event(self, progress):
+        if self.mute_events:
+            return
         event = self.get_base_event_body()
         event["progress"] = int(progress)
         events.emit("update", event, namespace="/events")
@@ -274,15 +279,7 @@ class FileReadProgress(object):
 
 class CachedImage(EventResource):
     data_id_key = "url"
-
-    def pre_event(self, name):
-        pass
-
-    def post_event(self, name):
-        pass
-
-    def progress_event(self, progress):
-        pass
+    mute_events = True
 
     @task
     def cache(self):
@@ -368,6 +365,7 @@ class Nic(base.Plugin):
 class NovaSubnet(EventResource):
     data_id_key = "cidr"
     event_id_key = "cidr"
+    events_type = "subnet"
 
     create = task(name="create")
     delete = task(name="delete", before=[create])
@@ -449,6 +447,8 @@ class NovaFloatingIP(EventResource):
 
 
 class NovaFixedIP(EventResource):
+    mute_events = True
+
     @classmethod
     def get_id_for(cls, data):
         return (
@@ -475,6 +475,8 @@ class NovaFixedIP(EventResource):
 
 @Nic.register("nova")
 class NovaNic(EventResource):
+    mute_events = True
+
     @classmethod
     def get_id_for(cls, data):
         return NovaFixedIP.get_id_for(data["fixed_ip"])
@@ -513,8 +515,16 @@ class NeutronSubnet(EventResource):
             cidr = ""
         return (NeutronNetwork.get_id_for(data["network"]), cidr)
 
+    events_type = "subnet"
+
     def event_id(self):
         return "_".join(self.get_id_for(self.data))
+
+    def event_data(self):
+        return {
+            "cidr": self.data.get("cidr"),
+            "network_id": self.data.get("network_id"),
+        }
 
     @task
     def create(self):
@@ -548,6 +558,14 @@ class NeutronNetwork(EventResource):
             return data["label"]
         except KeyError:
             return data["name"]
+
+    def event_data(self):
+        return {
+            "id": self.data.get("id"),
+            "name": self.data.get("name"),
+            "status": self.data.get("status"),
+            "tenant_id": self.data.get("tenant_id"),
+        }
 
     @Tenant()
     def tenant(self):
@@ -618,8 +636,16 @@ class NeutronPort(EventResource):
             data["address"],
         )
 
+    events_type = "port"
+
     def event_id(self):
         return "_".join(self.get_id_for(self.data))
+
+    def event_data(self):
+        return {
+            "address": self.data.get("address"),
+            "network_id": self.data.get("network_id"),
+        }
 
     @NeutronNetwork()
     def network(self):
@@ -729,12 +755,11 @@ class NeutronFloatingIP(EventResource):
 
 @Nic.register("neutron")
 class NeutronNic(EventResource):
+    mute_events = True
+
     @classmethod
     def get_id_for(cls, data):
         return NeutronPort.get_id_for(data["fixed_ip"])
-
-    def event_id(self):
-        return "_".join(self.get_id_for(self.data))
 
     @NeutronPort()
     def port(self):
