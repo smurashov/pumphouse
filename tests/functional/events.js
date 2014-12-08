@@ -108,11 +108,12 @@ HandlersManager.prototype.match = function () {
     var event,
         handler = this.handlers[0],
         k,
-        match = true;
+        match;
 
     console.log('Looking for matches for: ', JSON.stringify(handler));
 
     while (this.events_bus.length) {
+        match = true;
         event = this.events_bus.shift();
         console.log('* Checking event: ' + JSON.stringify(event));
         if (event.name === handler.event) {
