@@ -85,7 +85,7 @@ class TasksBaseTestCase(unittest.TestCase):
             {"name": "server1", "tenant": tenant},
             {"name": "server2", "tenant": tenant},
         ]
-        env = mock.Mock()
+        env = mock.Mock(plugins={})
         env.cloud.keystone.tenants.create.return_value = created_tenant
 
         runner = base.TaskflowRunner(env)
@@ -113,7 +113,7 @@ class TasksBaseTestCase(unittest.TestCase):
             {"id": "servid1", "name": "server1", "tenant_id": tenant["id"]},
             {"id": "servid2", "name": "server2", "tenant_id": tenant["id"]},
         ]
-        env = mock.Mock()
+        env = mock.Mock(plugins={})
         env.cloud.nova.servers.list.return_value = servers
         env.cloud.keystone.tenants.get.return_value = tenant
 
