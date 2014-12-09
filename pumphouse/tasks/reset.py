@@ -412,7 +412,7 @@ class NovaFloatingIP(EventResource):
             "name": self.data["address"],
             "address": self.data["address"],
             "interface": self.data.get("interface"),
-            "server_id": self.data.get("instance_uuid"),
+            "server_id": self.data.get("server", {}).get("id"),
             "tenant_id": self.data.get("project_id"),
         }
 
@@ -438,6 +438,8 @@ class NovaFloatingIP(EventResource):
                 self.data["server"]["id"],
                 self.data["address"],
             )
+            self.data = dict(self.data)
+            del self.data["server"]
 
     @task(before=[create], requires=[disassociate])
     def delete(self):
