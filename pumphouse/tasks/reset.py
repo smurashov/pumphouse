@@ -922,6 +922,22 @@ class Server(EventResource):
                        stop_excs=(nova_excs.NotFound,))
 
 
+class Service(EventResource):
+    @classmethod
+    def get_id_for(cls, data):
+        return (data["host"], data["binary"])
+
+    @task
+    def enable(self):
+        self.env.cloud.nova.services.enable(self.data["host"],
+                                            self.data["binary"])
+
+    @task
+    def disable(self):
+        self.env.cloud.nova.services.disable(self.data["host"],
+                                             self.data["binary"])
+
+
 class CleanupWorkload(EventResource):
     @base.Collection(Tenant)
     def tenants(self):
@@ -976,6 +992,14 @@ class CleanupWorkload(EventResource):
                             "network": networks[label],
                         })
         return servers
+
+    @base.Collection(Service)
+    def services(self):
+        services = self.env.cloud.nova.services.list()
+        for service in services:
+            if (service.state.lower() == "up" and
+                    service.status.lower() == "disabled"):
+                yield service.to_dict()
 
     @base.Collection(Flavor)
     def flavors(self):
@@ -1045,6 +1069,7 @@ class CleanupWorkload(EventResource):
                 yield volume_info
 
     delete = base.task(name="delete", requires=[
+        services.each().enable,
         tenants.each().delete,
         roles.each().delete,
         users.each().delete,
@@ -1248,6 +1273,14 @@ class SetupWorkload(EventResource):
                     server["floating_ips"].append(floating_ip)
                 yield server
 
+    @base.Collection(Service)
+    def services(self):
+        services = self.env.cloud.nova.services.list()
+        for service in services:
+            if (service.state.lower() == "up" and
+                    service.status.lower() == "disabled"):
+                yield service.to_dict()
+
     @base.Collection(Volume)
     def volumes(self):
         for tenant in self.tenants:
@@ -1256,6 +1289,10 @@ class SetupWorkload(EventResource):
                 volume["tenant"] = tenant
                 yield volume
 
+    boot_servers = task(name="boot_servers",
+                        after=[services.each().enable],
+                        includes=[servers.each().create])
+
     create = base.task(name="create", requires=[
         tenants.each().create,
         users.each().create,
@@ -1263,7 +1300,7 @@ class SetupWorkload(EventResource):
         flavors.each().create,
         security_groups.each().create,
         networks.each().create,
-        servers.each().create,
+        boot_servers,
         floating_ips.each().create,
         volumes.each().create,
     ])
