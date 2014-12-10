@@ -63,15 +63,17 @@ class EventTask(base.UnboundTask):
     def wrapper(self, fn):
         @functools.wraps(fn)
         def inner(resource):
-            if self.pre_event is None:
-                resource.pre_event(self.name)
-            else:
-                self.pre_event(resource)
+            if not resource.mute_events:
+                if self.pre_event is None:
+                    resource.pre_event(self.name)
+                else:
+                    self.pre_event(resource)
             res = fn(resource)
-            if self.post_event is None:
-                resource.post_event(self.name)
-            else:
-                self.post_event(resource)
+            if not resource.mute_events:
+                if self.post_event is None:
+                    resource.post_event(self.name)
+                else:
+                    self.post_event(resource)
             return res
         return inner
 
@@ -109,8 +111,6 @@ class EventResource(base.Resource):
         }
 
     def post_event(self, name):
-        if self.mute_events:
-            return
         event = self.get_base_event_body()
         if name == "create":
             events.emit(name, event, namespace="/events")
@@ -121,8 +121,6 @@ class EventResource(base.Resource):
             events.emit("update", event, namespace="/events")
 
     def progress_event(self, progress):
-        if self.mute_events:
-            return
         event = self.get_base_event_body()
         event["progress"] = int(progress)
         events.emit("update", event, namespace="/events")
@@ -269,7 +267,8 @@ class FileReadProgress(object):
         if progress_since > 0.1 or\
                 (now - self.reported_time) > 1 and progress_since > 0.01:
             progress = (self.read_size / self.size) * 100
-            self.resource.progress_event(progress)
+            if not self.resource.mute_events:
+                self.resource.progress_event(progress)
             LOG.debug("%s %s progress %3.2f%%", self.action, self.resource,
                       progress)
             self.reported = self.read_size
