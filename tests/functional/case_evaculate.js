@@ -125,11 +125,13 @@ EvacuateTestCase.addStep('Assuring host is clean and all servers live migrated f
             s = old[i];
             n = now.get(s);
 
-            console.log(' - Server ' + s.data.name + ': ' + s.data.host_id + ' -> ' + n.data.host_id);
             if (!n) {
                 this.fail('Unable to locate server ' + s.name + ' (' + s.id + ') existed before evacuation');
-            } else if (n.data.host_id === host.id) {
-                this.fail('Host still contains server: ' + n.data.name + ' (' + n.id + ')');
+            } else {
+                console.log(' - Server ' + s.data.name + ': ' + s.data.host_id + ' -> ' + n.data.host_id);
+                if (n.data.host_id === host.id) {
+                    this.fail('Host still contains server: ' + n.data.name + ' (' + n.id + ')');
+                }
             }
         }
     }
