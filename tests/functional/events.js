@@ -98,6 +98,7 @@ HandlersManager.prototype.intercept = function (event_name, data) {
 };
 
 HandlersManager.prototype.match = function () {
+    console.log('Events: ', JSON.stringify(this.events_bus));
     console.log('Handlers: ', JSON.stringify(this.handlers));
     if (!this.handlers.length) {
         this.startListening();
@@ -107,17 +108,20 @@ HandlersManager.prototype.match = function () {
     var event,
         handler = this.handlers[0],
         k,
-        match = true;
+        match;
 
     console.log('Looking for matches for: ', JSON.stringify(handler));
 
     while (this.events_bus.length) {
+        match = true;
         event = this.events_bus.shift();
+        console.log('* Checking event: ' + JSON.stringify(event));
         if (event.name === handler.event) {
             // Check if event has all the values handler requires
             for (k in handler.entity) {
                 if (handler.entity.hasOwnProperty(k)) {
                     if (!event.entity.hasOwnProperty(k) || handler.entity[k] !== event.entity[k]) {
+                        console.log('* Property ' + k + ' differs: ' + handler.entity[k] + ' vs ' + event.entity[k]);
                         match = false;
                     }
                 }
@@ -129,6 +133,7 @@ HandlersManager.prototype.match = function () {
                     for (k in handler.data) {
                         if (handler.data.hasOwnProperty(k)) {
                             if (!event.data.hasOwnProperty(k) || handler.data[k] !== event.data[k]) {
+                                console.log('* Property ' + k + ' in data differs: ' + handler.data[k] + ' vs ' + event.data[k]);
                                 match = false;
                             }
                         }
@@ -139,7 +144,7 @@ HandlersManager.prototype.match = function () {
             if (match) {
                 // Event matched to the handler
                 // Handling funtion is executed with the event data
-                console.log('Match found: ', JSON.stringify(event));
+                console.log('* Match found: ', JSON.stringify(event));
 
                 handler.executions -= 1;
                 if (handler.handler(event) && !handler.executions) {
