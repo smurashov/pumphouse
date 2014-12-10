@@ -164,7 +164,6 @@ class SuspendServer(task.BaseCloudTask):
 class BootServerFromImage(task.BaseCloudTask):
     def execute(self, server_info, image_info, flavor_info, user_info,
                 tenant_info, server_nics, server_dm):
-        # TODO(akscram): Network information doesn't saved.
         restrict_cloud = self.cloud.restrict(
             username=user_info["name"],
             tenant_name=tenant_info["name"],
@@ -175,8 +174,25 @@ class BootServerFromImage(task.BaseCloudTask):
         server = utils.wait_for(server, self.cloud.nova.servers.get,
                                 value="ACTIVE")
         spawn_server_info = server.to_dict()
+        for volume_id in dict(server_dm).values():
+            volume = self.cloud.cinder.volumes.get(volume_id)
+            volume = utils.wait_for(volume.id,
+                                    self.cloud.cinder.volumes.get,
+                                    value="in-use")
+            self.attach_event(volume.id,
+                              server.id)
         self.spawn_event(spawn_server_info)
         return spawn_server_info
+
+    def attach_event(self, volume_id, server_id):
+        LOG.info("Volume updated: %s", volume_id)
+        events.emit("update", {
+            "id": volume_id,
+            "cloud": self.cloud.name,
+            "type": "volume",
+            "action": "attach",
+            "data": dict(server_ids=[server_id]),
+        }, namespace="/events")
 
     def spawn_event(self, server):
         LOG.info("Server spawned: %s", server)
@@ -201,6 +217,16 @@ class TerminateServer(task.BaseCloudTask):
         self.cloud.nova.servers.delete(server_info["id"])
         self.terminate_event(server_info)
 
+    def detach_event(self, volume_id):
+        LOG.info("Volume updated: %s", volume_id)
+        events.emit("update", {
+            "id": volume_id,
+            "cloud": self.cloud.name,
+            "type": "volume",
+            "action": "detach",
+            "data": dict(server_ids=[]),
+        }, namespace="/events")
+
     def terminate_event(self, server):
         LOG.info("Server terminated: %s", server["id"])
         events.emit("delete", {
@@ -208,6 +234,10 @@ class TerminateServer(task.BaseCloudTask):
             "type": "server",
             "cloud": self.cloud.name,
         }, namespace="/events")
+        server_volumes = server.get("os-extended-volumes:volumes_attached",
+                                    [])
+        for volume in server_volumes:
+            self.detach_event(volume["id"])
 
 
 def reprovision_server(context, server, server_nics):
