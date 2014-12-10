@@ -129,7 +129,7 @@ EvacuateTestCase.addStep('Assuring host is clean and all servers live migrated f
             n = now.get(s);
 
             if (!n) {
-                this.fail('Unable to locate server ' + s.name + ' (' + s.id + ') existed before evacuation');
+                this.fail('Unable to locate server ' + s.data.name + ' (' + s.id + ') existed before evacuation');
             } else {
                 console.log(' - Server ' + s.data.name + ': ' + s.data.host_id + ' -> ' + n.data.host_id);
                 if (n.data.host_id === host.id) {
