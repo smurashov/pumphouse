@@ -69,6 +69,7 @@ class TestServer(unittest.TestCase):
         self.cloud.nova.servers.get.return_value = self.server
         self.cloud.nova.servers.find.return_value = self.server
         self.cloud.nova.servers.create.return_value = self.server
+        self.cloud.cinder.volumes.get.return_value = self.volume
 
         self.src_cloud = Mock()
         self.dst_cloud = Mock()
@@ -128,6 +129,7 @@ class TestBootServer(TestServer):
         boot_server = server.BootServerFromImage(self.cloud)
         self.assertIsInstance(boot_server, task.BaseCloudTask)
         self.volume.status = "in-use"
+        self.volume_info.update(status="available")
         self.cloud.cinder.volume.get.return_value = self.volume
 
         server_info = boot_server.execute(self.server_info,
