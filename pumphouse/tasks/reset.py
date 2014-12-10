@@ -28,6 +28,7 @@ from neutronclient.common import exceptions as neutron_excs
 from novaclient import exceptions as nova_excs
 
 from pumphouse import events
+from pumphouse import exceptions
 from pumphouse.tasks import base
 from pumphouse import utils
 
@@ -889,6 +890,8 @@ class Server(EventResource):
             return []
         return self.data.get("os-extended-volumes:volumes_attached")
 
+    mute_events = True  # Events will be handled manualy here
+
     @task(requires=[image.upload, tenant.create, flavor.create, user.create,
                     nics.each().create, floating_ips.each().create],
           includes=[floating_ips.each().associate, volumes.each().attach])
@@ -905,8 +908,18 @@ class Server(EventResource):
             self.flavor["id"],
             nics=[nic["nic"] for nic in self.nics],
         )
-        server = utils.wait_for(server.id, servers.get, value="ACTIVE")
-        self.data = server = server.to_dict()
+
+        def do_get(id_, created=[]):
+            res = servers.get(id_)
+            self.data = res.to_dict()
+            if not created:
+                self.post_event("create")
+                created.append(True)
+            else:
+                self.post_event("update")
+            return res
+
+        server = utils.wait_for(server.id, do_get, value="ACTIVE").to_dict()
         for floating_ip in self.floating_ips:
             floating_ip["server"] = server
         for volume in self.volumes:
@@ -919,6 +932,7 @@ class Server(EventResource):
         self.env.cloud.nova.servers.delete(self.data["id"])
         utils.wait_for(self.data["id"], self.env.cloud.nova.servers.get,
                        stop_excs=(nova_excs.NotFound,))
+        self.post_event("delete")
 
 
 class CleanupWorkload(EventResource):
