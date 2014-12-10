@@ -53,6 +53,16 @@ class TestServer(unittest.TestCase):
         self.server.flavor = self.flavor_info
         self.server.to_dict.return_value = self.server_info
 
+        self.test_volume_id = "333"
+        self.volume_info = {
+            "id": self.test_volume_id,
+            "status": "available",
+        }
+        self.volume = Mock()
+        self.volume.id = self.test_volume_id
+        self.volume.status = "available"
+        self.volume._info = self.volume_info
+
         self.cloud = Mock()
         self.cloud.name = "test-cloud"
         self.cloud.restrict.return_value = self.cloud
@@ -117,6 +127,8 @@ class TestBootServer(TestServer):
     def test_execute(self):
         boot_server = server.BootServerFromImage(self.cloud)
         self.assertIsInstance(boot_server, task.BaseCloudTask)
+        self.volume.status = "in-use"
+        self.cloud.cinder.volume.get.return_value = self.volume
 
         server_info = boot_server.execute(self.server_info,
                                           self.image_info,
