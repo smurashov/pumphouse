@@ -41,6 +41,8 @@ class Resource(object):
                     resources.append(k)
                 elif isinstance(v, tasks.UnboundTask):
                     tasks_.append(k)
+                    if v.name is None:
+                        v.name = k
             cls_vars["_resources"] = tuple(resources)
             cls_vars["_tasks"] = tuple(tasks_)
             return type.__new__(mcs, name, bases, cls_vars)

@@ -73,8 +73,7 @@ class TenantWorkload(base.Resource):
 
     delete = base.task(name="delete",
                        requires=[tenant.delete, servers.each().delete])
-    create = base.task(name="create",
-                       requires=[tenant.create, servers.each().create])
+    create = base.task(requires=[tenant.create, servers.each().create])
 
 
 class TasksBaseTestCase(unittest.TestCase):

@@ -367,8 +367,8 @@ class NovaSubnet(EventResource):
     event_id_key = "cidr"
     events_type = "subnet"
 
-    create = task(name="create")
-    delete = task(name="delete", before=[create])
+    create = task()
+    delete = task(before=[create])
 
 
 @Network.register("nova")
@@ -472,7 +472,7 @@ class NovaFixedIP(EventResource):
             "address": self.data["address"],
         }
 
-    delete = task(name="delete", before=[network.delete])
+    delete = task(before=[network.delete])
 
 
 @Nic.register("nova")
@@ -505,7 +505,7 @@ class NovaNic(EventResource):
             },
         }
 
-    delete = task(name="delete", includes=[fixed_ip.delete])
+    delete = task(includes=[fixed_ip.delete])
 
 
 @Subnet.register("neutron")
@@ -776,7 +776,7 @@ class NeutronNic(EventResource):
             },
         }
 
-    delete = task(name="delete", includes=[port.delete])
+    delete = task(includes=[port.delete])
 
 
 class Volume(EventResource):
