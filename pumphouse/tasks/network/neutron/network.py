@@ -1,458 +1,741 @@
-import logging
-import json
+from neutronclient.neutron import client
+import pprint
+import inspect
 
+from taskflow import engines
+from taskflow import task
+from taskflow.patterns import linear_flow
 from taskflow.patterns import graph_flow
-from sets import Set
+from collections import defaultdict
 
-from pumphouse import exceptions
-from pumphouse import task
-
-
-LOG = logging.getLogger(__name__)
-
-# Useful documentation
-# http://docs.openstack.org/user-guide/content/sdk_neutron_apis.html
-
-# Port
-# http://docs.openstack.org/api/openstack-network/2.0/content/Overview-d1e71.html
+import novaclient.client
+import re
 
 
-def get_port_by(client, **port_filter):
+def get_port_by(neutron, port_filter):
     try:
-        LOG.debug("port_filter: %s" % str(port_filter))
-        return client.list_ports(**port_filter)['ports'].to_dict()
+        return neutron.list_ports(**port_filter)['ports']
     except Exception as e:
-        LOG.exception("Error in listing ports: %s" % e.message)
         raise
 
 
-def get_security_groups_by(client, **sg_filter):
+def get_subnet_by(neutron, subnet_filter):
     try:
-        LOG.debug("security_groups_filter: %s" % str(sg_filter))
-        return client.list_security_groups(
-            **sg_filter)['security_groups'].to_dict()
+        return neutron.list_subnets(**subnet_filter)['subnets']
     except Exception as e:
-        LOG.exception("Error in security_groups: %s" % e.message)
-        raise
+        raise e
 
 
-def get_subnet_by(client, **subnet_filter):
+def get_router_by(neutron, router_filter):
     try:
-        LOG.debug("subnet filter: %s" % str(subnet_filter))
-        return client.list_subnets(**subnet_filter)['subnets']
+        return neutron.list_routers(**router_filter)['routers']
     except Exception as e:
-        LOG.exception("Error in subnet: %s" % e.message)
+        raise e
 
 
-# Network. An isolated virtual layer-2 domain. A network can also be a
-# virtual, or logical, switch.
-def get_network_by(client, **net_filter):
+def get_router_by(neutron, router_filter):
     try:
-        LOG.debug("get_network_by: %s" % str(net_filter))
-        return client.list_networks(**net_filter)['network'].to_dict()
+        return neutron.list_routers(**router_filter)['routers']
     except Exception as e:
-        LOG.exception("Error in network: %s" % e.message)
+        raise e
 
 
-def del_port(client, **port_filter):
+def get_floatingIp_by(neutron, floatingIp_filter):
     try:
-        i = 0
-        for port in get_port_by(client, **port_filter):
-            client.delete_port(id=port['id'])
-            i = i + 1
-        return i
+        return neutron.list_floatingips(**floatingIp_filter)["floatingips"]
     except Exception as e:
-        LOG.exception("Error in delete port: %s, pord_id: %s" %
-                      (e.message, str(port_filter)))
-        raise
+        raise e
 
 
-def create_port(client, **create_params):
-    default_params = {
-        "admin_state_up": True,  # Administrative state of port.
-        """Indicates whether network is currently operational.
-           Possible values include: ACTIVE, DOWN, BUILD, ERROR"""
-        "status": "ACTIVE",
-    }
-    required_params = ["mac_address"]
-
-    port_params = default_params.update(dict(create_params))
-
-    for required in required_params:
-        if required not in port_params or not port_params[required]:
-            LOG.warning("Required property '%s' is not set" % required)
-            return -1
-
-    if (port_params['status'] != "ACTIVE"):
-        LOG.warning('Create port with status != ACTIVE')
-
+def get_securityGroups_by(neutron, security_groups_filter):
     try:
-        LOG.debug("Create port %s" % str(port_params))
-        return client.create_port(body=port_params)['port']
+        return neutron.list_security_groups(**security_groups_filter)['security_groups']
     except Exception as e:
-        LOG.exception("Error in create_port: %s, params: %s" %
-                      (e.message, str(port_params)))
-        raise
+        raise e
 
 
-def get_security_groups(client, **sg_filter):
+def create_securityGroup_rule(neutron, security_group_rule_info):
     try:
-        return get_security_groups(**sg_filter)['security_groups']
+        return neutron.create_security_group_rule({'security_group_rule': security_group_rule_info})
     except Exception as e:
-        LOG.exception("Error in get security groups: %s, filer: %s" %
-                      (e.message, str(sg_filter)))
-        raise
+        raise e
 
 
-def del_security_groups(client, **sg_filter):
+def create_network(neutron, net_info):
     try:
-        i = 0
-        for security_group in get_security_groups_by(**sg_filter):
-            client.delete_security_group(
-                security_group_id=security_group['id'])
-            i = i + 1
-        return i
+        return neutron.create_network({'network': net_info})['network']
     except Exception as e:
-        LOG.exception("Error in del security groups: %s, filter: %s" %
-                      (e.message, str(sg_filter)))
-        raise
+        raise e
 
 
-# XXX Intersects with nova security groups
-# implements?
-def create_security_group(client, **sg_params):
+def create_subnet(neutron, subnet_info):
     try:
-        return client.create_sequrity_group(sg_params)
+        return neutron.create_subnet({'subnet': subnet_info})['subnet']
     except Exception as e:
-        LOG.exception("Error in get security groups: %s" % e.message)
-        raise
+        raise e
 
 
-def list_subnets(client, net_id):
+def create_port(neutron, port_info):
     try:
-        return get_subnet_by(client, network_id=net_id)
+        return neutron.create_port(body={'port': port_info})['port']
     except Exception as e:
-        LOG.exception("Error in list subnets: %s" % e.message)
-        raise
+        raise e
 
 
-def del_subnet(client, **subnet_filter):
+def create_security_group(neutron, security_group_info):
     try:
-        i = 0
-        for subnet in get_subnet_by(client, subnet_filter):
-            LOG.debug("Delete subnet '%s' match by '%s' filter" %
-                      (subnet['id'], str(subnet_filter)))
-            client.delete_subnet(subnet['id'])
-            i = i + 1
-        return i
+        return neutron.create_security_group({'security_group': security_group_info})['security_group']
     except Exception as e:
-        LOG.exception(
-            "Error in list subnets: %s" % e.message)
-    raise
+        raise e
 
 
-def create_subnet(client, **subnet_params):
-    """
-        body_create_subnet = {'subnets': [{'cidr': '192.168.199.0/24',
-            'ip_version': 4, 'network_id': network_id}]}
+class BaseCloudTask(task.Task):
+    neutron = None
 
-        neutron.create_subnet(body=body_create_subnet)
+    def __init__(self, ip, *args, **kwargs):
+        super(BaseCloudTask, self).__init__(*args, **kwargs)
+        URL = "http://" + ip + ":5000/v2.0"
+        self.cloud.neutron = client.Client(
+            '2.0', username='admin', password='admin', tenant_name='admin', auth_url=URL)
+        self.nova = novaclient.client.Client(
+            '2', 'admin', 'admin', 'admin', auth_url=URL)
+        self.log("init")
 
-    """
-
-    try:
-        LOG.debug("Create subnet '%s'" % (str(subnet_params)))
-        return client.create_subnet(body=json.dumps(subnet_params))
-    except Exception as e:
-        LOG.exception("Error in list subnets: %s" % e.message)
-        raise
-
-
-def del_network(client, network_filter):
-    try:
-        i = 0
-        for network in get_network_by(network_filter):
-            LOG.debug("Delete network '%s' match by '%s' filter" %
-                      (network['id'], str(network_filter)))
-            client.delete_network(network['id'])
-            i = i + 1
-        return i
-    except Exception as e:
-        LOG.exception("Error in delete network: %s" % e.message)
-        raise
+    def log(self, message):
+        print("%s: %s" % (self.__class__.__name__, message))
 
 
-def create_network(client, network_data):
-    try:
-        # TODO (sryabin) stub create_network
-        return client.create_network({
-            'network': network_data
+class BaseCloud():
+
+    def __init__(self, ip):
+        URL = "http://" + ip + ":5000/v2.0"
+        self.cloud.neutron = client.Client(
+            '2.0', username='admin', password='admin', tenant_name='admin', auth_url=URL)
+        self.nova = novaclient.client.Client(
+            '2', 'admin', 'admin', 'admin', auth_url=URL)
+
+
+class RetrieveNeutronNetworks(BaseCloudTask):
+
+    def execute(self):
+        return self.cloud.neutron.list_networks()['networks']
+
+
+class RetrieveNetworkById(BaseCloudTask):
+
+    def execute(self, sourceNeutronNetworks, net_id):
+        for net in sourceNeutronNetworks:
+            if (net['id'] == net_id):
+                self.log("Match network %s" % net_id)
+                return net
+
+
+class RetrieveAllPorts(BaseCloudTask):
+
+    def execute(self):
+        return self.cloud.neutron.list_ports()['ports']
+
+
+class RetrieveAllSubnets(BaseCloudTask):
+
+    def execute(self):
+        return get_subnet_by(self.cloud.neutron, {})
+
+
+class RetrieveAllRouters(BaseCloudTask):
+
+    def execute(self):
+        return get_router_by(self.cloud.neutron, {})
+
+
+class RetrieveSubnetById(BaseCloudTask):
+
+    def execute(self, subnets, subnet_id):
+        for subnet in subnets:
+            if (subnet['id'] == subnet_id):
+                return subnet
+
+        return None
+
+
+class RetrieveRouterById(BaseCloudTask):
+
+    def execute(self, all_routers, router_id):
+        for router in all_routers:
+            if (router['id'] == router_id):
+                return router
+
+        return None
+
+
+class EnsureRouter(BaseCloudTask):
+
+    def execute(self, all_routers, router_info):
+        for router in all_routers:
+            if (router["name"] == router_info["name"]):
+                return router
+
+        del router_info['id']
+
+        router = self.cloud.neutron.create_router(
+            {'router': router_info}
+        )['router']
+        return router
+
+
+class EnsureSubnet(BaseCloudTask):
+
+    def execute(self, subnets, subnet_info, network_info):
+        for subnet in subnets:
+            if (subnet['name'] == subnet_info['name']):
+                self.log("Subnet %s is allready exists, name: %s" %
+                         (subnet_info['id'], subnet_info['name']))
+                return subnet
+
+        self.log("Subnet not found, name: %s" % subnet_info['name'])
+
+        subnet = create_subnet(self.cloud.neutron, {
+            'allocation_pools': subnet_info['allocation_pools'],
+            'cidr': subnet_info['cidr'],
+            'ip_version': subnet_info['ip_version'],
+            'gateway_ip': subnet_info['gateway_ip'],
+            'name': subnet_info['name'],
+            'network_id': network_info['id']
         })
-    except Exception as e:
-        LOG.exception("Error in list subnets: %s" % e.message)
-        raise
+
+        self.log("Subnet %s created: %s" % (subnet['id'], str(subnet)))
+
+        return subnet
 
 
-class RetrieveNeutronNetwork(task.BaseCloudTask):
+class EnsureNetwork(BaseCloudTask):
 
-    def execute(self, net_id):
-        try:
-            return get_network_by(self.cloud.neutron, id=net_id)[0]
-        except IndexError:
-            raise exceptions.Error(
-                "Empty answer for network_id: %s" % str(net_id))
+    def execute(self, networks, net_info):
+        for net in networks:
+            if (net['name'] == net_info['name']):
+                self.log("Network %s is allready exists, name: %s" %
+                         (net_info['id'], net['name']))
+                return net
 
+        self.log("Network %s not exists" % net_info['id'])
 
-class RetrieveNeutronPort(task.BaseCloudTask):
+        network = create_network(self.cloud.neutron, {
+            'name': net_info['name']
+        })
 
-    def execute(self, port_id):
-        try:
-            return get_port_by(self.cloud.neutron, id=port_id)[0]
-        except IndexError:
-            raise exceptions.Error(
-                "Empty answer for port_id: %s" % str(port_id))
+        self.log("Network %s created: %s" % network['id'], str(network))
 
-
-class RetrieveNeutronSubnet(task.BaseCloudTask):
-
-    def execute(self, subnet_id):
-        try:
-            return get_subnet_by(self.cloud.neutron, id=subnet_id)[0]
-        except IndexError:
-            LOG.exception("Empty answer for subnet_id: %s" % str(subnet_id))
-            raise
+        return network
 
 
-class EnsureNeutronPort(task.BaseCloudTask):
+class RetrievePortById(BaseCloudTask):
 
-    def verifyPort(self, src_port, dst_port):
-        # TODO (sryabin) more complex check
-        try:
-            return dst_port['mac_address'] == src_port['mac_address']
-        except KeyError:
-            raise exceptions.Error("Bad dicts src: %s, dst: %s" %
-                                   (str(src_port), str(dst_port)))
+    def execute(self, all_ports, port_id):
+        for port in all_ports:
+            if port["id"] == port_id:
+                self.log("port found %s " % str(port))
+                return port
 
-    def execute(self, port_id, port_data):
-        try:
-            port = get_port_by(self.cloud.neutron, id=port_id)[0]
-        except IndexError:
-            # port not found
-            # XXX (sryabin) stub
-            return create_port(self.cloud.neutron, port_data)
-        else:
-            assert self.verifyPort(port, port_data) == 1
-            return port
-
-
-class EnsureNeutronSubnet(task.BaseCloudTask):
-
-    # XXX (sryabin) similar verify in EnsureNeutronNetwork
-    def verifySubnet(self, src_subnet, dst_subnet):
-        try:
-            # TODO (sryabin) more complex check
-            return src_subnet['name'] == dst_subnet['name']
-        except KeyError:
-            raise exceptions.Error("Bad dicts src: %s, dst: %s" %
-                                   (str(src_subnet), str(dst_subnet)))
-
-    def execute(self, subnet):
-        try:
-            dst_subnet = get_port_by(
-                self.cloud.neutron, name=subnet['name'])[0]
-        except IndexError:
-            # subnet not found in dst cloud
-            # TODO (sryabin) stub
-            # TODO (sryabin) catch KeyError
-            return create_subnet(self.cloud.neutron, subnet)
-        else:
-            assert self.verifySubnet(subnet, dst_subnet)
-            return subnet
-
-
-class EnsureNeutronNetwork(task.BaseCloudTask):
-    # XXX (sryabin) similar verify in EnsureNeutronSubnet
-
-    def verify(self, src, dst):
-        try:
-            return src['name'] == dst['name']
-        except KeyError:
-            raise exceptions.Error("Bad dicts src: %s, dst: %s" %
-                                   (str(src), str(dst)))
-
-    def execute(self, src):
-        try:
-            # TODO (sryabin) catch KeyError
-            # TODO (sryabin) stub
-            dst = get_network_by(self.cloud.neutron, name=src['name'])
-        except IndexError:
-            return create_network(self.cloud.neutron, src)
-        else:
-            assert self.verify(src, dst)
-            return dst
-
-
-def migrate_neutron_network(context, network_id):
-    network_binding = "neutron-network-{}".format(network_id)
-
-    if (network_binding in context.store):
         return None
 
-    # generate new flor for network migration
-    flow = graph_flow.Flow("migrate-neutron-network-{}".format(network_id))
 
-    network_retrieve = "{}-retrieve".format(network_binding)
-    network_ensure = "{}-ensure".format(network_binding)
+class EnsurePort(BaseCloudTask):
 
-    flow.add(RetrieveNeutronNetwork(context.src_cloud,
-                                    name=network_binding,
-                                    provides=network_binding))
+    def execute(self, all_ports, port_info, network_info, subnet_info, device_info):
+        for port in all_ports:
+            if (port['mac_address'] == port_info['mac_address']):
+                return port
 
-    flow.add(EnsureNeutronNetwork(context.dst_cloud,
-                                  name=network_ensure,
-                                  provides=network_ensure))
+        SKIP_PROPS = ['device_id', 'id', 'security_groups', 'fixed_ips',
+                      'status', 'binding:vif_details', 'binding:vif_type']
 
-    context.store[network_binding] = None
+        for prop in SKIP_PROPS:
+            if prop in port_info:
+                self.log("removed prop: %s" % prop)
+                del port_info[prop]
 
-    return flow
+        port_info['network_id'] = network_info['id']
+
+        port = create_port(self.cloud.neutron, port_info)
+
+        return port
 
 
-def migrate_neutron_subnet(context, subnet_id):
-    subnet_binding = "neutron-network-subnet-{}".format(subnet_id)
+class RetrieveFloatingIps(BaseCloudTask):
 
-    if (subnet_binding in context.store):
+    def execute(self):
+        return get_floatingIp_by(self.cloud.neutron, {})
+
+
+class RetrieveFloatingIpById(BaseCloudTask):
+
+    def execute(self, all_floatingips, floating_id):
+        for floating_ip in all_floatingips:
+            if (floating_ip['id'] == floating_id):
+                return floating_ip
+
         return None
 
-    flow = graph_flow.Flow(
-        "migrate-neutron-network-subnet-{}".format(subnet_id))
 
-    # generate new flow for subnet migration
-    subnet_retrieve = "{}-retrieve".format(subnet_binding)
-    subnet_ensure = "{}-ensure".format(subnet_binding)
+class EnsureFloatingIp(BaseCloudTask):
 
-    flow.add(RetrieveNeutronSubnet(context.src_cloud,
-                                   name=subnet_binding,
-                                   provides=subnet_binding))
-    flow.add(EnsureNeutronSubnet(context.dst_cloud,
-                                 name=subnet_ensure,
-                                 provides=subnet_ensure))
+    def execute(self, all_floatingips, floating_info):
+        # TODO add server_id to arguments
+        for floating_ip in all_floatingips:
+            if (floating_ip['floating_ip_address'] == floating_info['floating_ip_address']):
+                return floating_ip
 
-    context.store[subnet_binding] = None
+        del floating_info['id']
 
-    return flow
+        floating_ip = self.cloud.neutron.create_floatingip(
+            {'floatingip': floating_info}
+        )
 
-
-def migrate_single_neutron_port(context, port):
-    port_binding = "neutron-net-port-{}".format(port['id'])
-    port_retrieve = "{}-retrieve".format(port_binding)
-    port_ensure = "{}-ensure".format(port_binding)
-
-    flow = graph_flow.Flow(
-        "migrate-neutron-network-port-{}".format(port['id']))
-
-    if (port_binding in context.store):
-        return None, port_ensure
-
-    try:
-        subnet_flow = migrate_neutron_subnet(context, port['subnet_id'])
-        if (subnet_flow):
-            flow.add(subnet_flow)
-    except KeyError:
-        pass
-
-    try:
-        network_flow = migrate_neutron_network(context, port['network_id'])
-        if (network_flow):
-            flow.add(network_flow)
-    except KeyError:
-        pass
-
-    flow.add(RetrieveNeutronPort(context.src._cloud,
-                                 name=port_binding,
-                                 provides=port_binding))
-    flow.add(EnsureNeutronPort(context.dst_cloud,
-                               name=port_ensure,
-                               provides=port_ensure))
-
-    context.store[port_binding] = None
-
-    return flow
+        return floating_ip
 
 
-def migrate_neutron_ports(context, server_id):
-    network_dep = Set()
-    subnet_dep = Set()
+class RetrieveSecurityGroups(BaseCloudTask):
 
-    ports = get_port_by(context.src_cloud, device_id=server_id)
-
-    if (not len(ports)):
-        LOG.warning("server_id: %d no port assignmnet" % server_id)
-        return None, None
-
-    flow = graph_flow.Flow("migrate-neutron-network-{}".format(server_id))
-
-    for port in ports:
-        try:
-            # TODO (sryabin) change namespace policy to
-            # neutron-net-(network|subnet|port)-{}.format(entity_id)
-            port_flow = migrate_single_neutron_port(context, port)
-            if (port_flow):
-                flow.add(port_flow)
-
-        except KeyError:
-            raise exceptions.Error(
-                "Missing keys in get_port_by asnwer: %s" % str(port))
-
-    return flow
+    def execute(self):
+        return get_securityGroups_by(self.cloud.neutron, {})
 
 
-def migrate_ports(context, port_id):
-    port_binding = "neutron-network-port-{}".format(port_id)
-    port_retrieve = "{}-retrieve".format(port_binding)
-    port_ensure = "{}-ensure".format(port_binding)
+class RetrieveSecurityGroupById(BaseCloudTask):
 
-    if (port_binding in context.store):
-        return None, port_ensure
+    def execute(self, all_security_groups, security_id):
+        for security_group in all_security_groups:
+            if (security_group['id'] == security_id):
+                return security_group
 
-#   flow.add()
+        return None
 
 
-def migrate_network(context, tenant_id, network_id=None):
-    # all_networks = get_network_by()
-    # XXX (sryabin) nova migration driver uses "networks-src, networks-dst"
-    all_src_networks = "neutron-network-src"
-    all_dst_networks = "neutron-network-dst"
+class EnsureSecurityGroup(BaseCloudTask):
 
-    network_binding = "neutron-network-{}".format(
-        network_id)
-    network_retrieve = "{}-retrieve".format(
+    def execute(self, all_security_groups, security_group_info, port_info):
+
+        for security_group in all_security_groups:
+            if (security_group['name'] == security_group_info['name']):
+                # XXX check security group assigned to port
+                self.log("security '%s' group already exists %s" %
+                         (security_group['name'], str(security_group)))
+                return security_group
+
+        self.log("security '%s' group not exists" %
+                 security_group_info['name'])
+
+        security_group_rules = security_group_info['security_group_rules']
+
+        del security_group_info['id'], security_group_info[
+            'security_group_rules']
+        security_group = create_security_group(
+            self.cloud.neutron, security_group_info)
+
+        for rule in security_group_rules:
+            del rule['id'], rule['tenant_id']
+            rule['security_group_id'] = security_group['id']
+            create_securityGroup_rule(self.cloud.neutron, rule)
+
+        if security_group['id'] not in port_info['security_groups']:
+            port_info['security_groups'].append(security_group['id'])
+            self.cloud.neutron.update_port(port_info['id'], {
+                'port': {'security_groups': port_info['security_groups']}
+            })
+
+        return security_group
+
+
+def migrate_floatingip(context, floatingip_id):
+
+    floatingip_binding = floatingip_id
+
+    floatingip_retrieve = "migrate-neutron-floatingip-{}-retrieve".format(
+        floatingip_binding)
+    floatingip_ensure = "migrate-neutron-floatingip-{}-ensure".format(
+        floatingip_binding)
+
+    (retrieve, ensure) = generate_binding(
+        floatingip_binding, inspect.stack()[0][3])
+    #(router_retrieve, router_ensure) = generate_binding(router_binding, inspect.stack()[0][3])
+
+    if (floatingip_binding in context):
+        return None, floatingip_retrieve
+
+    context[floatingip_binding] = floatingip_id
+
+    f = graph_flow.Flow(
+        "neutron-floatingip-migration-{}".format(floatingip_binding))
+
+    all_src_floatingips_binding = "srcNeutronAllFloatingIps"
+    all_dst_floatingips_binding = "dstNeutronAllFloatingIps"
+
+    if (all_src_floatingips_binding not in context):
+        f.add(RetrieveFloatingIps(
+            context.src_cloud,
+            name="retrieveAllSrcFloatingIps",
+            provides=all_src_floatingips_binding
+        ))
+        context[all_src_floatingips_binding] = None
+
+    if (all_dst_floatingips_binding not in context):
+        f.add(RetrieveFloatingIps(
+            "172.16.0.16",
+            name="retrieveDstAllFloatingIps",
+            provides=all_dst_floatingips_binding
+        ))
+        context[all_dst_floatingips_binding] = None
+
+    f.add(RetrieveFloatingIpById(context.src_cloud,
+                                 name=floatingip_retrieve,
+                                 provides=floatingip_retrieve,
+                                 rebind=[
+                                     all_src_floatingips_binding, floatingip_binding],
+                                 ))
+
+    f.add(EnsureFloatingIp("172.16.0.16",
+                           name=floatingip_ensure,
+                           provides=floatingip_ensure,
+                           rebind=[
+                               all_dst_floatingips_binding, floatingip_retrieve]
+                           ))
+
+    return f, floatingip_ensure
+
+
+def migrate_network(context, network_id):
+
+    network_binding = network_id
+
+    network_retrieve = "migrate-neutron-network-{}-retrieve".format(
         network_binding)
-    network_ensure = "{}-ensure".format(network_binding)
+    network_ensure = "migrate-neutron-network-{}-ensure".format(
+        network_binding)
 
-    if (network_binding in context.store):
-        return None, network_ensure
+    if (network_binding in context):
+        return None, network_retrieve
 
-    flow = graph_flow.Flow(
-        "migrate-{}".format(network_binding))
+    context[network_binding] = network_id
 
-    if ("all_src_networks_retrieve" not in context.store):
-        context.store[all_src_networks] = None
+    f = graph_flow.Flow("neutron-network-migration-{}".format(network_binding))
 
-#        flow.add(RetrieveAllNetworks(context.src_cloud,
-#                                     name=all_src_networks,
-#                                     provides=all_src_networks))
-#
+    all_src_networks_binding = "srcNeutronAllNetworks"
+    all_dst_networks_binding = "dstNeutronAllNetworks"
 
-    if ("all_dst_networks_retrieve" not in context.store):
-        context.store[all_dst_networks] = None
+    if (all_src_networks_binding not in context):
+        f.add(RetrieveNeutronNetworks(
+            context.src_cloud,
+            name="retrieveAllSrcNetworks",
+            provides=all_src_networks_binding
+        ))
+        context[all_src_networks_binding] = None
 
-#        flow.add(RetrieveAllNetworks(context.dst_cloud,
-#                                     name=all_dst_networks,
-#                                     provides=all_dst_networks))
+    if (all_dst_networks_binding not in context):
+        f.add(RetrieveNeutronNetworks(
+            "172.16.0.16",
+            name="retrieveDstAllNetworks",
+            provides=all_dst_networks_binding
+        ))
+        context[all_dst_networks_binding] = None
+
+    f.add(RetrieveNetworkById(context.src_cloud,
+                              name=network_retrieve,
+                              provides=network_retrieve,
+                              rebind=[
+                                  all_src_networks_binding, network_binding],
+                              ))
+
+    f.add(EnsureNetwork("172.16.0.16",
+                        name=network_ensure,
+                        provides=network_ensure,
+                        rebind=[all_dst_networks_binding, network_retrieve]
+                        ))
+
+    return f, network_ensure
 
 
-#    flow.add(EnsureNetwork(context.dst_cloud,
-#                           name=network_ensure,
-#                           rebind=[all_dst_networks, network_retrieve]))
+def migrate_securityGroup(context, securityGroup_id, port_binding):
+    securityGroup_binding = securityGroup_id
 
-    return flow, network_ensure
+    securityGroup_retrieve = "migrate-neutron-securityGroup-{}-retrieve".format(
+        securityGroup_binding)
+    securityGroup_ensure = "migrate-neutron-securityGroup-{}-ensure".format(
+        securityGroup_binding)
+
+    if (securityGroup_binding in context):
+        return None, securityGroup_ensure
+
+    context[securityGroup_binding] = securityGroup_id
+
+    f = graph_flow.Flow(
+        "neutron-securityGroup-migration-{}".format(securityGroup_id))
+
+    all_src_securityGroup_binding = "srcNeutronAllSecurityGroups"
+    all_dst_securityGroup_binding = "dstNeutronAllSecurityGroups"
+
+    if (all_src_securityGroup_binding not in context):
+
+        f.add(RetrieveSecurityGroups(
+            context.src_cloud,
+            name="retrieveAllSrcSecurityGroups",
+            provides=all_src_securityGroup_binding
+        ))
+
+        context[all_src_securityGroup_binding] = None
+
+    if (all_dst_securityGroup_binding not in context):
+
+        f.add(RetrieveSecurityGroups(
+            "172.16.0.16",
+            name="retrieveAllDstSecurityGroups",
+            provides=all_dst_securityGroup_binding
+        ))
+
+        context[all_dst_securityGroup_binding] = None
+
+    f.add(RetrieveSecurityGroupById(context.src_cloud,
+                                    name=securityGroup_retrieve,
+                                    provides=securityGroup_retrieve,
+                                    rebind=[
+                                        all_src_securityGroup_binding, securityGroup_binding]
+                                    ))
+
+    f.add(EnsureSecurityGroup("172.16.0.16",
+                              name=securityGroup_ensure,
+                              provides=securityGroup_ensure,
+                              rebind=[
+                                  all_dst_securityGroup_binding, securityGroup_retrieve, port_binding]
+                              ))
+
+    return f, securityGroup_ensure
+
+
+def migrate_subnet(context, subnet_id, network_info):
+
+    subnet_binding = subnet_id
+
+    subnet_retrieve = "migrate-neutron-subnet-{}-retrieve".format(
+        subnet_binding)
+    subnet_ensure = "migrate-neutron-subnet-{}-ensure".format(subnet_binding)
+
+    if (subnet_binding in context):
+        return None, subnet_ensure
+
+    context[subnet_binding] = subnet_id
+
+    f = graph_flow.Flow("neutron-subnet-migration-{}".format(subnet_id))
+
+    all_src_subnet_binding = "srcNeutronAllSubnets"
+    all_dst_subnet_binding = "dstNeutronAllSubnets"
+
+    if (all_src_subnet_binding not in context):
+
+        f.add(RetrieveAllSubnets(
+            context.src_cloud,
+            name="retrieveAllSrcSubnets",
+            provides=all_src_subnet_binding
+        ))
+
+        context[all_src_subnet_binding] = None
+
+    if (all_dst_subnet_binding not in context):
+
+        f.add(RetrieveAllSubnets(
+            "172.16.0.16",
+            name="retrieveAllDstSubnets",
+            provides=all_dst_subnet_binding
+        ))
+
+        context[all_dst_subnet_binding] = None
+
+    f.add(RetrieveSubnetById(context.src_cloud,
+                             name=subnet_retrieve,
+                             provides=subnet_retrieve,
+                             rebind=[all_src_subnet_binding, subnet_binding]
+                             ))
+
+    f.add(EnsureSubnet("172.16.0.16",
+                       name=subnet_ensure,
+                       provides=subnet_ensure,
+                       rebind=[
+                           all_dst_subnet_binding, subnet_retrieve, network_info]
+                       ))
+
+    return f, subnet_ensure
+
+
+def migrate_router(context, router_id):
+
+    router_binding = router_id
+
+    #router_retrieve = "migrate-neutron-router-{}-retrieve".format(router_binding)
+    #router_ensure = "migrate-neutron-router-{}-ensure".format(router_binding)
+    (router_retrieve, router_ensure) = generate_binding(
+        router_binding, inspect.stack()[0][3])
+
+    if (router_binding in context):
+        return None, router_ensure
+
+    context[router_binding] = router_id
+
+    f = graph_flow.Flow("neutron-router-migration-{}".format(router_id))
+
+    all_src_router_binding = "srcNeutronAllRouters"
+    all_dst_router_binding = "dstNeutronAllRouters"
+
+    if (all_src_router_binding not in context):
+
+        f.add(RetrieveAllRouters(
+            context.src_cloud,
+            name="retrieveAllSrcRouters",
+            provides=all_src_router_binding
+        ))
+
+        context[all_src_router_binding] = None
+
+    if (all_dst_router_binding not in context):
+
+        f.add(RetrieveAllRouters(
+            "172.16.0.16",
+            name="retrieveAllDstRouters",
+            provides=all_dst_router_binding
+        ))
+
+        context[all_dst_router_binding] = None
+
+    f.add(RetrieveRouterById(context.src_cloud,
+                             name=router_retrieve,
+                             provides=router_retrieve,
+                             rebind=[all_src_router_binding, router_binding]
+                             ))
+
+    f.add(EnsureRouter("172.16.0.16",
+                       name=router_ensure,
+                       provides=router_ensure,
+                       rebind=[all_dst_router_binding, router_retrieve]
+                       ))
+
+    return f, router_ensure
+
+
+def migrate_port(context, port_id, destination_instance_id):
+
+    port_binding = port_id
+
+    if (port_binding in context):
+        return None
+
+    context[port_binding] = port_id
+
+    f = graph_flow.Flow("neutron-port-migration-{}".format(port_binding))
+
+    port_info = get_port_by(context.src_cloud, {'id': port_id})[0]
+
+    all_src_ports_binding = "srcNeutronAllPorts"
+    all_dst_ports_binding = "dstNeutronAllPorts"
+
+    if (all_src_ports_binding not in context):
+        f.add(RetrieveAllPorts(
+            context.src_cloud,
+            name="retrieveNeutronAllSrcPorts",
+            provides=all_src_ports_binding
+        ))
+        context[all_src_ports_binding] = None
+
+    if (all_dst_ports_binding not in context):
+        f.add(RetrieveAllPorts(
+            "172.16.0.16",
+            name="retrieveNeutronAllDstPorts",
+            provides=all_dst_ports_binding
+        ))
+        context[all_dst_ports_binding] = None
+
+    port_retrieve = "neutron-port-migration-{}-retrieve".format(port_binding)
+    port_ensure = "neutron-port-migration-{}-ensure".format(port_binding)
+    network_info = "NullNetworkInfo"
+    subnet_info = "NullSubnet"
+    device_info = "NullDevice"
+
+    if ('network_id' in port_info and port_info['network_id'] is not None):
+        networkFlow, network_info = migrate_network(
+            context, port_info['network_id'])
+        if (networkFlow is not None):
+            f.add(networkFlow)
+
+    # migrate subnet
+    if ('fixed_ips' in port_info and port_info['fixed_ips'] is not None):
+        for fixed_ip in port_info['fixed_ips']:
+            if 'subnet_id' in fixed_ip:
+                subnetFlow, subnet_info = migrate_subnet(
+                    context, fixed_ip['subnet_id'], network_info)
+                if (subnetFlow is not None):
+                    f.add(subnetFlow)
+
+    if ("device_owner" in port_info):
+        if (port_info['device_owner'] == 'network:floatingip'):
+            floatingIpFlow, device_info = migrate_floatingip(
+                context, port_info['device_id'])
+            if (floatingIpFlow is not None):
+                f.add(floatingIpFlow)
+        elif (port_info["device_owner"] == "network:dhcp"):
+            # migrate network
+            return None
+            #a = 2
+        elif (port_info["device_owner"] == "network:router_gateway"):
+            return None
+            #a = 3
+        elif (port_info['device_owner'] == 'compute:None'):
+            a = 4
+        elif (port_info["device_owner"] == "network:router_interface"):
+            routerFlow, device_info = migrate_router(
+                context, port_info['device_id'])
+            if (routerFlow is not None):
+                f.add(routerFlow)
+
+        else:
+            raise NotImplementedError("port %s have unknown device_owner %s" % (
+                port_info["id"], port_info["device_owner"]))
+
+    f.add(RetrievePortById(
+        context.src_cloud,
+        name=port_retrieve,
+        provides=port_retrieve,
+        rebind=[all_src_ports_binding, port_binding]
+    ))
+
+    context[device_info] = None
+
+    f.add(EnsurePort(
+        "172.16.0.16",
+        name=port_ensure,
+        provides=port_ensure,
+        #rebind = [ all_dst_ports_binding, port_retrieve ]
+        rebind=[all_dst_ports_binding, port_retrieve,
+                network_info, subnet_info, device_info]
+    ))
+
+    if "security_groups" in port_info:
+        for security_id in port_info["security_groups"]:
+            securityGroupFlow, securityGroup_retrieve = migrate_securityGroup(
+                context, security_id, port_ensure)
+            if (securityGroupFlow is not None):
+                f.add(securityGroupFlow)
+
+    return f
+
+
+PREFIX = "neutron-"
+
+
+def generate_binding(uid, label):
+    label.replace("_", "-")
+    return PREFIX + "{}-{}-ensure".format(label, uid), PREFIX + "{}-{}-retrieve".format(label, uid)
+
+
+def migrate_server(context, server_id, dst_server_id):
+
+    f = graph_flow.Flow("neutron-server-migration-{}".format(server_id))
+
+    for port in get_port_by(context.src_cloud, {'device_id': server_id}):
+        f.add(migrate_port(context, port['id'], dst_server_id))
+
+    return f
