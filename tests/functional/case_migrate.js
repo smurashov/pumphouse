@@ -184,7 +184,7 @@ MigrateTestCase.getTenantServers = function (tenant_id, resources, cloud) {
             // Assigning all floating ips
             s.floating_ips = floating_ips[s.id] ? floating_ips[s.id].sort().join(',') : '';
 
-            servers[s.name] = s;
+            servers[s.data.name] = s;
         }
     }
     return servers;
