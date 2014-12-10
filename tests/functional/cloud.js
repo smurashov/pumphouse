@@ -25,20 +25,25 @@ CloudResources.prototype.getKey = function (data) {
 CloudResources.prototype.parseCloud = function (name, data) {
     var i,
         o,
+        key,
         r = data[name].resources;
 
+    console.log('Parsing cloud data:');
     for (i in r) {
         if (r.hasOwnProperty(i)) {
             try {
                 o = r[i];
                 o.cloud = name;
-                this.resources[this.getKey(o)] = o;
+                key = this.getKey(o);
+                this.resources[key] = o;
                 this.length++;
+                console.log(' * ', key, ' -> ', o);
             } catch (e) {
                 console.error('Unable to parse object', o);
             }
         }
     }
+    console.log('Cloud resources: ', this.resources);
 };
 
 CloudResources.prototype.get = function (id, type, cloud) {
