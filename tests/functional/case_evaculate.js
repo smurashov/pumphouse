@@ -119,8 +119,8 @@ EvacuateTestCase.addStep('Assuring host is clean and all servers live migrated f
         s,
         n;
 
-    console.log('Initial state: ', context.initial_state);
-    console.log('Resulting state: ', this.test_case.context.state);
+    console.log('Initial state: ', JSON.stringify(context.initial_state));
+    console.log('Resulting state: ', JSON.stringify(this.test_case.context.state));
 
     // Making sure all servers evacuated from host still alive
     for (i in old) {

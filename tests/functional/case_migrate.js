@@ -238,8 +238,8 @@ MigrateTestCase.addStep('Make sure tenants are equal', function () {
     }
 
     // Checking that all entities that relate to these tenants are the same
-    console.log('Source servers: ', src_servers);
-    console.log('Destination servers: ', dst_servers);
+    console.log('Source servers: ', JSON.stringify(src_servers));
+    console.log('Destination servers: ', JSON.stringify(dst_servers));
 
     console.log('Assure source tenant servers are the same with destination ones');
     this.test_case.assureServersEqual(src_servers, dst_servers);
