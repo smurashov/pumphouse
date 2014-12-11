@@ -854,7 +854,7 @@ class Volume(EventResource):
         for attachment in self.data["attachments"]:
             server_id = attachment["server_id"]
             self.cloud.nova.volumes.delete_server_volume(server_id,
-                                                             self.data["id"])
+                                                         self.data["id"])
         if self.data["attachments"]:
             volume = utils.wait_for(self.data["id"],
                                     self.cloud.cinder.volumes.get,
@@ -992,13 +992,13 @@ class Service(EventResource):
     @task
     def enable(self):
         data = self.cloud.nova.services.enable(self.data["host"],
-                                                   self.data["binary"])
+                                               self.data["binary"])
         self.data.update(data.to_dict())
 
     @task
     def disable(self):
         data = self.cloud.nova.services.disable(self.data["host"],
-                                                    self.data["binary"])
+                                                self.data["binary"])
         self.data.update(data.to_dict())
 
 
