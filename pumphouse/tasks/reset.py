@@ -80,7 +80,17 @@ class EventTask(base.UnboundTask):
 task = EventTask
 
 
-class EventResource(base.Resource):
+class CloudResource(base.Resource):
+    @property
+    def env(self):
+        return self.runner.env
+
+    @property
+    def cloud(self):
+        return self.runner.env.cloud
+
+
+class EventResource(CloudResource):
     class __metaclass__(base.Resource.__metaclass__):
         def __new__(mcs, name, bases, cls_vars):
             if "events_type" not in cls_vars:
@@ -104,7 +114,7 @@ class EventResource(base.Resource):
         return {
             "id": self.event_id(),
             "type": self.events_type,
-            "cloud": self.env.cloud.name,
+            "cloud": self.cloud.name,
             "action": None,
             "progress": None,
             "data": self.event_data(),
@@ -131,17 +141,17 @@ class Tenant(EventResource):
 
     @task
     def create(self):
-        tenant = self.env.cloud.keystone.tenants.create(
+        tenant = self.cloud.keystone.tenants.create(
             self.data["name"],
             **make_kwargs(
                 description=self.data.get("description"),
                 enabled=self.data.get("enabled"),
             )
         )
-        our_user_id = self.env.cloud.keystone.auth_ref.user_id
-        all_roles = self.env.cloud.keystone.roles.list()
+        our_user_id = self.cloud.keystone.auth_ref.user_id
+        all_roles = self.cloud.keystone.roles.list()
         admin_role = [r for r in all_roles if r.name == "admin"][0]
-        self.env.cloud.keystone.tenants.add_user(
+        self.cloud.keystone.tenants.add_user(
             tenant.id,
             our_user_id,
             admin_role.id,
@@ -150,7 +160,7 @@ class Tenant(EventResource):
 
     @task(before=[create])
     def delete(self):
-        self.env.cloud.keystone.tenants.delete(self.data["id"])
+        self.cloud.keystone.tenants.delete(self.data["id"])
 
 
 class Role(EventResource):
@@ -158,13 +168,13 @@ class Role(EventResource):
 
     @task
     def create(self):
-        self.data = self.env.cloud.keystone.role.create(
+        self.data = self.cloud.keystone.role.create(
             name=self.data["name"],
         ).to_dict()
 
     @task(before=[create])
     def delete(self):
-        self.env.cloud.keystone.roles.delete(self.data["id"])
+        self.cloud.keystone.roles.delete(self.data["id"])
 
 
 class User(EventResource):
@@ -176,7 +186,7 @@ class User(EventResource):
 
     @task(requires=[tenant.create])
     def create(self):
-        self.data = self.env.cloud.keystone.users.create(
+        self.data = self.cloud.keystone.users.create(
             name=self.data["name"],
             password="default",
             tenant_id=self.tenant["id"],
@@ -184,7 +194,7 @@ class User(EventResource):
 
     @task(before=[create])
     def delete(self):
-        self.env.cloud.keystone.users.delete(self.data["id"])
+        self.cloud.keystone.users.delete(self.data["id"])
 
 
 class Flavor(EventResource):
@@ -197,7 +207,7 @@ class Flavor(EventResource):
             swap = None
         elif swap is not None:
             swap = int(swap)
-        self.data = self.env.cloud.nova.flavors.create(
+        self.data = self.cloud.nova.flavors.create(
             self.data["name"],
             self.data["ram"],
             self.data["vcpus"],
@@ -213,7 +223,7 @@ class Flavor(EventResource):
 
     @task(before=[create])
     def delete(self):
-        self.env.cloud.nova.flavors.delete(self.data["id"])
+        self.cloud.nova.flavors.delete(self.data["id"])
 
 
 class SecurityGroup(EventResource):
@@ -229,7 +239,7 @@ class SecurityGroup(EventResource):
 
     @task(requires=[tenant.create])
     def create(self):
-        cloud = self.env.cloud.restrict(
+        cloud = self.cloud.restrict(
             tenant_name=self.tenant["name"],
         )
         sg_name = self.data["name"]
@@ -247,7 +257,7 @@ class SecurityGroup(EventResource):
             cloud.nova.security_groups.delete(self.data["id"])
         else:
             for rule in self.data["rules"]:
-                self.env.cloud.nova.security_group_rules.delete(rule["id"])
+                self.cloud.nova.security_group_rules.delete(rule["id"])
 
 
 class FileReadProgress(object):
@@ -322,7 +332,7 @@ class Image(EventResource):
         image = self.data.copy()
         image.pop("url")
         image.setdefault("visibility", "public")
-        image = self.env.cloud.glance.images.create(**image)
+        image = self.cloud.glance.images.create(**image)
         self.data = dict(image)
 
     @task(requires=[create])
@@ -331,13 +341,13 @@ class Image(EventResource):
         with open(self.cached_image["file"].name, 'rb') as f:
             f = FileReadProgress(f, self.cached_image["size"], self,
                                  "Uploading")
-            self.env.cloud.glance.images.upload(self.data["id"], f)
-        image = self.env.cloud.glance.images.get(self.data["id"])
+            self.cloud.glance.images.upload(self.data["id"], f)
+        image = self.cloud.glance.images.get(self.data["id"])
         self.data = dict(image)
 
     @task(before=[create])
     def delete(self):
-        self.env.cloud.glance.images.delete(self.data["id"])
+        self.cloud.glance.images.delete(self.data["id"])
 
 
 class Subnet(base.Plugin):
@@ -395,7 +405,7 @@ class NovaNetwork(EventResource):
 
     @task(requires=[tenant.create, subnet.create])
     def create(self):
-        self.data = self.env.cloud.nova.networks.create(
+        self.data = self.cloud.nova.networks.create(
             label=self.data["label"],
             cidr=self.data["cidr"],
             project_id=self.tenant["id"],
@@ -403,8 +413,8 @@ class NovaNetwork(EventResource):
 
     @task(before=[create], includes=[subnet.delete])
     def delete(self):
-        self.env.cloud.nova.networks.disassociate(self.data["id"])
-        self.env.cloud.nova.networks.delete(self.data["id"])
+        self.cloud.nova.networks.disassociate(self.data["id"])
+        self.cloud.nova.networks.delete(self.data["id"])
 
 
 @FloatingIP.register("nova")
@@ -424,14 +434,14 @@ class NovaFloatingIP(EventResource):
 
     @task
     def create(self):
-        self.env.cloud.nova.floating_ips_bulk.create(
+        self.cloud.nova.floating_ips_bulk.create(
             self.data["address"],
             pool=self.data["pool"],
         )
 
     @task(requires=[create])
     def associate(self):
-        self.env.cloud.nova.servers.add_floating_ip(
+        self.cloud.nova.servers.add_floating_ip(
             self.data["server"]["id"],
             self.data["address"],
             self.data["fixed_ip"]["address"],
@@ -440,7 +450,7 @@ class NovaFloatingIP(EventResource):
     @task
     def disassociate(self):
         if self.data.get("server"):
-            self.env.cloud.nova.servers.remove_floating_ip(
+            self.cloud.nova.servers.remove_floating_ip(
                 self.data["server"]["id"],
                 self.data["address"],
             )
@@ -449,7 +459,7 @@ class NovaFloatingIP(EventResource):
 
     @task(before=[create], requires=[disassociate])
     def delete(self):
-        self.env.cloud.nova.floating_ips_bulk.delete(
+        self.cloud.nova.floating_ips_bulk.delete(
             self.data["address"],
         )
 
@@ -536,7 +546,7 @@ class NeutronSubnet(EventResource):
 
     @task
     def create(self):
-        subnet = self.env.cloud.neutron.create_subnet({"subnet": {
+        subnet = self.cloud.neutron.create_subnet({"subnet": {
             "network_id": self.data["network"]["id"],
             "cidr": self.data["cidr"],
             "ip_version": 4,
@@ -545,7 +555,7 @@ class NeutronSubnet(EventResource):
             subnet,
             network=self.data["network"],
         )
-        self.env.cloud.neutron.add_interface_router(
+        self.cloud.neutron.add_interface_router(
             self.data["network"]["router"]["id"],
             {"subnet_id": subnet["id"]},
         )
@@ -553,7 +563,7 @@ class NeutronSubnet(EventResource):
     @task(before=[create])
     def delete(self):
         if self.data["cidr"] is not None:
-            self.env.cloud.neutron.delete_subnet(self.data["id"])
+            self.cloud.neutron.delete_subnet(self.data["id"])
 
 
 @Network.register("neutron")
@@ -588,7 +598,7 @@ class NeutronNetwork(EventResource):
         except IndexError:
             subnet = {"cidr": None}
         else:
-            subnet = self.env.cloud.neutron.show_subnet(subnet_id)["subnet"]
+            subnet = self.cloud.neutron.show_subnet(subnet_id)["subnet"]
         subnet["network"] = self.data
         return subnet
 
@@ -601,7 +611,7 @@ class NeutronNetwork(EventResource):
 
     @task(requires=[tenant.create], includes=[subnet.create, save_subnet])
     def create(self):
-        cloud = self.env.cloud.restrict(
+        cloud = self.cloud.restrict(
             tenant_name=self.tenant["name"],
         )
         network = cloud.neutron.create_network({"network": {
@@ -609,7 +619,7 @@ class NeutronNetwork(EventResource):
             "tenant_id": self.tenant["id"],
         }})["network"]
         network["tenant"] = self.data["tenant"]
-        public_net = self.env.cloud.neutron.list_networks(**{
+        public_net = self.cloud.neutron.list_networks(**{
             "router:external": True,
         })["networks"][0]
         network["router"] = cloud.neutron.create_router({"router": {
@@ -620,7 +630,7 @@ class NeutronNetwork(EventResource):
 
     @task(before=[subnet.delete])
     def clear_ports(self):
-        neutron = self.env.cloud.neutron
+        neutron = self.cloud.neutron
         for port in neutron.list_ports(network_id=self.data["id"])["ports"]:
             if port["device_owner"] == "network:router_interface":
                 neutron.remove_interface_router(
@@ -632,7 +642,7 @@ class NeutronNetwork(EventResource):
 
     @task(before=[create], requires=[clear_ports, subnet.delete])
     def delete(self):
-        self.env.cloud.neutron.delete_network(self.data["id"])
+        self.cloud.neutron.delete_network(self.data["id"])
 
 
 class NeutronPort(EventResource):
@@ -660,7 +670,7 @@ class NeutronPort(EventResource):
 
     @task(requires=[network.create])
     def create(self):
-        cloud = self.env.cloud.restrict(
+        cloud = self.cloud.restrict(
             tenant_name=self.network["tenant"]["name"],
         )
         port = cloud.neutron.create_port(body={"port": {
@@ -680,7 +690,7 @@ class NeutronPort(EventResource):
     @task(before=[network.delete, create])
     def delete(self):
         try:
-            self.env.cloud.neutron.delete_port(self.data["id"])
+            self.cloud.neutron.delete_port(self.data["id"])
         # KeyError can be raised if we came here through Server
         except (neutron_excs.PortNotFoundClient, KeyError):
             pass
@@ -710,7 +720,7 @@ class NeutronFloatingIP(EventResource):
 
     @NeutronNetwork()
     def public_network(self):
-        nets = self.env.cloud.neutron.list_networks(**{
+        nets = self.cloud.neutron.list_networks(**{
             "router:external": True,
         })
         return nets["networks"][0]
@@ -725,14 +735,14 @@ class NeutronFloatingIP(EventResource):
 
     @task(requires=[tenant.create])
     def create(self):
-        cloud = self.env.cloud.restrict(tenant_name=self.tenant["name"])
+        cloud = self.cloud.restrict(tenant_name=self.tenant["name"])
         self.data = cloud.neutron.create_floatingip({"floatingip": {
             "floating_network_id": self.public_network["id"],
         }})["floatingip"]
 
     @task(requires=[create, port.create])
     def associate(self):
-        self.data = self.env.cloud.neutron.update_floatingip(
+        self.data = self.cloud.neutron.update_floatingip(
             self.data["id"],
             {
                 "floatingip": {
@@ -744,7 +754,7 @@ class NeutronFloatingIP(EventResource):
     @task(before=[port.delete])
     def disassociate(self):
         try:
-            self.data = self.env.cloud.neutron.update_floatingip(
+            self.data = self.cloud.neutron.update_floatingip(
                 self.data["id"],
                 {
                     "floatingip": {
@@ -757,7 +767,7 @@ class NeutronFloatingIP(EventResource):
 
     @task(before=[create], requires=[disassociate])
     def delete(self):
-        self.env.cloud.neutron.delete_floatingip(self.data["id"])
+        self.cloud.neutron.delete_floatingip(self.data["id"])
 
 
 @Nic.register("neutron")
@@ -805,14 +815,14 @@ class Volume(EventResource):
 
     @task(requires=[tenant.create])
     def create(self):
-        cloud = self.env.cloud.restrict(
+        cloud = self.cloud.restrict(
             tenant_name=self.tenant["name"],
         )
         volume = cloud.cinder.volumes.create(
             self.data["size"],
             display_name=self.data["display_name"],
         )
-        volume = utils.wait_for(volume.id, self.env.cloud.cinder.volumes.get,
+        volume = utils.wait_for(volume.id, self.cloud.cinder.volumes.get,
                                 value="available")
         self.data = dict(volume._info,
                          **make_kwargs(
@@ -823,10 +833,10 @@ class Volume(EventResource):
     def attach(self):
         if self.data.get("server"):
             device = None
-            self.env.cloud.nova.volumes.create_server_volume(
+            self.cloud.nova.volumes.create_server_volume(
                 self.data["server"]["id"], self.data["id"], device)
             volume = utils.wait_for(self.data["id"],
-                                    self.env.cloud.cinder.volumes.get,
+                                    self.cloud.cinder.volumes.get,
                                     value="in-use")
             self.data = volume._info
 
@@ -834,17 +844,17 @@ class Volume(EventResource):
     def detach(self):
         for attachment in self.data["attachments"]:
             server_id = attachment["server_id"]
-            self.env.cloud.nova.volumes.delete_server_volume(server_id,
+            self.cloud.nova.volumes.delete_server_volume(server_id,
                                                              self.data["id"])
         if self.data["attachments"]:
             volume = utils.wait_for(self.data["id"],
-                                    self.env.cloud.cinder.volumes.get,
+                                    self.cloud.cinder.volumes.get,
                                     value="available")
             self.data = volume._info
 
     @task(before=[create], requires=[detach])
     def delete(self):
-        self.env.cloud.cinder.volumes.delete(self.data["id"])
+        self.cloud.cinder.volumes.delete(self.data["id"])
 
 
 class Server(EventResource):
@@ -901,7 +911,7 @@ class Server(EventResource):
                     nics.each().create, floating_ips.each().create],
           includes=[floating_ips.each().associate, volumes.each().attach])
     def create(self):
-        cloud = self.env.cloud.restrict(
+        cloud = self.cloud.restrict(
             username=self.user["name"],
             password="default",
             tenant_name=self.tenant["name"],
@@ -941,8 +951,8 @@ class Server(EventResource):
           requires=[floating_ips.each().disassociate, volumes.each().detach],
           includes=[nics.each().delete])
     def delete(self):
-        self.env.cloud.nova.servers.delete(self.data["id"])
-        utils.wait_for(self.data["id"], self.env.cloud.nova.servers.get,
+        self.cloud.nova.servers.delete(self.data["id"])
+        utils.wait_for(self.data["id"], self.cloud.nova.servers.get,
                        stop_excs=(nova_excs.NotFound,))
         self.post_event("delete")
 
@@ -972,13 +982,13 @@ class Service(EventResource):
 
     @task
     def enable(self):
-        data = self.env.cloud.nova.services.enable(self.data["host"],
+        data = self.cloud.nova.services.enable(self.data["host"],
                                                    self.data["binary"])
         self.data.update(data.to_dict())
 
     @task
     def disable(self):
-        data = self.env.cloud.nova.services.disable(self.data["host"],
+        data = self.cloud.nova.services.disable(self.data["host"],
                                                     self.data["binary"])
         self.data.update(data.to_dict())
 
@@ -986,22 +996,22 @@ class Service(EventResource):
 class CleanupWorkload(EventResource):
     @base.Collection(Tenant)
     def tenants(self):
-        tenants = self.env.cloud.keystone.tenants.list()
+        tenants = self.cloud.keystone.tenants.list()
         return filter_prefixed(tenants)
 
     @base.Collection(Role)
     def roles(self):
-        roles = self.env.cloud.keystone.roles.list()
+        roles = self.cloud.keystone.roles.list()
         return filter_prefixed(roles)
 
     @base.Collection(User)
     def users(self):
-        users = self.env.cloud.keystone.users.list()
+        users = self.cloud.keystone.users.list()
         return filter_prefixed(users)
 
     @base.Collection(Server)
     def servers(self):
-        servers = self.env.cloud.nova.servers.list(
+        servers = self.cloud.nova.servers.list(
             search_opts={"all_tenants": 1})
         servers = filter_prefixed(servers)
         # FIXME(yorik-sar): workaroud for missing resource lookup by id
@@ -1040,7 +1050,7 @@ class CleanupWorkload(EventResource):
 
     @base.Collection(Service)
     def services(self):
-        services = self.env.cloud.nova.services.list()
+        services = self.cloud.nova.services.list()
         for service in services:
             if (service.state.lower() == "up" and
                     service.status.lower() == "disabled"):
@@ -1048,12 +1058,12 @@ class CleanupWorkload(EventResource):
 
     @base.Collection(Flavor)
     def flavors(self):
-        return filter_prefixed(self.env.cloud.nova.flavors.list())
+        return filter_prefixed(self.cloud.nova.flavors.list())
 
     @base.Collection(SecurityGroup)
     def security_groups(self):
         tenants = {tenant["id"]: tenant for tenant in self.tenants}
-        for sg in self.env.cloud.nova.security_groups.list():
+        for sg in self.cloud.nova.security_groups.list():
             if sg.tenant_id in tenants:
                 sg = sg.to_dict()
                 sg["tenant"] = tenants[sg["tenant_id"]]
@@ -1063,10 +1073,10 @@ class CleanupWorkload(EventResource):
     def networks(self):
         plugin = self.env.plugins.get("network", "nova")
         if plugin == "nova":
-            networks = self.env.cloud.nova.networks.list()
+            networks = self.cloud.nova.networks.list()
             return filter_prefixed(networks, key="label")
         elif plugin == "neutron":
-            networks = self.env.cloud.neutron.list_networks()["networks"]
+            networks = self.cloud.neutron.list_networks()["networks"]
             return filter_prefixed(networks, convert_fn=lambda x: x)
         else:
             assert False
@@ -1075,16 +1085,16 @@ class CleanupWorkload(EventResource):
     def floating_ips(self):
         plugin = self.env.plugins["network"]
         if plugin == "nova":
-            floating_ips = self.env.cloud.nova.floating_ips_bulk.list()
+            floating_ips = self.cloud.nova.floating_ips_bulk.list()
             for f in floating_ips:
                 yield f.to_dict()
         elif plugin == "neutron":
             networks = {network["id"]: network for network in self.networks}
-            fips = self.env.cloud.neutron.list_floatingips()["floatingips"]
+            fips = self.cloud.neutron.list_floatingips()["floatingips"]
             for floating_ip in fips:
                 port_id = floating_ip["port_id"]
                 if port_id is not None:
-                    port = self.env.cloud.neutron.show_port(port_id)["port"]
+                    port = self.cloud.neutron.show_port(port_id)["port"]
                     floating_ip["fixed_ip"] = {
                         "id": port_id,
                         "address": floating_ip["fixed_ip_address"],
@@ -1100,12 +1110,12 @@ class CleanupWorkload(EventResource):
 
     @base.Collection(Image)
     def images(self):
-        return filter_prefixed(self.env.cloud.glance.images.list(),
+        return filter_prefixed(self.cloud.glance.images.list(),
                                convert_fn=dict)
 
     @base.Collection(Volume)
     def volumes(self):
-        volumes = self.env.cloud.cinder.volumes.list(
+        volumes = self.cloud.cinder.volumes.list(
             search_opts={"all_tenants": 1})
         for volume in volumes:
             volume_info = volume._info
@@ -1320,7 +1330,7 @@ class SetupWorkload(EventResource):
 
     @base.Collection(Service)
     def services(self):
-        services = self.env.cloud.nova.services.list()
+        services = self.cloud.nova.services.list()
         for service in services:
             if (service.state.lower() == "up" and
                     service.status.lower() == "disabled"):

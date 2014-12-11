@@ -128,10 +128,6 @@ class Resource(object):
             value = 'unbound'
         return '<{} {}>'.format(type(self).__name__, value)
 
-    @property
-    def env(self):
-        return self.runner.env
-
 
 class Collection(Resource):
     _collection_tasks = {}
