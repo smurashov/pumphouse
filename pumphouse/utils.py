@@ -69,7 +69,8 @@ def wait_for(resource, update_resource,
         try:
             upd_resource = update_resource(resource)
         except stop_excs:
-            LOG.exception("Could not fetch updated resource: %s", resource)
+            LOG.debug("Could not fetch updated resource: %s", resource,
+                      exc_info=True)
             break
         except expect_excs as exc:
             LOG.warn("Expected exception: %s", exc.message)
