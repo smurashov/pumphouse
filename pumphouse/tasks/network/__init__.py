@@ -14,6 +14,8 @@
 
 from pumphouse import flows
 from . import nova
+from . import neutron
 
 migrate_nic = flows.register("network", default="nova")
+migrate_nic.add("neutron", neutron.migrate_nic)
 migrate_nic.add("nova", nova.migrate_nic)
