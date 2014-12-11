@@ -935,6 +935,42 @@ class Server(EventResource):
         self.post_event("delete")
 
 
+class Service(EventResource):
+    events_type = "host"
+    event_id_key = "host"
+
+    @classmethod
+    def get_id_for(cls, data):
+        return (data["host"], data["binary"])
+
+    def event_data(self):
+        def get_proper_status():
+            state = self.data["state"].lower()
+            status = self.data["status"].lower()
+            if state == "up":
+                if status == "enabled":
+                    return "available"
+                else:
+                    return "blocked"
+            else:
+                return "error"
+
+        return dict(self.data,
+                    status=get_proper_status())
+
+    @task
+    def enable(self):
+        data = self.env.cloud.nova.services.enable(self.data["host"],
+                                                   self.data["binary"])
+        self.data.update(data.to_dict())
+
+    @task
+    def disable(self):
+        data = self.env.cloud.nova.services.disable(self.data["host"],
+                                                    self.data["binary"])
+        self.data.update(data.to_dict())
+
+
 class CleanupWorkload(EventResource):
     @base.Collection(Tenant)
     def tenants(self):
@@ -989,6 +1025,14 @@ class CleanupWorkload(EventResource):
                             "network": networks[label],
                         })
         return servers
+
+    @base.Collection(Service)
+    def services(self):
+        services = self.env.cloud.nova.services.list()
+        for service in services:
+            if (service.state.lower() == "up" and
+                    service.status.lower() == "disabled"):
+                yield service.to_dict()
 
     @base.Collection(Flavor)
     def flavors(self):
@@ -1058,6 +1102,7 @@ class CleanupWorkload(EventResource):
                 yield volume_info
 
     delete = base.task(name="delete", requires=[
+        services.each().enable,
         tenants.each().delete,
         roles.each().delete,
         users.each().delete,
@@ -1261,6 +1306,14 @@ class SetupWorkload(EventResource):
                     server["floating_ips"].append(floating_ip)
                 yield server
 
+    @base.Collection(Service)
+    def services(self):
+        services = self.env.cloud.nova.services.list()
+        for service in services:
+            if (service.state.lower() == "up" and
+                    service.status.lower() == "disabled"):
+                yield service.to_dict()
+
     @base.Collection(Volume)
     def volumes(self):
         for tenant in self.tenants:
@@ -1269,6 +1322,10 @@ class SetupWorkload(EventResource):
                 volume["tenant"] = tenant
                 yield volume
 
+    boot_servers = task(name="boot_servers",
+                        after=[services.each().enable],
+                        includes=[servers.each().create])
+
     create = base.task(name="create", requires=[
         tenants.each().create,
         users.each().create,
@@ -1276,7 +1333,7 @@ class SetupWorkload(EventResource):
         flavors.each().create,
         security_groups.each().create,
         networks.each().create,
-        servers.each().create,
+        boot_servers,
         floating_ips.each().create,
         volumes.each().create,
     ])
