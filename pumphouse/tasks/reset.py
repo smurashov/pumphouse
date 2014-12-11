@@ -906,8 +906,7 @@ class Server(EventResource):
             password="default",
             tenant_name=self.tenant["name"],
         )
-        servers = cloud.nova.servers
-        server = servers.create(
+        server = cloud.nova.servers.create(
             self.data["name"],
             self.image["id"],
             self.flavor["id"],
@@ -918,7 +917,7 @@ class Server(EventResource):
             last_event_data = None
             yield
             while True:
-                res = servers.get(id_)
+                res = self.env.cloud.nova.servers.get(id_)
                 self.data = res.to_dict()
                 event_data = self.event_data()
                 if last_event_data is None:
