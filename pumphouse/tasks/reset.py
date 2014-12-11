@@ -923,19 +923,39 @@ class Server(EventResource):
 
 
 class Service(EventResource):
+    events_type = "host"
+    event_id_key = "host"
+
     @classmethod
     def get_id_for(cls, data):
         return (data["host"], data["binary"])
 
+    def event_data(self):
+        def get_proper_status():
+            state = self.data["state"].lower()
+            status = self.data["status"].lower()
+            if state == "up":
+                if status == "enabled":
+                    return "available"
+                else:
+                    return "blocked"
+            else:
+                return "error"
+
+        return dict(self.data,
+                    status=get_proper_status())
+
     @task
     def enable(self):
-        self.env.cloud.nova.services.enable(self.data["host"],
-                                            self.data["binary"])
+        data = self.env.cloud.nova.services.enable(self.data["host"],
+                                                   self.data["binary"])
+        self.data.update(data.to_dict())
 
     @task
     def disable(self):
-        self.env.cloud.nova.services.disable(self.data["host"],
-                                             self.data["binary"])
+        data = self.env.cloud.nova.services.disable(self.data["host"],
+                                                    self.data["binary"])
+        self.data.update(data.to_dict())
 
 
 class CleanupWorkload(EventResource):
