@@ -375,6 +375,13 @@ class NovaNetwork(EventResource):
     data_id_key = "label"
     events_type = "network"
 
+    def event_data(self):
+        return {
+            "id": self.data.get("id"),
+            "name": self.data.get("label"),
+            "tenant_id": self.data.get("project_id"),
+        }
+
     @Tenant()
     def tenant(self):
         return self.data["tenant"]
@@ -564,7 +571,6 @@ class NeutronNetwork(EventResource):
         return {
             "id": self.data.get("id"),
             "name": self.data.get("name"),
-            "status": self.data.get("status"),
             "tenant_id": self.data.get("tenant_id"),
         }
 
