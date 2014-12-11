@@ -8,6 +8,8 @@ function API(endpoint) {
         // Returns world's picture
         return this._request
             .get(this._endpoint + '/resources')
+            .set('X-Requested-With', 'XMLHttpRequest')
+            .set('Cache-Control', 'no-cache,no-store,must-revalidate,max-age=-1')
             .end(function (err, res) {
                 (callback || this._no_callback)(err, res);
             });
