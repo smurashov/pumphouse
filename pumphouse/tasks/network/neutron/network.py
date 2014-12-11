@@ -203,7 +203,7 @@ class EnsureNetwork(task.BaseCloudTask):
             'name': net_info['name']
         })
 
-        LOG.info("Network %s created: %s" % network['id'], str(network))
+        LOG.info("Network %s created: %s" % (network['id'], str(network)))
 
         return network
 
