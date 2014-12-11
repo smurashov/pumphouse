@@ -681,7 +681,7 @@ def migrate_port(context, port_id):
             pass
         elif (port_info["device_owner"] == "network:router_gateway"):
             pass
-        elif (port_info['device_owner'] == 'compute:None'):
+        elif port_info['device_owner'].startswith('compute:'):
             pass
         elif (port_info["device_owner"] == "network:router_interface"):
             routerFlow, device_info = migrate_router(
