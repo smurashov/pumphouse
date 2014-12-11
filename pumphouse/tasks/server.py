@@ -70,7 +70,8 @@ class EvacuateServer(task.BaseCloudTask):
             "id": server["id"],
             "type": "server",
             "cloud": self.cloud.name,
-            "action": "live migration",
+            "action": "",
+            "status": "live migration",
         }, namespace="/events")
 
     def evacuation_end_event(self, server):
