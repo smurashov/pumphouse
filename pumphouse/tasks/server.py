@@ -47,18 +47,20 @@ class EvacuateServer(task.BaseCloudTask):
 
     def execute(self, server_info, **requires):
         server_id = server_info["id"]
-        self.evacuation_start_event(server_info)
+        self.evacuation_event(server_info)
         # NOTE(akscram): The destination host will be chosen by the
         #                scheduler.
         self.cloud.nova.servers.live_migrate(server_id, None,
                                              self.block_migration,
                                              self.disk_over_commit)
-        server = utils.wait_for(server_id, self.cloud.nova.servers.get)
+        server = self.cloud.nova.servers.get(server_id)
+        self.evacuation_event(server.to_dict())
+        server = utils.wait_for(server.id, self.cloud.nova.servers.get)
         migrated_server_info = server.to_dict()
-        self.evacuation_end_event(migrated_server_info)
+        self.evacuation_event(migrated_server_info)
         return migrated_server_info
 
-    def evacuation_start_event(self, server):
+    def evacuation_event(self, server):
         if HYPERVISOR_HOSTNAME_ATTR not in server:
             LOG.warning("Could not get %r attribute from server %r",
                         HYPERVISOR_HOSTNAME_ATTR, server)
@@ -66,21 +68,6 @@ class EvacuateServer(task.BaseCloudTask):
         hostname = server[HYPERVISOR_HOSTNAME_ATTR]
         LOG.info("Perform evacuation of server %r from %r host",
                  server["id"], hostname)
-        events.emit("update", {
-            "id": server["id"],
-            "type": "server",
-            "cloud": self.cloud.name,
-            "action": "",
-            "status": "live migration",
-        }, namespace="/events")
-
-    def evacuation_end_event(self, server):
-        if HYPERVISOR_HOSTNAME_ATTR not in server:
-            LOG.warning("Could not get %r attribute from server %r",
-                        HYPERVISOR_HOSTNAME_ATTR, server)
-            return
-        hostname = server[HYPERVISOR_HOSTNAME_ATTR]
-        LOG.info("Server %r evacuated to host %r", server["id"], hostname)
         events.emit("update", {
             "id": server["id"],
             "type": "server",
