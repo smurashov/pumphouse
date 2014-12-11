@@ -28,7 +28,6 @@ from neutronclient.common import exceptions as neutron_excs
 from novaclient import exceptions as nova_excs
 
 from pumphouse import events
-from pumphouse import exceptions
 from pumphouse.tasks import base
 from pumphouse import utils
 
