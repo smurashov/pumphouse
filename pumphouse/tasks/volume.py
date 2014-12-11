@@ -104,6 +104,7 @@ class CreateVolumeTask(task.BaseCloudTask):
             "cloud": self.cloud.name,
             "type": "volume",
             "data": dict(volume_info,
+                         host_id=volume_info.get("os-vol-host-attr:host", None),
                          name=volume_info["display_name"],
                          server_ids=[att["server_id"]
                                      for att in volume_info["attachments"]]),
