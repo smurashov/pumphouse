@@ -207,15 +207,15 @@ MigrateTestCase.assureServersEqual = function (s1, s2) {
             so = s2[i];
 
             if (!so) {
-                this.fail('Unable to find server "' + s.name + '"');
+                this.fail('Unable to find server "' + s.data.name + '"');
             }
 
             if (s.image_name !== so.image_name) {
-                this.fail('Server "' + s.name + '" uses different image ("' + s.image_name + '" vs "' + so.image_name + '")');
+                this.fail('Server "' + s.data.name + '" uses different image ("' + s.image_name + '" vs "' + so.image_name + '")');
             }
 
             if (s.floating_ips !== so.floating_ips) {
-                this.fail('Server "' + s.name + '" has different set of floating ips ("' + s.floating_ips + '" vs "' + so.floating_ips + '")');
+                this.fail('Server "' + s.data.name + '" has different set of floating ips ("' + s.floating_ips + '" vs "' + so.floating_ips + '")');
             }
 
             console.log(' - ' + this.makeServerPrintable(s) + ' = ' + this.makeServerPrintable(so));
