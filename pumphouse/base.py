@@ -50,11 +50,14 @@ class Service(object):
 
     def reset(self, events, cloud):
         try:
-            env = reset.Environment(cloud, self.plugins)
+            env = reset.Environment({cloud.name: cloud}, self.plugins)
 
             runner = base.TaskflowRunner(env)
-            cleanup_workload = runner.get_resource(reset.CleanupWorkload,
-                                                   {"id": cloud.name})
+            cleanup_workload = runner.get_resource(
+                reset.CleanupWorkload,
+                {},
+                reset.Context(cloud.name),
+            )
             runner.add(cleanup_workload.delete)
 
             populate = self.populate_config
@@ -65,10 +68,9 @@ class Service(object):
                 if workloads is None:
                     workloads = {}
                 setup_workload = runner.get_resource(reset.SetupWorkload, {
-                    "id": cloud.name,
                     "populate": populate,
                     "workloads": workloads,
-                })
+                }, reset.Context(cloud.name))
                 runner.add(setup_workload.create)
             runner.run()
         except Exception:

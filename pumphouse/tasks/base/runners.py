@@ -35,8 +35,8 @@ class Runner(object):
         self.tasks = set()
         self.env = env
 
-    def get_resource(self, resource, data):
-        id_ = resource.get_id_for_runner(data, self)
+    def get_resource(self, resource, data, context=None):
+        id_ = resource.get_id_for_runner(data, context, self)
         if isinstance(resource, resources.Collection):
             base_cls = resource.base_cls
             res_type = functools.partial(resources.Collection,
@@ -51,7 +51,7 @@ class Runner(object):
         try:
             return self.resources[key]
         except KeyError:
-            res = res_type(data=data, runner=self)
+            res = res_type(data=data, context=context, runner=self)
             self.resources[key] = res
             return res
 

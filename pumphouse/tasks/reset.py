@@ -87,11 +87,20 @@ class CloudResource(base.Resource):
 
     @property
     def cloud(self):
-        return self.runner.env.cloud
+        return self.runner.env.clouds[self.context.cloud]
+
+    @classmethod
+    def get_id_for_runner(cls, data, context, runner):
+        id_ = super(CloudResource, cls).get_id_for_runner(
+            data, context, runner)
+        if context is None or not context.cloud:
+            return id_
+        else:
+            return (context.cloud, id_)
 
 
 class EventResource(CloudResource):
-    class __metaclass__(base.Resource.__metaclass__):
+    class __metaclass__(CloudResource.__metaclass__):
         def __new__(mcs, name, bases, cls_vars):
             if "events_type" not in cls_vars:
                 cls_vars["events_type"] = name.lower()
@@ -994,6 +1003,10 @@ class Service(EventResource):
 
 
 class CleanupWorkload(EventResource):
+    @classmethod
+    def get_id_for(cls, data):
+        return ()
+
     @base.Collection(Tenant)
     def tenants(self):
         tenants = self.cloud.keystone.tenants.list()
@@ -1139,6 +1152,10 @@ class CleanupWorkload(EventResource):
 
 
 class SetupWorkload(EventResource):
+    @classmethod
+    def get_id_for(cls, data):
+        return ()
+
     @base.Collection(Tenant)
     def tenants(self):
         tenants = self.data["workloads"].get("tenants")
@@ -1361,7 +1378,8 @@ class SetupWorkload(EventResource):
     ])
 
 
-Environment = collections.namedtuple("Environment", ["cloud", "plugins"])
+Environment = collections.namedtuple("Environment", ["clouds", "plugins"])
+Context = collections.namedtuple("Context", ["cloud"])
 
 if __name__ == "__main__":
     import logging

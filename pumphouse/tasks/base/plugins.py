@@ -61,19 +61,20 @@ class Plugin(resources.Resource):
         assert set(impl._tasks) >= cls._tasks.items
         return impl
 
-    def __new__(cls, data=None, runner=None):
+    def __new__(cls, data=None, runner=None, context=None):
         if data is not None:
-            return runner.get_resource(cls.get_impl(runner), data)
+            return runner.get_resource(cls.get_impl(runner), data, context)
         else:
-            return super(Plugin, cls).__new__(cls, data=data, runner=runner)
+            return super(Plugin, cls).__new__(
+                cls, data=data, runner=runner, context=context)
 
     def __getattr__(self, name):
         unbound_task = getattr(type(self), name)
         return unbound_task.__get__(self, type(self))
 
     @classmethod
-    def get_id_for_runner(cls, data, runner):
-        return cls.get_impl(runner).get_id_for_runner(data, runner)
+    def get_id_for_runner(cls, data, context, runner):
+        return cls.get_impl(runner).get_id_for_runner(data, context, runner)
 
 
 class PluginUnboundTask(tasks.UnboundTask):

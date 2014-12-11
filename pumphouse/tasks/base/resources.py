@@ -47,19 +47,31 @@ class Resource(object):
             cls_vars["_tasks"] = tuple(tasks_)
             return type.__new__(mcs, name, bases, cls_vars)
 
-    def __init__(self, data=None, runner=None):
+    def __init__(self, data=None, runner=None, context=None):
         self._resource_subres = {}
         self.runner = runner
         self.bound = data is not None
         self.data = data
+        self.context = context
         self.id_ = None
         self.data_fn = None
+        self.derive_context_fn = None
 
     def set_data_fn(self, data_fn):
         self.data_fn = data_fn
         return self
 
     __call__ = set_data_fn
+
+    def context_fn(self, f):
+        self.mod_context_fn = f
+        return self
+
+    def derive_context(self, context):
+        if self.derive_context_fn is not None:
+            return self.derive_context_fn
+        else:
+            return context
 
     def get_bound_subres(self, resource, data=None):
         assert not self.bound
@@ -72,7 +84,8 @@ class Resource(object):
             data = self.data_fn(resource)
             if isinstance(data, types.GeneratorType):
                 data = list(data)
-        res = resource.get_runner().get_resource(self, data)
+        context = self.derive_context(resource.context)
+        res = resource.get_runner().get_resource(self, data, context)
         self._resource_subres[resource] = res
         return res
 
@@ -90,7 +103,7 @@ class Resource(object):
         return self.runner
 
     @classmethod
-    def get_id_for_runner(cls, data, runner):
+    def get_id_for_runner(cls, data, context, runner):
         return cls.get_id_for(data)
 
     data_id_key = None
@@ -107,7 +120,8 @@ class Resource(object):
     def get_id(self):
         assert self.bound
         if self.id_ is None:
-            self.id_ = self.get_id_for_runner(self.data, self.get_runner())
+            self.id_ = self.get_id_for_runner(
+                self.data, self.context, self.get_runner())
         return self.id_
 
     def __get__(self, instance, owner):
@@ -142,13 +156,15 @@ class Collection(Resource):
     def get_data(self):
         data = []
         for el_data in self.data:
-            res = self.runner.get_resource(self.base_cls, el_data)
+            res = self.runner.get_resource(self.base_cls, el_data,
+                                           self.context)
             data.append(res.get_data())
         return data
 
-    def get_id_for_runner(self, data, runner):
+    def get_id_for_runner(self, data, context, runner):
         elements = frozenset(
-            self.base_cls.get_id_for_runner(el, runner) for el in data,
+            self.base_cls.get_id_for_runner(el, context, runner)
+            for el in data,
         )
         return (self.base_cls, elements)
 
@@ -188,7 +204,8 @@ class CollectionUnboundTask(tasks.UnboundTask):
         runner = resource.get_runner()
         includes = []
         for data in resource.data:
-            res = runner.get_resource(resource.base_cls, data)
+            res = runner.get_resource(resource.base_cls, data,
+                                      resource.context)
             includes.append(self.base_task.get_for_resource(res))
         return tasks.Task(
             None,
