@@ -19,17 +19,23 @@ import mock
 from pumphouse.tasks import base
 
 
-class Tenant(base.Resource):
+class CloudResource(base.Resource):
+    @property
+    def cloud(self):
+        return self.get_runner().env.cloud
+
+
+class Tenant(CloudResource):
     @base.task
     def create(self):
-        self.data = self.env.cloud.keystone.tenants.create(self.data)
+        self.data = self.cloud.keystone.tenants.create(self.data)
 
     @base.task
     def delete(self):
-        self.env.cloud.keystone.tenants.delete(self.data["id"])
+        self.cloud.keystone.tenants.delete(self.data["id"])
 
 
-class Server(base.Resource):
+class Server(CloudResource):
     @classmethod
     def get_id_for(cls, data):
         try:
@@ -52,21 +58,21 @@ class Server(base.Resource):
         server = self.data.copy()
         server.pop("tenant")
         server["tenant_id"] = self.tenant["id"]
-        self.data = self.env.cloud.nova.servers.create(server)
+        self.data = self.cloud.nova.servers.create(server)
 
     @base.task(before=[tenant.delete])
     def delete(self):
-        self.env.cloud.nova.servers.delete(self.data)
+        self.cloud.nova.servers.delete(self.data)
 
 
-class TenantWorkload(base.Resource):
+class TenantWorkload(CloudResource):
     @Tenant()
     def tenant(self):
         return self.data
 
     @base.Collection(Server)
     def servers(self):
-        return self.env.cloud.nova.servers.list(search_opts={
+        return self.cloud.nova.servers.list(search_opts={
             "all_tenants": 1,
             "tenant_id": self.tenant["id"],
         })

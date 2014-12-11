@@ -34,6 +34,7 @@ class TestBase(unittest.TestCase):
 
         self.cloud = mock.Mock()
         self.events = mock.Mock()
+        self.context = reset.Context(self.cloud.name)
 
         self.service = base.Service(
             self.config.copy(),
@@ -81,12 +82,11 @@ class TestService(TestBase):
         self.assertEqual(
             runner.get_resource.call_args_list,
             [
-                mock.call(reset.CleanupWorkload, {"id": self.cloud.name}),
+                mock.call(reset.CleanupWorkload, {}, self.context),
                 mock.call(reset.SetupWorkload, {
-                    "id": self.cloud.name,
                     "populate": self.config["populate"],
                     "workloads": self.config["workloads"],
-                }),
+                }, self.context),
             ],
         )
         resource = runner.get_resource.return_value
@@ -104,12 +104,11 @@ class TestService(TestBase):
         self.assertEqual(
             runner.get_resource.call_args_list,
             [
-                mock.call(reset.CleanupWorkload, {"id": self.cloud.name}),
+                mock.call(reset.CleanupWorkload, {}, self.context),
                 mock.call(reset.SetupWorkload, {
-                    "id": self.cloud.name,
                     "populate": self.config["populate"],
                     "workloads": {},
-                }),
+                }, self.context),
             ],
         )
         resource = runner.get_resource.return_value
@@ -130,12 +129,11 @@ class TestService(TestBase):
         self.assertEqual(
             runner.get_resource.call_args_list,
             [
-                mock.call(reset.CleanupWorkload, {"id": self.cloud.name}),
+                mock.call(reset.CleanupWorkload, {}, self.context),
                 mock.call(reset.SetupWorkload, {
-                    "id": self.cloud.name,
                     "populate": {},
                     "workloads": {},
-                }),
+                }, self.context),
             ],
         )
         resource = runner.get_resource.return_value
@@ -155,7 +153,7 @@ class TestService(TestBase):
         self.assertEqual(
             runner.get_resource.call_args_list,
             [
-                mock.call(reset.CleanupWorkload, {"id": self.cloud.name}),
+                mock.call(reset.CleanupWorkload, {}, self.context),
             ],
         )
         resource = runner.get_resource.return_value
