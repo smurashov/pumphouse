@@ -909,17 +909,25 @@ class Server(EventResource):
             nics=[nic["nic"] for nic in self.nics],
         )
 
-        def do_get(id_, created=[]):
-            res = servers.get(id_)
-            self.data = res.to_dict()
-            if not created:
-                self.post_event("create")
-                created.append(True)
-            else:
-                self.post_event("update")
-            return res
+        def _do_get(id_):
+            last_event_data = None
+            yield
+            while True:
+                res = servers.get(id_)
+                self.data = res.to_dict()
+                event_data = self.event_data()
+                if last_event_data is None:
+                    self.post_event("create")
+                    last_event_data = event_data
+                elif last_event_data != event_data:
+                    self.post_event("update")
+                    last_event_data = event_data
+                yield res
 
-        server = utils.wait_for(server.id, do_get, value="ACTIVE").to_dict()
+        do_get = _do_get(server.id)
+        next(do_get)
+        server = utils.wait_for(server.id, do_get.send, value="ACTIVE")
+        server = server.to_dict()
         for floating_ip in self.floating_ips:
             floating_ip["server"] = server
         for volume in self.volumes:
