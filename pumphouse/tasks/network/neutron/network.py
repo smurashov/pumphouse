@@ -546,8 +546,8 @@ def migrate_subnet(context, subnet_id, network_info):
                              name=subnet_retrieve,
                              provides=subnet_retrieve,
                              rebind=[
-                                all_src_subnet_binding,
-                                subnet_binding
+                                 all_src_subnet_binding,
+                                 subnet_binding
                              ]))
 
     f.add(EnsureSubnet(context.dst_cloud,
@@ -603,16 +603,16 @@ def migrate_router(context, router_id):
                              name=router_retrieve,
                              provides=router_retrieve,
                              rebind=[
-                                all_src_router_binding,
-                                router_binding
+                                 all_src_router_binding,
+                                 router_binding
                              ]))
 
     f.add(EnsureRouter(context.dst_cloud,
                        name=router_ensure,
                        provides=router_ensure,
                        rebind=[
-                               all_dst_router_binding,
-                               router_retrieve
+                           all_dst_router_binding,
+                           router_retrieve
                        ]))
 
     return f, router_ensure
@@ -736,6 +736,7 @@ def generate_binding(uid, label):
 
 def migrate_nic(context, network_name, address, tenant_id):
 
-    port_info = context.src_cloud.neutron.list_ports(fixed_ips=['ip_address=%s' % address['addr']])['ports'][0]
+    port_info = context.src_cloud.neutron.list_ports(
+        fixed_ips=['ip_address=%s' % address['addr']])['ports'][0]
 
     return migrate_port(context, port_info['id'])
