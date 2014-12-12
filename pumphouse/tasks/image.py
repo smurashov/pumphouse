@@ -130,7 +130,7 @@ class EnsureSingleImage(EnsureImage):
 
 
 class DeleteImage(task.BaseCloudTask):
-    def execute(self, image_info):
+    def execute(self, image_info, **requires):
         image_id = image_info["id"]
         try:
             self.cloud.glance.images.delete(image_id)
@@ -139,6 +139,20 @@ class DeleteImage(task.BaseCloudTask):
             raise exc
         else:
             LOG.info("Deleted: %s", str(image_info))
+            self.delete_event(image_info)
+
+    def delete_event(self, image_info):
+        events.emit("delete", {
+            "cloud": self.cloud.name,
+            "type": "image",
+            "id": image_info["id"]
+        }, namespace="/events")
+
+
+class DeleteImageByID(DeleteImage):
+    def execute(self, image_id, **requires):
+        image = self.cloud.glance.images.get(image_id)
+        super(DeleteImageByID, self).execute(dict(image))
 
 
 def migrate_image_task(context, task_class, image_id, user_id, *rebind):

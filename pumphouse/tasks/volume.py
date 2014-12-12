@@ -269,6 +269,8 @@ def migrate_attached_volume(context, server_id, volume_id,
     user_ensure = "user-{}-ensure".format(user_id)
     tenant_ensure = "tenant-{}-ensure".format(tenant_id)
     timeout = context.config.get("volume_tasks_timeout", 120)
+    image_src_delete = "{}-img-src-delete".format(volume_binding)
+    image_dst_delete = "{}-img-dst-delete".format(volume_binding)
 
     flow = graph_flow.Flow("migrate-{}".format(volume_binding))
     flow.add(RetrieveVolume(context.src_cloud,
@@ -304,6 +306,14 @@ def migrate_attached_volume(context, server_id, volume_id,
                           name=volume_delete,
                           rebind=[volume_clone],
                           requires=[volume_ensure]),
+             image_tasks.DeleteImageByID(context.src_cloud,
+                                         name=image_src_delete,
+                                         rebind=[volume_image],
+                                         requires=[image_ensure]),
+             image_tasks.DeleteImage(context.dst_cloud,
+                                     name=image_dst_delete,
+                                     rebind=[image_ensure],
+                                     requires=[volume_ensure]),
              BlockDeviceMapping(name=volume_mapping,
                                 provides=volume_mapping,
                                 rebind=[volume_binding,
