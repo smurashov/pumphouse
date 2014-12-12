@@ -99,12 +99,13 @@ class UploadVolume(task.BaseCloudTask):
 class CreateVolumeTask(task.BaseCloudTask):
     def create_volume_event(self, volume_info):
         LOG.info("Created: %s", volume_info)
+        host_id = volume_info.get("os-vol-host-attr:host", None)
         events.emit("create", {
             "id": volume_info["id"],
             "cloud": self.cloud.name,
             "type": "volume",
             "data": dict(volume_info,
-                         host_id=volume_info.get("os-vol-host-attr:host", None),
+                         host_id=host_id,
                          name=volume_info["display_name"],
                          server_ids=[att["server_id"]
                                      for att in volume_info["attachments"]]),
