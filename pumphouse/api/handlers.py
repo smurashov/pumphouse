@@ -254,7 +254,7 @@ def migrate_tenant(tenant_id):
                 "message": msg,
             }, namespace="/events")
         except Exception:
-            msg = ("Error is occured during migration resources of tenant: {}"
+            msg = ("Error occured during migration resources of tenant: {}"
                    .format(tenant_id))
             LOG.exception(msg)
             events.emit("log", {
@@ -297,7 +297,7 @@ def evacuate_host(host_id):
             result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of evacuation: %s", result)
         except Exception:
-            msg = ("Error is occured during evacuating host {}"
+            msg = ("Error occured during evacuating host {}"
                    .format(host_id))
             LOG.exception(msg)
             events.emit("log", {
@@ -345,7 +345,7 @@ def reassign_host(host_id):
             result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of migration: %s", result)
         except Exception:
-            msg = ("Error is occured during reassigning host {}"
+            msg = ("Error occured during reassigning host {}"
                    .format(host_id))
             LOG.exception(msg)
             events.emit("log", {
