@@ -203,7 +203,7 @@ class EnsureNetwork(task.BaseCloudTask):
             'name': net_info['name']
         })
 
-        LOG.info("Network %s created: %s" % network['id'], str(network))
+        LOG.info("Network %s created: %s" % (network['id'], str(network)))
 
         return network
 
@@ -681,7 +681,7 @@ def migrate_port(context, port_id):
             pass
         elif (port_info["device_owner"] == "network:router_gateway"):
             pass
-        elif (port_info['device_owner'] == 'compute:None'):
+        elif port_info['device_owner'].startswith('compute:'):
             pass
         elif (port_info["device_owner"] == "network:router_interface"):
             routerFlow, device_info = migrate_router(
