@@ -325,7 +325,10 @@ def restore_floating_ips(context, server_info):
     flow = unordered_flow.Flow("post-migration-{}".format(server_info["id"]))
     addresses = server_info["addresses"]
     for label in addresses:
-        fixed_ip = addresses[label][0]
+        fixed_ips = addresses[label]
+        if not fixed_ips:
+            continue
+        fixed_ip = fixed_ips[0]
         for floating_ip in [addr["addr"] for addr in addresses[label]
                             if addr['OS-EXT-IPS:type'] == 'floating']:
             fip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)
