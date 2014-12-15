@@ -14,6 +14,7 @@
 
 import argparse
 import collections
+import json
 import logging
 import os
 
@@ -21,6 +22,7 @@ from pumphouse import exceptions
 from pumphouse import utils
 from pumphouse import flows
 from pumphouse import context
+from pumphouse.api import handlers
 from pumphouse.tasks import base as tasks_base
 from pumphouse.tasks import evacuation as evacuation_tasks
 from pumphouse.tasks import image as image_tasks
@@ -153,6 +155,14 @@ def get_parser():
     evacuate_parser.set_defaults(action="reassign")
     evacuate_parser.add_argument("hostname",
                                  help="The hostname of the host to reassign.")
+    get_res_parser = subparsers.add_parser("get_resources",
+                                           help="Return clouds resources")
+    get_res_parser.set_defaults(action="get_resources")
+    get_res_parser.add_argument("target",
+                                nargs="?",
+                                choices=("source", "destination"),
+                                default="destination",
+                                help="Choose a cloud to get resources.")
     return parser
 
 
@@ -194,6 +204,10 @@ def migrate_resources(ctx, flow, ids):
             ctx, tenant_id)
         flow.add(resources_flow)
     return flow
+
+
+def get_resources(client):
+    return {"resources": list(handlers.cloud_resources(client))}
 
 
 def get_ids_by_tenant(cloud, resource_type, tenant_id):
@@ -425,6 +439,14 @@ def main():
                 utils.dump_flow(flow, f, True)
             return
         flows.run_flow(flow, ctx.store)
+    elif args.action == "get_resources":
+        client = init_client(
+            clouds_config[args.target],
+            args.target,
+            Cloud,
+            Identity,
+        )
+        print(json.dumps(get_resources(client)))
 
 if __name__ == "__main__":
     main()
