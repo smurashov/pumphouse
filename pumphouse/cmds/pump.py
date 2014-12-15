@@ -440,18 +440,13 @@ def main():
             return
         flows.run_flow(flow, ctx.store)
     elif args.action == "get_resources":
-        if args.target == "source":
-            src = init_client(clouds_config["source"],
-                              "source",
-                              Cloud,
-                              Identity)
-            print(json.dumps(get_resources(src), indent=4))
-        elif args.target == "destination":
-            dst = init_client(clouds_config["destination"],
-                              "destination",
-                              Cloud,
-                              Identity)
-            print(json.dumps(get_resources(dst), indent=4))
+        client = init_client(
+            clouds_config[args.target],
+            args.target,
+            Cloud,
+            Identity,
+        )
+        print(json.dumps(get_resources(client)))
 
 if __name__ == "__main__":
     main()
