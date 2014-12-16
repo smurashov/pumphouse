@@ -27,10 +27,10 @@ from pumphouse.tasks import base as tasks_base
 from pumphouse.tasks import evacuation as evacuation_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import identity as identity_tasks
-from pumphouse.tasks import resources as resources_tasks
 from pumphouse.tasks import volume_resources as volume_tasks
 from pumphouse.tasks import node as reassignment_tasks
 from pumphouse.tasks import reset as reset_tasks
+from pumphouse.tasks import workloads
 
 from taskflow.patterns import graph_flow
 from taskflow.patterns import unordered_flow
@@ -198,11 +198,11 @@ def migrate_identity(ctx, flow, ids):
     return flow
 
 
-def migrate_resources(ctx, flow, ids):
-    for tenant_id in ids:
-        resources_flow = resources_tasks.migrate_resources(
-            ctx, tenant_id)
-        flow.add(resources_flow)
+def migrate_projects(ctx, flow, ids):
+    for project_id in ids:
+        project_flow = workloads.project.migrate_project(
+            ctx, project_id)
+        flow.add(project_flow)
     return flow
 
 
@@ -292,8 +292,9 @@ def get_all_resource_ids(cloud, resource_type):
 RESOURCES_MIGRATIONS = collections.OrderedDict([
     ("images", migrate_images),
     ("identity", migrate_identity),
-    ("resources", migrate_resources),
+    ("resources", migrate_projects),
     ("volumes", migrate_volumes),
+    ("projects", migrate_projects),
 ])
 
 
