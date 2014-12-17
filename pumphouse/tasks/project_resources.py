@@ -19,6 +19,7 @@ from taskflow.patterns import graph_flow, unordered_flow
 from pumphouse.tasks import server_resources
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import volume as volume_tasks
+from pumphouse.tasks import identity as identity_tasks
 
 
 LOG = logging.getLogger(__name__)
@@ -70,8 +71,10 @@ def migrate_project(context, project_id):
     flow = graph_flow.Flow("migrate-project-{}".format(project_id))
     server_flow = migrate_project_servers(context, project_id)
     images_flow = migrate_project_images(context, project_id)
+    _, identity_flow = identity_tasks.migrate_identity(context, project_id)
     volumes_flow = migrate_project_volumes(context, project_id)
     flow.add(server_flow,
              images_flow,
+             identity_flow,
              volumes_flow)
     return flow
