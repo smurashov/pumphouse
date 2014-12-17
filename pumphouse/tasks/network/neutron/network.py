@@ -264,7 +264,8 @@ class RetrieveFloatingIpById(task.BaseCloudTask):
 
 class EnsureFloatingIp(task.BaseCloudTask):
 
-    def execute(self, all_floatingips, floating_info, network_info, port_info, tenant_info):
+    def execute(self, all_floatingips, floating_info,
+                network_info, port_info, tenant_info):
         # TODO add router_id to arguments
         for floating_ip in all_floatingips:
             if (floating_ip['floating_ip_address'] ==
@@ -339,7 +340,8 @@ class EnsureSecurityGroup(task.BaseCloudTask):
         return security_group
 
 
-def migrate_floatingip(context, floatingip_id, floating_ip_addr, network_info, port_info, tenant_info):
+def migrate_floatingip(context, floatingip_id, floating_ip_addr,
+                       network_info, port_info, tenant_info):
 
     floatingip_binding = "floating-ip-{}".format(floating_ip_addr)
 
@@ -727,10 +729,12 @@ def migrate_port(context, port_id, tenant_info):
 
     if (port_info['device_owner'] == 'network:floatingip'):
         floatingIpAddr = get_floatingIp_by(
-            context.src_cloud.neutron, {'id': port_info['device_id']})[0]['floating_ip_address']
+            context.src_cloud.neutron,
+            {'id': port_info['device_id']})[0]['floating_ip_address']
 
         floatingIpFlow, device_info = migrate_floatingip(
-            context, port_info['device_id'], floatingIpAddr, network_info, port_ensure, tenant_info)
+            context, port_info['device_id'], floatingIpAddr,
+            network_info, port_ensure, tenant_info)
         if (floatingIpFlow is not None):
             f.add(floatingIpFlow)
 
