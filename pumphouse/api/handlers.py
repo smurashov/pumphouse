@@ -342,12 +342,14 @@ def reassign_host(host_id):
         os.environ["KEYSTONE_USER"] = fuel_config["username"]
         os.environ["KEYSTONE_PASS"] = fuel_config["password"]
 
+        plugins = flask.current_app.config.get("PLUGINS") or {}
+
         src_config = hooks.source.config()
         dst_config = hooks.destination.config()
-        config = {
+        config = dict(plugins, **{
             "source": src_config["environment"],
             "destination": dst_config["environment"],
-        }
+        })
 
         try:
             src = hooks.source.connect()
