@@ -198,8 +198,6 @@ class EnsureNetwork(task.BaseCloudTask):
                          (net_info['id'], net['name']))
                 return net
 
-        import pdb; pdb.set_trace()
-
         LOG.info("Network %s not exists" % net_info['id'])
 
         net_info['tenant_id'] = tenant_info['id']
@@ -273,8 +271,8 @@ class EnsureFloatingIp(task.BaseCloudTask):
                     floating_info['floating_ip_address']):
                 return floating_ip
 
-        SKIP_PROPS = ["id", "router_id", "floating_ip_address", "status", "tenant_id", "fixed_ip_address" ]
-
+        SKIP_PROPS = ["id", "router_id", "floating_ip_address",
+                      "status", "tenant_id", "fixed_ip_address"]
 
         for prop in SKIP_PROPS:
             if prop in floating_info:
@@ -285,11 +283,10 @@ class EnsureFloatingIp(task.BaseCloudTask):
         floating_info["port_id"] = port_info["id"]
         floating_info["tenant_id"] = tenant_info["id"]
 
-        #import pdb; pdb.set_trace()
-
         return self.cloud.neutron.create_floatingip(
             {'floatingip': floating_info}
         )
+
 
 class RetrieveSecurityGroups(task.BaseCloudTask):
 
@@ -392,7 +389,6 @@ def migrate_floatingip(context, floatingip_id, floating_ip_addr, network_info, p
     f.add(EnsureFloatingIp(context.dst_cloud,
                            name=floatingip_ensure,
                            provides=floatingip_ensure,
-                           #requires= [ floatingip_retrieve ],
                            rebind=[
                                all_dst_floatingips_binding,
                                floatingip_retrieve,
@@ -400,9 +396,6 @@ def migrate_floatingip(context, floatingip_id, floating_ip_addr, network_info, p
                                port_info,
                                tenant_info
                            ]))
-    #context.store[floatingip_retrieve] = None
-
-    #import pdb; pdb.set_trace()
 
     return f, floatingip_ensure
 
@@ -564,8 +557,8 @@ def migrate_subnet(context, subnet_id, network_info, tenant_info):
                              name=subnet_retrieve,
                              provides=subnet_retrieve,
                              rebind=[
-                                all_src_subnet_binding,
-                                subnet_binding
+                                 all_src_subnet_binding,
+                                 subnet_binding
                              ]))
 
     f.add(EnsureSubnet(context.dst_cloud,
@@ -622,16 +615,16 @@ def migrate_router(context, router_id):
                              name=router_retrieve,
                              provides=router_retrieve,
                              rebind=[
-                                all_src_router_binding,
-                                router_binding
+                                 all_src_router_binding,
+                                 router_binding
                              ]))
 
     f.add(EnsureRouter(context.dst_cloud,
                        name=router_ensure,
                        provides=router_ensure,
                        rebind=[
-                               all_dst_router_binding,
-                               router_retrieve
+                           all_dst_router_binding,
+                           router_retrieve
                        ]))
 
     return f, router_ensure
@@ -692,7 +685,7 @@ def migrate_port(context, port_id, tenant_info):
 
     if ("device_owner" in port_info):
         if (port_info['device_owner'] == 'network:floatingip'):
-             pass
+            pass
         elif (port_info["device_owner"] == "network:dhcp"):
             pass
         elif (port_info["device_owner"] == "network:router_gateway"):
@@ -732,14 +725,14 @@ def migrate_port(context, port_id, tenant_info):
             tenant_info
         ]))
 
-
     if (port_info['device_owner'] == 'network:floatingip'):
-       floatingIpAddr = get_floatingIp_by(context.src_cloud.neutron, { 'id': port_info['device_id'] } )[0]['floating_ip_address']
+        floatingIpAddr = get_floatingIp_by(
+            context.src_cloud.neutron, {'id': port_info['device_id']})[0]['floating_ip_address']
 
-       floatingIpFlow, device_info = migrate_floatingip(context, port_info['device_id'], floatingIpAddr, network_info, port_ensure, tenant_info)
-       if (floatingIpFlow is not None):
-        f.add(floatingIpFlow)
-
+        floatingIpFlow, device_info = migrate_floatingip(
+            context, port_info['device_id'], floatingIpAddr, network_info, port_ensure, tenant_info)
+        if (floatingIpFlow is not None):
+            f.add(floatingIpFlow)
 
     if "security_groups" in port_info:
         for security_id in port_info["security_groups"]:
@@ -762,7 +755,8 @@ def generate_binding(uid, label):
 
 def migrate_nic(context, network_name, address, tenant_id):
 
-    port_info = context.src_cloud.neutron.list_ports(fixed_ips=['ip_address=%s' % address['addr']])['ports'][0]
+    port_info = context.src_cloud.neutron.list_ports(
+        fixed_ips=['ip_address=%s' % address['addr']])['ports'][0]
 
     tenant_binding = "tenant-{}-ensure".format(tenant_id)
 
