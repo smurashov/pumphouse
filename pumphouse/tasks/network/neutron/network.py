@@ -341,11 +341,11 @@ class EnsureSecurityGroup(task.BaseCloudTask):
 
 def migrate_floatingip(context, floatingip_id, floating_ip_addr, network_info, port_info, tenant_info):
 
-    floatingip_binding = floating_ip_addr
+    floatingip_binding = "floating-ip-{}".format(floating_ip_addr)
 
-    floatingip_retrieve = "floating-ip-{}-retrieve".format(
+    floatingip_retrieve = "{}-retrieve".format(
         floatingip_binding)
-    floatingip_ensure = "floating-ip-{}-ensure".format(
+    floatingip_ensure = "{}-ensure".format(
         floatingip_binding)
 
     (retrieve, ensure) = generate_binding(
@@ -354,7 +354,7 @@ def migrate_floatingip(context, floatingip_id, floating_ip_addr, network_info, p
     if (floatingip_binding in context.store):
         return None, floatingip_retrieve
 
-    context.store[floatingip_binding] = floatingip_id
+    context.store[floatingip_retrieve] = floatingip_id
 
     f = graph_flow.Flow(
         "neutron-floatingip-migration-{}".format(floatingip_binding))
@@ -379,11 +379,11 @@ def migrate_floatingip(context, floatingip_id, floating_ip_addr, network_info, p
         context.store[all_dst_floatingips_binding] = None
 
     f.add(RetrieveFloatingIpById(context.src_cloud,
-                                 name=floatingip_retrieve,
-                                 provides=floatingip_retrieve,
+                                 name=floatingip_binding,
+                                 provides=floatingip_binding,
                                  rebind=[
                                      all_src_floatingips_binding,
-                                     floatingip_binding,
+                                     floatingip_retrieve,
                                  ]))
 
     f.add(EnsureFloatingIp(context.dst_cloud,
@@ -391,7 +391,7 @@ def migrate_floatingip(context, floatingip_id, floating_ip_addr, network_info, p
                            provides=floatingip_ensure,
                            rebind=[
                                all_dst_floatingips_binding,
-                               floatingip_retrieve,
+                               floatingip_binding,
                                network_info,
                                port_info,
                                tenant_info
