@@ -196,7 +196,7 @@ class DeleteSourceVolume(DeleteVolume):
                 self.do_delete(volume_info)
 
         except exceptions.cinder_excs.NotFound as exc:
-            LOG.info("Volume: %s allready deleted before", str(volume_info))
+            LOG.info("Volume: %s already deleted before", str(volume_info))
             pass
 
 
