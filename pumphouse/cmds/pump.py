@@ -30,7 +30,7 @@ from pumphouse.tasks import identity as identity_tasks
 from pumphouse.tasks import volume_resources as volume_tasks
 from pumphouse.tasks import node as reassignment_tasks
 from pumphouse.tasks import reset as reset_tasks
-from pumphouse.tasks import workloads
+from pumphouse.tasks import project_resources
 
 from taskflow.patterns import graph_flow
 from taskflow.patterns import unordered_flow
@@ -200,7 +200,7 @@ def migrate_identity(ctx, flow, ids):
 
 def migrate_projects(ctx, flow, ids):
     for project_id in ids:
-        project_flow = workloads.project.migrate_project(
+        project_flow = project_resources.migrate_project(
             ctx, project_id)
         flow.add(project_flow)
     return flow
