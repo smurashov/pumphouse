@@ -20,12 +20,15 @@ from taskflow import task
 
 from pumphouse import events
 from pumphouse import exceptions
+from pumphouse import flows
 from pumphouse.tasks import service as service_tasks
 from pumphouse import task as pump_task
 from pumphouse import utils
 
 
 LOG = logging.getLogger(__name__)
+
+assignment = flows.register("assignment", default="fixed")
 
 
 # NOTE(akscram): Here we should transform FQDNs of nodes to
@@ -123,18 +126,60 @@ class ExtractRolesFromNode(task.Task):
         return node_info["roles"]
 
 
-class CopyDisksAttributesFromNode(task.Task):
-    def execute(self, from_node_info, node_info):
+class ExtractDisksFromNode(task.Task):
+    def execute(self, node_info):
         from pumphouse._vendor.fuelclient.objects.node import Node
-        from_node = Node.init_with_data(from_node_info)
+        node = Node.init_with_data(node_info)
+        disks = node.get_attribute("disks")
+        return [{
+            "name": d["name"],
+            "size": d["size"],
+            "volumes": d["volumes"],
+        } for d in disks]
+
+
+class ExtractIfacesFromNode(task.Task):
+    def execute(self, node_info):
+        from pumphouse._vendor.fuelclient.objects.node import Node
+        node = Node.init_with_data(node_info)
+        ifaces = node.get_attribute("interfaces")
+        return [{
+            "name": i["name"],
+            "assigned_networks": i["assigned_networks"],
+        } for i in ifaces]
+
+
+class ExtractNetworkDataFromEnv(task.Task):
+    def execute(self, env_info):
+        from pumphouse._vendor.fuelclient.objects import environment
+        env = environment.Environment.init_with_data(env_info)
+        network_data = env.get_network_data()
+        return network_data
+
+
+class PopulateIfacesWithIDs(task.Task):
+    def execute(self, network_data, ifaces):
+        ifaces_ids = {n["name"]: n["id"] for n in network_data["networks"]}
+        ifaces_with_ids = [{
+            "name": i["name"],
+            "assigned_networks": [{
+                "id": ifaces_ids[a],
+                "name": a,
+            } for a in i["assigned_networks"]],
+        } for i in ifaces]
+        return ifaces_with_ids
+
+
+class ApplyDisksAttributesFromNode(task.Task):
+    def execute(self, disks, node_info):
+        from pumphouse._vendor.fuelclient.objects.node import Node
         node = Node.init_with_data(node_info)
 
-        from_disks = from_node.get_attribute("disks")
-        disks = node.get_attribute("disks")
-        changed_disks = self.update_disks_attrs(from_disks, disks)
+        node_disks = node.get_attribute("disks")
+        changed_disks = self.update_disks_attrs(disks, node_disks)
         node.upload_node_attribute("disks", changed_disks)
-
         node.update()
+
         return node.data
 
     def update_disks_attrs(self, disks1, disks2):
@@ -161,18 +206,16 @@ class CopyDisksAttributesFromNode(task.Task):
         return attrs
 
 
-class CopyNetAttributesFromNode(task.Task):
-    def execute(self, from_node_info, node_info):
+class ApplyNetAttributesFromNode(task.Task):
+    def execute(self, ifaces, node_info):
         from pumphouse._vendor.fuelclient.objects.node import Node
-        from_node = Node.init_with_data(from_node_info)
         node = Node.init_with_data(node_info)
 
-        from_ifaces = from_node.get_attribute("interfaces")
-        ifaces = node.get_attribute("interfaces")
-        changed_ifaces = self.update_ifaces_attrs(from_ifaces, ifaces)
+        node_ifaces = node.get_attribute("interfaces")
+        changed_ifaces = self.update_ifaces_attrs(ifaces, node_ifaces)
         node.upload_node_attribute("interfaces", changed_ifaces)
-
         node.update()
+
         return node.data
 
     def update_ifaces_attrs(self, ifaces1, ifaces2):
@@ -315,6 +358,9 @@ def unassign_node(context, flow, env_name, hostname):
     unassigned_node = "node-unassigned-{}".format(hostname)
 
     flow.add(
+        RetrieveEnvNodes(name=env_nodes,
+                         provides=env_nodes,
+                         rebind=[env]),
         RetrieveNode(name=node,
                      provides=node,
                      rebind=[env_nodes],
@@ -360,34 +406,87 @@ def remove_computes(context, flow, env_name, hostname):
     )
 
 
-def assign_node(context, flow, env_name, hostname):
+@assignment.add("discovery")
+def assignment_discovery(context, flow, env_name, hostname):
     env = "dst-env-{}".format(env_name)
-    deployed_env = "dst-env-deployed-{}".format(env_name)
     env_nodes = "dst-env-nodes-{}".format(env_name)
-    unassigned_node = "node-unassigned-{}".format(hostname)
-    assigned_node = "node-assigned-{}".format(hostname)
     compute_node = "node-compute-{}".format(env_name)
+
     compute_roles = "compute-roles-{}".format(env_name)
-    node_with_disks = "node-with-disks-{}".format(hostname)
-    node_with_nets = "node-with-nets-{}".format(hostname)
+    compute_disks = "compute-disks-{}".format(env_name)
+    compute_ifaces = "compute-ifaces-{}".format(env_name)
 
     flow.add(
+        RetrieveEnvNodes(name=env_nodes,
+                         provides=env_nodes,
+                         rebind=[env]),
         ChooseAnyComputeNode(name=compute_node,
                              provides=compute_node,
                              rebind=[env_nodes, env]),
         ExtractRolesFromNode(name=compute_roles,
                              provides=compute_roles,
                              rebind=[compute_node]),
+        ExtractDisksFromNode(name=compute_disks,
+                             provides=compute_disks,
+                             rebind=[compute_node]),
+        ExtractIfacesFromNode(name=compute_ifaces,
+                              provides=compute_ifaces,
+                              rebind=[compute_node]),
+    )
+
+
+@assignment.add("fixed")
+def assignment_fixed(context, flow, env_name, hostname):
+    env = "dst-env-{}".format(env_name)
+    env_network = "dst-env-network-{}".format(env_name)
+
+    compute_roles = "compute-roles-{}".format(env_name)
+    compute_disks = "compute-disks-{}".format(env_name)
+    compute_ifaces = "compute-ifaces-{}".format(env_name)
+
+    params = context.config["assignment_parameters"]
+
+    context.store.update({
+        compute_roles: params["roles"],
+        compute_disks: params["disks"],
+    })
+    flow.add(
+        ExtractNetworkDataFromEnv(name=env_network,
+                                  provides=env_network,
+                                  rebind=[env]),
+        PopulateIfacesWithIDs(name=compute_ifaces,
+                              provides=compute_ifaces,
+                              rebind=[env_network],
+                              inject={"ifaces": params["ifaces"]}),
+    )
+
+
+def assign_node(context, flow, env_name, hostname):
+    env = "dst-env-{}".format(env_name)
+    deployed_env = "dst-env-deployed-{}".format(env_name)
+    env_nodes = "dst-env-nodes-{}".format(env_name)
+
+    unassigned_node = "node-unassigned-{}".format(hostname)
+    assigned_node = "node-assigned-{}".format(hostname)
+
+    compute_roles = "compute-roles-{}".format(env_name)
+    compute_disks = "compute-disks-{}".format(env_name)
+    compute_ifaces = "compute-ifaces-{}".format(env_name)
+
+    node_with_disks = "node-with-disks-{}".format(hostname)
+    node_with_nets = "node-with-nets-{}".format(hostname)
+
+    flow.add(
         AssignNode(context.dst_cloud,
                    name=assigned_node,
                    provides=assigned_node,
                    rebind=[unassigned_node, compute_roles, env]),
-        CopyDisksAttributesFromNode(name=node_with_disks,
-                                    provides=node_with_disks,
-                                    rebind=[compute_node, assigned_node]),
-        CopyNetAttributesFromNode(name=node_with_nets,
-                                  provides=node_with_nets,
-                                  rebind=[compute_node, assigned_node]),
+        ApplyDisksAttributesFromNode(name=node_with_disks,
+                                     provides=node_with_disks,
+                                     rebind=[compute_disks, assigned_node]),
+        ApplyNetAttributesFromNode(name=node_with_nets,
+                                   provides=node_with_nets,
+                                   rebind=[compute_ifaces, assigned_node]),
         DeployChanges(context.dst_cloud,
                       name=deployed_env,
                       provides=deployed_env,
@@ -431,7 +530,6 @@ def reassign_node(context, hostname):
     src_env = "src-env-{}".format(src_env_name)
     dst_env = "dst-env-{}".format(dst_env_name)
     src_env_nodes = "src-env-nodes-{}".format(src_env_name)
-    dst_env_nodes = "dst-env-nodes-{}".format(dst_env_name)
 
     flow = graph_flow.Flow(name="reassign-node-{}".format(hostname))
     flow.add(
@@ -442,20 +540,15 @@ def reassign_node(context, hostname):
                             provides=src_env,
                             rebind=[envs],
                             inject={"env_name": src_env_name}),
-        RetrieveEnvNodes(name=src_env_nodes,
-                         provides=src_env_nodes,
-                         rebind=[src_env]),
         # Destination
         RetrieveEnvironment(name=dst_env,
                             provides=dst_env,
                             rebind=[envs],
                             inject={"env_name": dst_env_name}),
-        RetrieveEnvNodes(name=dst_env_nodes,
-                         provides=dst_env_nodes,
-                         rebind=[dst_env]),
     )
     unassign_node(context, flow, src_env_name, hostname)
     remove_computes(context, flow, src_env_name, hostname)
+    assignment(context, flow, dst_env_name, hostname)
     assign_node(context, flow, dst_env_name, hostname)
     wait_computes(context, flow, dst_env_name, hostname)
     return flow
