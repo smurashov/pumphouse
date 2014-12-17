@@ -37,6 +37,53 @@ PARAMETERS:
     volume_tasks_timeout: 300
 PLUGINS:
     provision_server: image
+    assignment: fixed # fixed/discovery
+    assignment_parameters: # only when assignment=fixed
+        roles:
+            - compute
+            - cinder
+        disks:
+            - name: sda
+              size: 11427148
+              volumes:
+              - name: os
+                size: 0
+              - name: cinder
+                size: 5713574
+              - name: vm
+                size: 5713574
+            - name: sdb
+              size: 190090
+              volumes:
+              - name: os
+                size: 190090
+              - name: cinder
+                size: 0
+              - name: vm
+                size: 0
+            - name: sdc
+              size: 190090
+              volumes:
+              - name: os
+                size: 0
+              - name: cinder
+                size: 0
+              - name: vm
+                size: 190090
+        ifaces:
+            - name: eth0
+              assigned_networks:
+              - fuelweb_admin
+            - name: eth1
+              assigned_networks: []
+            - name: eth2
+              assigned_networks:
+              - public
+            - name: eth3
+              assigned_networks:
+              - management
+              - storage
+              - fixed
 cmds:
     ping: &ping
         cmd: "ping %"
