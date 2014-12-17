@@ -34,9 +34,9 @@ def extract_hostname(info):
     # XXX(akscram): There is no the fqdn attribute in node with
     #               `discover` status.
     if info["fqdn"] is None:
-        hostname = "node-{}".format(info["id"])
+        hostname = "node-{}.domain.tld".format(info["id"])
     else:
-        hostname, _, _ = info["fqdn"].partition(".")
+        hostname = info["fqdn"]
     return hostname
 
 
@@ -88,7 +88,7 @@ class DeployChanges(pump_task.BaseCloudTask):
         return env.data
 
     def revert(self, env_info, result, flow_failures, **nodes_infos):
-        LOG.error("Deploying of changed failed for env %r with result %r",
+        LOG.error("Deploying of changes failed for env %r with result %r",
                   env_info, result)
 
     def provisioning_event(self, progress, node):
