@@ -18,6 +18,7 @@ from taskflow.patterns import graph_flow, unordered_flow
 
 from pumphouse.tasks import server_resources
 from pumphouse.tasks import image as image_tasks
+from pumphouse.tasks import volume as volume_tasks
 
 
 LOG = logging.getLogger(__name__)
@@ -50,10 +51,27 @@ def migrate_project_images(context, tenant_id):
     return flow
 
 
+def migrate_project_volumes(context, tenant_id):
+    volumes = context.src_cloud.cinder.volumes.list(
+        search_opts={"all_tenants": 1})
+    flow = unordered_flow.Flow("migrate-project-{}-volumes".format(tenant_id))
+    for volume in volumes:
+        tenant_id = getattr(volume, "os-vol-tenant-attr:tenant_id")
+        volume_binding = "volume-{}".format(volume.id)
+        if volume_binding not in context.store \
+                and volume.status == "available":
+            volume_flow = volume_tasks.migrate_detached_volume(
+                context, volume.id, None, tenant_id)
+            flow.add(volume_flow)
+    return flow
+
+
 def migrate_project(context, project_id):
     flow = graph_flow.Flow("migrate-project-{}".format(project_id))
     server_flow = migrate_project_servers(context, project_id)
     images_flow = migrate_project_images(context, project_id)
+    volumes_flow = migrate_project_volumes(context, project_id)
     flow.add(server_flow,
-             images_flow)
+             images_flow,
+             volumes_flow)
     return flow
