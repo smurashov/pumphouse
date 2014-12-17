@@ -43,9 +43,9 @@ def migrate_project_images(context, tenant_id):
     images = context.src_cloud.glance.images.list(owner=tenant_id)
     flow = unordered_flow.Flow("migrate-project-{}-images".format(tenant_id))
     for image in list(images):
-        image_retrieve = "image-{}-retrieve".format(image.id)
-        if image_retrieve not in context.store:
-            image_flow = image_tasks.migrate_image(image.id)
+        image_binding = "image-{}".format(image.id)
+        if image_binding not in context.store:
+            image_flow = image_tasks.migrate_image(context, image.id)
             flow.add(image_flow)
     return flow
 
