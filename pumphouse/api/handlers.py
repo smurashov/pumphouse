@@ -168,6 +168,20 @@ def cloud_resources(cloud):
                 "status": status,
             },
         }
+    for secgroup in cloud.nova.security_groups.list(
+            search_opts={"all_tenants": 1}):
+        yield {
+            "id": secgroup.id,
+            "cloud": cloud.name,
+            "type": "secgroup",
+            "data": {
+                "id": secgroup.id,
+                "name": secgroup.name,
+                "description": secgroup.description,
+                "tenant_id": secgroup.tenant_id,
+                "rules": secgroup.rules
+            }
+        }
 
 
 def cloud_view(client):
