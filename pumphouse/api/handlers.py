@@ -134,7 +134,7 @@ def cloud_resources(cloud):
             "type": "image",
             "data": {
                 "id": image["id"],
-                "status": "",
+                "status": image["status"],
                 "name": image["name"],
             },
         }
