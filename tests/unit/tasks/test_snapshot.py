@@ -21,6 +21,7 @@ class TestSnapshot(unittest.TestCase):
         self.test_server_id = "123"
         self.test_snapshot_id = "456"
         self.test_user_id = '777'
+        self.test_tenant_id = '888'
         self.test_server_name = "test-server"
         self.test_snapshot_info = AttrDict({
             "id": self.test_snapshot_id,
@@ -29,6 +30,7 @@ class TestSnapshot(unittest.TestCase):
         self.test_server_info = AttrDict({
             "id": self.test_server_id,
             "user_id": self.test_user_id,
+            "tenant_id": self.test_tenant_id,
             "name": self.test_server_name,
         })
 
