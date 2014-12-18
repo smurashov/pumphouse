@@ -182,7 +182,7 @@ def cloud_resources(cloud):
                 "rules": secgroup.rules
             }
         }
-    if flask.current_app.config["PLUGINS"]["network"] == "nova":
+    if flask.current_app.config["PLUGINS"].get("network", "nova") == "nova":
         for network in cloud.nova.networks.list():
             yield {
                 "id": network.id,
@@ -190,7 +190,7 @@ def cloud_resources(cloud):
                 "type": "network",
                 "data": {
                     "id": network.id,
-                    "label": network.label,
+                    "name": network.label,
                     "bridge": network.bridge,
                     "bridge_interface": network.bridge_interface,
                     "broadcast": network.broadcast,
