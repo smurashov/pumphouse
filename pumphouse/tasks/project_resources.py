@@ -42,7 +42,8 @@ def migrate_project_servers(context, tenant_id):
 
 
 def migrate_project_images(context, tenant_id):
-    images = context.src_cloud.glance.images.list(owner=tenant_id)
+    images = context.src_cloud.glance.images.list(
+        filters={"owner": tenant_id})
     flow = unordered_flow.Flow("migrate-project-{}-images".format(tenant_id))
     for image in list(images):
         image_binding = "image-{}".format(image.id)
