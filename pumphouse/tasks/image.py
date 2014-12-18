@@ -183,7 +183,7 @@ def migrate_image(context, image_id):
             kernel = migrate_image_task(context, EnsureSingleImage,
                                         image["kernel_id"], tenant_id)
             ramdisk = migrate_image_task(context, EnsureSingleImage,
-                                         image["ramdisk_id"], user_id)
+                                         image["ramdisk_id"], tenant_id)
             image = migrate_image_task(context, EnsureImage, image_id,
                                        tenant_id, kernel.provides,
                                        ramdisk.provides)
@@ -192,13 +192,13 @@ def migrate_image(context, image_id):
             kernel = migrate_image_task(context, EnsureSingleImage,
                                         image["kernel_id"], tenant_id)
             image = migrate_image_task(context, EnsureImageWithKernel,
-                                       image_id, user_id, kernel.provides)
+                                       image_id, tenant_id, kernel.provides)
             flow.add(kernel, image)
         else:
             ramdisk = migrate_image_task(context, EnsureSingleImage,
                                          image["ramdisk_id"], tenant_id)
             image = migrate_image_task(context, EnsureImageWithRamdisk,
-                                       image_id, user_id, ramdisk.provides)
+                                       image_id, tenant_id, ramdisk.provides)
             flow.add(ramdisk, image)
     else:
         flow = migrate_image_task(context, EnsureSingleImage,
