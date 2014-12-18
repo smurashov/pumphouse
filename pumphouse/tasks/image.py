@@ -174,7 +174,7 @@ def migrate_image(context, image_id):
     if image["visibility"] == "private":
         tenant_id = image.get("owner")
     else:
-        tenant_ensure = "image-{}-ensure".format("public")
+        tenant_ensure = "tenant-{}-ensure".format(tenant_id)
         context.store[tenant_ensure] = None
     if image["container_format"] == "ami" and (hasattr(image, "kernel_id") or
                                                hasattr(image, "ramdisk_id")):
