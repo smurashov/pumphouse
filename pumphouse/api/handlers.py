@@ -134,7 +134,7 @@ def cloud_resources(cloud):
             "type": "image",
             "data": {
                 "id": image["id"],
-                "status": "",
+                "status": image["status"],
                 "name": image["name"],
             },
         }
@@ -182,6 +182,61 @@ def cloud_resources(cloud):
                 "rules": secgroup.rules
             }
         }
+    if flask.current_app.config["PLUGINS"].get("network", "nova") == "nova":
+        for network in cloud.nova.networks.list():
+            yield {
+                "id": network.id,
+                "cloud": cloud.name,
+                "type": "network",
+                "data": {
+                    "id": network.id,
+                    "name": network.label,
+                    "bridge": network.bridge,
+                    "bridge_interface": network.bridge_interface,
+                    "broadcast": network.broadcast,
+                    "cidr": network.cidr,
+                    "cidr_v6": network.cidr_v6,
+                    "dhcp_start": network.dhcp_start,
+                    "dns1": network.dns1,
+                    "dns2": network.dns2,
+                    "gateway": network.gateway,
+                    "gateway_v6": network.gateway_v6,
+                    "host_id": network.host,
+                    "injected": network.injected,
+                    "multi_host": network.multi_host,
+                    "netmask": network.netmask,
+                    "netmask_v6": network.netmask_v6,
+                    "priority": network.priority,
+                    "tenant_id": network.project_id,
+                    "rxtx_base": network.rxtx_base,
+                    "vlan": network.vlan,
+                    "vpn_private_address": network.vpn_private_address,
+                    "vpn_public_address": network.vpn_public_address,
+                    "vpn_public_port": network.vpn_public_port
+                }
+            }
+    elif flask.current_app.config["PLUGINS"]["network"] == "neutron":
+        for network in cloud.neutron.list_networks()['networks']:
+            yield {
+                "id": network["id"],
+                "cloud": cloud.name,
+                "type": "network",
+                "data": {
+                    "id": network["id"],
+                    "admin_state_up": network["admin_state_up"],
+                    "name": network["name"],
+                    "provider:network_type": network["provider:network_type"],
+                    "provider:physical_network": network[
+                        "provider:physical_network"],
+                    "provider:segmentation_id": network[
+                        "provider:segmentation_id"],
+                    "router:external": network["router:external"],
+                    "shared": network["shared"],
+                    "status": network["status"],
+                    "subnets": network["subnets"],
+                    "tenant_id": network["tenant_id"]
+                }
+            }
 
 
 def cloud_view(client):
@@ -342,12 +397,14 @@ def reassign_host(host_id):
         os.environ["KEYSTONE_USER"] = fuel_config["username"]
         os.environ["KEYSTONE_PASS"] = fuel_config["password"]
 
+        plugins = flask.current_app.config.get("PLUGINS") or {}
+
         src_config = hooks.source.config()
         dst_config = hooks.destination.config()
-        config = {
+        config = dict(plugins, **{
             "source": src_config["environment"],
             "destination": dst_config["environment"],
-        }
+        })
 
         try:
             src = hooks.source.connect()

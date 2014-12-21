@@ -982,6 +982,10 @@ class Service(EventResource):
                                                     self.data["binary"])
         self.data.update(data.to_dict())
 
+    @task
+    def delete(self):
+        self.env.cloud.nova.services.delete(self.data["id"])
+
 
 class CleanupWorkload(EventResource):
     @base.Collection(Tenant)
@@ -1044,6 +1048,13 @@ class CleanupWorkload(EventResource):
         for service in services:
             if (service.state.lower() == "up" and
                     service.status.lower() == "disabled"):
+                yield service.to_dict()
+
+    @base.Collection(Service)
+    def offline_services(self):
+        services = self.env.cloud.nova.services.list()
+        for service in services:
+            if service.state.lower() == "down":
                 yield service.to_dict()
 
     @base.Collection(Flavor)
@@ -1114,6 +1125,7 @@ class CleanupWorkload(EventResource):
                 yield volume_info
 
     delete = base.task(name="delete", requires=[
+        offline_services.each().delete,
         services.each().enable,
         tenants.each().delete,
         roles.each().delete,
