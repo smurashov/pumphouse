@@ -27,7 +27,6 @@ from pumphouse.tasks import base as tasks_base
 from pumphouse.tasks import evacuation as evacuation_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import identity as identity_tasks
-from pumphouse.tasks import resources as resources_tasks
 from pumphouse.tasks import server_resources as server_tasks
 from pumphouse.tasks import volume_resources as volume_tasks
 from pumphouse.tasks import node as reassignment_tasks
