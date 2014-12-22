@@ -28,6 +28,7 @@ from pumphouse.tasks import evacuation as evacuation_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import identity as identity_tasks
 from pumphouse.tasks import resources as resources_tasks
+from pumphouse.tasks import server_resources as server_tasks
 from pumphouse.tasks import volume_resources as volume_tasks
 from pumphouse.tasks import node as reassignment_tasks
 from pumphouse.tasks import reset as reset_tasks
@@ -198,11 +199,22 @@ def migrate_identity(ctx, flow, ids):
     return flow
 
 
-def migrate_resources(ctx, flow, ids):
+def migrate_projects(ctx, flow, ids):
     for tenant_id in ids:
         resources_flow = resources_tasks.migrate_resources(
             ctx, tenant_id)
         flow.add(resources_flow)
+    return flow
+
+
+def migrate_servers(ctx, flow, ids):
+    for server in ctx.src_cloud.nova.servers.list(
+            search_opts={'all_tenants': 1}):
+        if server.id in ids:
+            resources, server_flow = server_tasks.migrate_server(ctx,
+                                                                 server.id)
+            flow.add(*resources)
+            flow.add(server_flow)
     return flow
 
 
@@ -292,8 +304,9 @@ def get_all_resource_ids(cloud, resource_type):
 RESOURCES_MIGRATIONS = collections.OrderedDict([
     ("images", migrate_images),
     ("identity", migrate_identity),
-    ("resources", migrate_resources),
+    ("projects", migrate_projects),
     ("volumes", migrate_volumes),
+    ("servers", migrate_servers)
 ])
 
 
