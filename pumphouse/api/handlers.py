@@ -79,7 +79,7 @@ def crossdomain(origin='*', methods=None, headers=('Accept', 'Content-Type'),
     return decorator
 
 
-def cloud_resources(cloud):
+def cloud_resources(conf, cloud):
     for tenant in cloud.keystone.tenants.list():
         yield {
             "id": tenant.id,
@@ -182,7 +182,7 @@ def cloud_resources(cloud):
                 "rules": secgroup.rules
             }
         }
-    if flask.current_app.config["PLUGINS"].get("network", "nova") == "nova":
+    if conf["PLUGINS"].get("network", "nova") == "nova":
         for network in cloud.nova.networks.list():
             yield {
                 "id": network.id,
@@ -215,7 +215,7 @@ def cloud_resources(cloud):
                     "vpn_public_port": network.vpn_public_port
                 }
             }
-    elif flask.current_app.config["PLUGINS"]["network"] == "neutron":
+    elif conf["PLUGINS"]["network"] == "neutron":
         for network in cloud.neutron.list_networks()['networks']:
             yield {
                 "id": network["id"],
@@ -242,7 +242,8 @@ def cloud_resources(cloud):
 def cloud_view(client):
     return {
         "urls": client.cloud_urls,
-        "resources": list(cloud_resources(client.connect())),
+        "resources": list(flask.current_app.config,
+                          cloud_resources(client.connect())),
     }
 
 

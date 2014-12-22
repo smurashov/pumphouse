@@ -108,3 +108,50 @@ class PHtests(testtools.TestCase, testtools.testcase.WithAttributes,
             [i["data"]["name"] for i in result["resources"]
              if i["type"] == "tenant"]
         )
+
+    def test_server_migrate(self):
+        source_resources = subprocess.Popen(["pumphouse", "api-config.yaml",
+                                             "get_resources", "source"],
+                                            stdout=subprocess.PIPE)
+
+        self.assertEqual(0, source_resources.wait())
+
+        result = json.loads(source_resources.communicate()[0])
+        server = next(
+            i for i in result["resources"]
+            if i["type"] == "server" and "pumphouse" in i["data"]["name"]
+        )
+        migration = subprocess.Popen("pumphouse ./api-config.yaml migrate "
+                                     "servers --ids %s" % server["id"],
+                                     shell=True, stdout=subprocess.PIPE)
+
+        self.assertEqual(0, migration.wait())
+
+        destination_resources = subprocess.Popen(["pumphouse",
+                                                  "api-config.yaml",
+                                                  "get_resources",
+                                                  "destination"],
+                                                 stdout=subprocess.PIPE)
+
+        self.assertEqual(0, destination_resources.wait())
+
+        result = json.loads(destination_resources.communicate()[0])
+
+        self.assertIn(
+            server["data"]["name"],
+            [i["data"]["name"] for i in result["resources"]
+             if i["type"] == "server"]
+        )
+        source_resources = subprocess.Popen(["pumphouse", "api-config.yaml",
+                                             "get_resources", "source"],
+                                            stdout=subprocess.PIPE)
+
+        self.assertEqual(0, source_resources.wait())
+
+        result = json.loads(source_resources.communicate()[0])
+
+        self.assertNotIn(
+            server["data"]["name"],
+            [i["data"]["name"] for i in result["resources"]
+             if i["type"] == "server"]
+        )

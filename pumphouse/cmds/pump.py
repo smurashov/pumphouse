@@ -218,8 +218,8 @@ def migrate_servers(ctx, flow, ids):
     return flow
 
 
-def get_resources(client):
-    return {"resources": list(handlers.cloud_resources(client))}
+def get_resources(conf, client):
+    return {"resources": list(handlers.cloud_resources(conf, client))}
 
 
 def get_ids_by_tenant(cloud, resource_type, tenant_id):
@@ -459,7 +459,7 @@ def main():
             Cloud,
             Identity,
         )
-        print(json.dumps(get_resources(client)))
+        print(json.dumps(get_resources(args.config, client)))
 
 if __name__ == "__main__":
     main()
