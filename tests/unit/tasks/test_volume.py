@@ -290,7 +290,7 @@ class TestMigrateDetachedVolume(TestMigrateVolume):
         ensure_img_mock.assert_called_once_with(
             self.context.src_cloud, self.context.dst_cloud,
             name=self.image_ensure, provides=self.image_ensure,
-            rebind=[self.volume_upload, self.user_ensure])
+            rebind=[self.volume_upload, self.tenant_ensure])
         flow_mock.assert_called_once_with(
             "migrate-{}".format(self.volume_binding))
         self.assertEqual(self.context.store, expected_store_dict)

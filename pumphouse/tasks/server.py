@@ -34,6 +34,7 @@ LOG = logging.getLogger(__name__)
 HYPERVISOR_HOSTNAME_ATTR = "OS-EXT-SRV-ATTR:hypervisor_hostname"
 
 provision_server = flows.register("provision_server", default="image")
+restore_floating_ips = flows.register("floating_ips", default="nova")
 
 
 class EvacuateServer(task.BaseCloudTask):
@@ -321,7 +322,8 @@ def rebuild_by_snapshot(context, server):
     return [], [], [snapshot_flow], snapshot_ensure
 
 
-def restore_floating_ips(context, server_info):
+@restore_floating_ips.add("nova")
+def restore_floating_ips_nova(context, server_info):
     flow = unordered_flow.Flow("post-migration-{}".format(server_info["id"]))
     addresses = server_info["addresses"]
     for label in addresses:
@@ -341,6 +343,11 @@ def restore_floating_ips(context, server_info):
             else:
                 raise exceptions.NotFound()
     return flow
+
+
+@restore_floating_ips.add("neutron")
+def restore_floating_ips_neutron(context, server_info):
+    return None
 
 
 def evacuate_server(context, flow, hostname, requires=None):

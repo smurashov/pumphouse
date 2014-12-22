@@ -71,9 +71,12 @@ class TestMigrateTenant(TenantTestCase):
 
     @patch.object(tenant, "RetrieveTenant")
     @patch.object(tenant, "EnsureTenant")
+    @patch.object(tenant, "AddTenantAdmin")
     @patch("taskflow.patterns.linear_flow.Flow")
     def test_migrate_tenant(self, mock_flow,
-                            mock_ensure_tenant, mock_retrieve_tenant):
+                            mock_add_tenant_admin,
+                            mock_ensure_tenant,
+                            mock_retrieve_tenant):
         flow = tenant.migrate_tenant(
             self.context,
             self.dummy_id,
@@ -81,12 +84,14 @@ class TestMigrateTenant(TenantTestCase):
         mock_flow.assert_called_once_with("migrate-tenant-%s" % self.dummy_id)
         self.assertEqual(1, mock_retrieve_tenant.call_count)
         self.assertEqual(1, mock_ensure_tenant.call_count)
+        self.assertEqual(1, mock_add_tenant_admin.call_count)
 
         self.assertEqual(
             mock_flow().add.call_args,
             call(
                 mock_retrieve_tenant(),
-                mock_ensure_tenant()
+                mock_ensure_tenant(),
+                mock_add_tenant_admin(),
             )
         )
         self.assertEqual(

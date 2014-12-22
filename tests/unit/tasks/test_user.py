@@ -159,11 +159,11 @@ class TestMigrateUser(unittest.TestCase):
         self.assertEqual(self.context.store,
                          {"user-%s-retrieve" % self.user_id: self.user_id})
 
-    @patch.object(user, "EnsureOrphanUser")
+    @patch.object(user, "EnsureUser")
     @patch.object(user, "RetrieveUser")
     @patch("taskflow.patterns.linear_flow.Flow")
     def test_migrate_orphan_user(self, flow_mock,
-                                 retrieve_user_mock, ensure_orphan_user_mock):
+                                 retrieve_user_mock, ensure_user_mock):
         flow_mock.return_value = self.flow
         flow = user.migrate_user(
             self.context,
@@ -172,10 +172,9 @@ class TestMigrateUser(unittest.TestCase):
 
         flow_mock.assert_called_once_with("migrate-user-%s" % self.user_id)
         self.assertEqual(retrieve_user_mock.call_count, 1)
-        self.assertEqual(ensure_orphan_user_mock.call_count, 1)
         self.assertEqual(
             self.flow.add.call_args_list,
-            [call(retrieve_user_mock()), call(ensure_orphan_user_mock())]
+            [call(retrieve_user_mock()), call(ensure_user_mock())]
         )
         self.assertEqual(self.context.store,
                          {"user-%s-retrieve" % self.user_id: self.user_id})

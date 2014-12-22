@@ -60,7 +60,7 @@ def migrate_snapshot(context, server):
     server_binding = "server-{}".format(server_id)
     snapshot_binding = "snapshot-{}".format(server_id)
     snapshot_ensure = "snapshot-{}-ensure".format(server_id)
-    user_ensure = "user-{}-ensure".format(server.user_id)
+    tenant_ensure = "user-{}-ensure".format(server.tenant_id)
     flow = linear_flow.Flow("migrate-ephemeral-storage-server-{}"
                             .format(server_id))
     flow.add(SnapshotServer(context.src_cloud,
@@ -72,5 +72,5 @@ def migrate_snapshot(context, server):
                                            name=snapshot_ensure,
                                            provides=snapshot_ensure,
                                            rebind=[snapshot_binding,
-                                                   user_ensure]))
+                                                   tenant_ensure]))
     return flow

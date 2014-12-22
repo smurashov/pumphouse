@@ -196,7 +196,7 @@ class DeleteSourceVolume(DeleteVolume):
                 self.do_delete(volume_info)
 
         except exceptions.cinder_excs.NotFound as exc:
-            LOG.info("Volume: %s allready deleted before", str(volume_info))
+            LOG.info("Volume: %s already deleted before", str(volume_info))
             pass
 
 
@@ -239,7 +239,7 @@ def migrate_detached_volume(context, volume_id, user_id, tenant_id):
                                            name=image_ensure,
                                            provides=image_ensure,
                                            rebind=[volume_upload,
-                                                   user_ensure]))
+                                                   tenant_ensure]))
     flow.add(CreateVolumeFromImage(context.dst_cloud,
                                    name=volume_ensure,
                                    provides=volume_ensure,
@@ -293,7 +293,7 @@ def migrate_attached_volume(context, server_id, volume_id,
                                            name=image_ensure,
                                            provides=image_ensure,
                                            rebind=[volume_image,
-                                                   user_ensure]),
+                                                   tenant_ensure]),
              CreateVolumeFromImage(context.dst_cloud,
                                    name=volume_ensure,
                                    provides=volume_ensure,

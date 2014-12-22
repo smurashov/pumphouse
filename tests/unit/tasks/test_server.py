@@ -243,7 +243,7 @@ class TestRestoreFloatingIPs(TestServer):
         fip_retrieve = "floating-ip-{}-retrieve".format(self.floating_ip)
         self.context.store = {fip_retrieve: self.floating_ip}
         associate_fip_mock.return_value = fip_flow_mock()
-        flow = server.restore_floating_ips(self.context, self.server_info)
+        flow = server.restore_floating_ips_nova(self.context, self.server_info)
 
         flow_mock.assert_called_once_with("post-migration-{}"
                                           .format(self.test_server_id))

@@ -54,10 +54,28 @@ class EnsureTenant(task.BaseCloudTask):
         }, namespace="/events")
 
 
+class AddTenantAdmin(task.BaseCloudTask):
+    def execute(self, tenant_info):
+        tenant = self.cloud.keystone.tenants.get(tenant_info["id"])
+        user = self.cloud.keystone.auth_ref.user_id
+        admin_roles = [r for r in self.cloud.keystone.roles.list()
+                       if r.name == "admin"]
+        if not admin_roles:
+            raise exceptions.NotFound
+        admin_role = admin_roles[0]
+        try:
+            self.cloud.keystone.tenants.add_user(tenant,
+                                                 user,
+                                                 admin_role)
+        except exceptions.keystone_excs.Conflict:
+            LOG.warning("User %s is admin in tenant %r", user, tenant)
+
+
 def migrate_tenant(context, tenant_id):
     tenant_binding = "tenant-{}".format(tenant_id)
     tenant_retrieve = "{}-retrieve".format(tenant_binding)
     tenant_ensure = "{}-ensure".format(tenant_binding)
+    tenant_addadmin = "{}-addadmin".format(tenant_binding)
     flow = linear_flow.Flow("migrate-tenant-{}".format(tenant_id)).add(
         RetrieveTenant(context.src_cloud,
                        name=tenant_binding,
@@ -67,6 +85,9 @@ def migrate_tenant(context, tenant_id):
                      name=tenant_ensure,
                      provides=tenant_ensure,
                      rebind=[tenant_binding]),
+        AddTenantAdmin(context.dst_cloud,
+                       name=tenant_addadmin,
+                       rebind=[tenant_ensure]),
     )
     context.store[tenant_retrieve] = tenant_id
     return flow

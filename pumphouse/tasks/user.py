@@ -115,9 +115,10 @@ def migrate_user(context, user_id, tenant_id=None):
                             provides=user_ensure,
                             rebind=[user_binding, tenant_ensure]))
     else:
-        flow.add(EnsureOrphanUser(context.dst_cloud,
-                                  name=user_ensure,
-                                  provides=user_ensure,
-                                  rebind=[user_binding]))
+        flow.add(EnsureUser(context.dst_cloud,
+                            name=user_ensure,
+                            provides=user_ensure,
+                            rebind=[user_binding],
+                            inject={"tenant_info": None}))
     context.store[user_retrieve] = user_id
     return flow

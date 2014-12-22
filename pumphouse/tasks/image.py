@@ -42,12 +42,10 @@ class LogReporter(task_utils.UploadReporter):
 
 
 class EnsureImage(task.BaseCloudsTask):
-    def execute(self, image_id, user_info, kernel_info, ramdisk_info):
-        if user_info:
-            tenant = self.dst_cloud.keystone.tenants.get(user_info["tenantId"])
-            dst_cloud = self.dst_cloud.restrict(username=user_info["name"],
-                                                password='default',
-                                                tenant_name=tenant.name)
+    def execute(self, image_id, tenant_info, kernel_info, ramdisk_info):
+        if tenant_info:
+            tenant = self.dst_cloud.keystone.tenants.get(tenant_info["id"])
+            dst_cloud = self.dst_cloud.restrict(tenant_name=tenant.name)
         else:
             dst_cloud = self.dst_cloud
         image_info = self.src_cloud.glance.images.get(image_id)
@@ -155,11 +153,11 @@ class DeleteImageByID(DeleteImage):
         super(DeleteImageByID, self).execute(dict(image))
 
 
-def migrate_image_task(context, task_class, image_id, user_id, *rebind):
+def migrate_image_task(context, task_class, image_id, tenant_id, *rebind):
     image_binding = "image-{}".format(image_id)
     image_ensure = "image-{}-ensure".format(image_id)
-    user_ensure = "user-{}-ensure".format(user_id)
-    rebind = itertools.chain((image_binding, user_ensure), *rebind)
+    tenant_ensure = "tenant-{}-ensure".format(tenant_id)
+    rebind = itertools.chain((image_binding, tenant_ensure), *rebind)
     task = task_class(context.src_cloud, context.dst_cloud,
                       name=image_ensure,
                       provides=image_ensure,
@@ -172,37 +170,37 @@ def migrate_image_task(context, task_class, image_id, user_id, *rebind):
 #               if-statements looks ugly.
 def migrate_image(context, image_id):
     image = context.src_cloud.glance.images.get(image_id)
-    user_id = None
+    tenant_id = None
     if image["visibility"] == "private":
-        user_id = image.get("owner")
+        tenant_id = image.get("owner")
     else:
-        user_id = "public"
-        user_ensure = "user-{}-ensure".format(user_id)
-        context.store[user_ensure] = None
+        tenant_ensure = "tenant-{}-ensure".format(tenant_id)
+        context.store[tenant_ensure] = None
     if image["container_format"] == "ami" and (hasattr(image, "kernel_id") or
                                                hasattr(image, "ramdisk_id")):
         flow = graph_flow.Flow("migrate-image-{}".format(image_id))
         if hasattr(image, "kernel_id") and hasattr(image, "ramdisk_id"):
             kernel = migrate_image_task(context, EnsureSingleImage,
-                                        image["kernel_id"], user_id)
+                                        image["kernel_id"], tenant_id)
             ramdisk = migrate_image_task(context, EnsureSingleImage,
-                                         image["ramdisk_id"], user_id)
-            image = migrate_image_task(context, EnsureImage, image_id, user_id,
-                                       kernel.provides, ramdisk.provides)
+                                         image["ramdisk_id"], tenant_id)
+            image = migrate_image_task(context, EnsureImage, image_id,
+                                       tenant_id, kernel.provides,
+                                       ramdisk.provides)
             flow.add(kernel, ramdisk, image)
         elif hasattr(image, "kernel_id"):
             kernel = migrate_image_task(context, EnsureSingleImage,
-                                        image["kernel_id"], user_id)
+                                        image["kernel_id"], tenant_id)
             image = migrate_image_task(context, EnsureImageWithKernel,
-                                       image_id, user_id, kernel.provides)
+                                       image_id, tenant_id, kernel.provides)
             flow.add(kernel, image)
         else:
             ramdisk = migrate_image_task(context, EnsureSingleImage,
-                                         image["ramdisk_id"], user_id)
+                                         image["ramdisk_id"], tenant_id)
             image = migrate_image_task(context, EnsureImageWithRamdisk,
-                                       image_id, user_id, ramdisk.provides)
+                                       image_id, tenant_id, ramdisk.provides)
             flow.add(ramdisk, image)
     else:
         flow = migrate_image_task(context, EnsureSingleImage,
-                                  image_id, user_id)
+                                  image_id, tenant_id)
     return flow
