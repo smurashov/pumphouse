@@ -58,10 +58,11 @@ def migrate_project_volumes(context, tenant_id):
         search_opts={"all_tenants": 1})
     flow = unordered_flow.Flow("migrate-project-{}-volumes".format(tenant_id))
     for volume in volumes:
-        tenant_id = getattr(volume, "os-vol-tenant-attr:tenant_id")
+        volume_tenant_id = getattr(volume, "os-vol-tenant-attr:tenant_id")
         volume_binding = "volume-{}".format(volume.id)
         if volume_binding not in context.store \
-                and volume.status == "available":
+                and volume.status == "available" \
+                and volume_tenant_id == tenant_id:
             volume_flow = volume_tasks.migrate_detached_volume(
                 context, volume.id, None, tenant_id)
             flow.add(volume_flow)
