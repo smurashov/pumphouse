@@ -242,8 +242,8 @@ def cloud_resources(conf, cloud):
 def cloud_view(client):
     return {
         "urls": client.cloud_urls,
-        "resources": list(flask.current_app.config,
-                          cloud_resources(client.connect())),
+        "resources": list(cloud_resources(flask.current_app.config,
+                                          client.connect())),
     }
 
 
