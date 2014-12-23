@@ -1,5 +1,6 @@
-import subprocess
 import json
+import subprocess
+import time
 
 import testresources
 import testtools
@@ -142,6 +143,7 @@ class PHtests(testtools.TestCase, testtools.testcase.WithAttributes,
             [i["data"]["name"] for i in result["resources"]
              if i["type"] == "server"]
         )
+        time.sleep(15)
         source_resources = subprocess.Popen(["pumphouse", "api-config.yaml",
                                              "get_resources", "source"],
                                             stdout=subprocess.PIPE)
