@@ -16,8 +16,6 @@ import logging
 
 from taskflow.patterns import graph_flow
 
-from pumphouse import exceptions
-from pumphouse import events
 from pumphouse import task
 
 from pumphouse.quota import nova, cinder, neutron
@@ -33,33 +31,37 @@ SERVICES = {
 
 class RetrieveTenantQuota(task.BaseCloudTask):
     client = None
+
     def execute(self, tenant_id):
-        quota = client.quotas.get(tenant_id)
+        quota = self.client.quotas.get(tenant_id)
         return quota.to_dict()
 
 
 class RetrieveDefaultQuota(task.BaseCloudTask):
     client = None
+
     def execute(self, tenant_id):
-        quota = client.quotas.defaults(tenant_id)
+        quota = self.client.quotas.defaults(tenant_id)
         return quota.to_dict()
 
 
 class EnsureTenantQuota(task.BaseCloudTask):
     client = None
+
     def execute(self, quota_info, tenant_info):
         tenant_id = tenant_info["id"]
-        quota = client.quotas.update(tenant_id,
-                                     **quota_info)
+        quota = self.client.quotas.update(tenant_id,
+                                          **quota_info)
         LOG.info("Quota updated: %r", quota)
         return quota.to_dict()
 
 
 class EnsureDefaultQuota(task.BaseCloudTask):
     client = None
+
     def execute(self, quota_info):
-        quota = client.quota_classes.update("default",
-                                            **quota_info)
+        quota = self.client.quota_classes.update("default",
+                                                 **quota_info)
         LOG.info("Quota updated: %r", quota)
         return quota.to_dict()
 
@@ -83,8 +85,9 @@ def migrate_tenant_quota(context, service_name, tenant_id):
                                   provides=quota_ensure,
                                   rebind=[quota_binding,
                                           tenant_ensure]),
-    )                           
-    return flow                 
+    )
+    return flow
+
 
 def migrate_default_quota(context, service_name):
     service = SERVICES[service_name]
