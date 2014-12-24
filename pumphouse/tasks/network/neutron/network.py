@@ -45,7 +45,7 @@ class RetrieveNetworkById(task.BaseCloudTask):
 
 class EnsureNetwork(task.BaseCloudTask):
 
-    def execute(self, networks, net_info, tenant_info):
+    def execute(self, networks, net_info, tenant_info, user_info):
         for net in networks:
             if (net['name'] == net_info['name']):
                 LOG.info("Network %s is allready exists, name: %s" %
@@ -65,7 +65,7 @@ class EnsureNetwork(task.BaseCloudTask):
         return network
 
 
-def migrate_network(context, network_id, tenant_info):
+def migrate_network(context, network_id, tenant_info, user_binding):
 
     network_binding = network_id
 
@@ -114,7 +114,8 @@ def migrate_network(context, network_id, tenant_info):
                         rebind=[
                             all_dst_networks_binding,
                             network_retrieve,
-                            tenant_info
+                            tenant_info,
+                            user_binding
                         ]))
 
     return f, network_ensure

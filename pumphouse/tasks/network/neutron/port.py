@@ -81,7 +81,7 @@ class EnsurePort(task.BaseCloudTask):
         return port
 
 
-def migrate_port(context, port_id, tenant_info):
+def migrate_port(context, port_id, tenant_binding, user_binding):
 
     port_binding = port_id
 
@@ -121,7 +121,7 @@ def migrate_port(context, port_id, tenant_info):
 
     if ('network_id' in port_info and port_info['network_id'] is not None):
         networkFlow, network_info = network.migrate_network(
-            context, port_info['network_id'], tenant_info)
+            context, port_info['network_id'], tenant_binding, user_binding)
         if (networkFlow is not None):
             f.add(networkFlow)
 
@@ -130,7 +130,7 @@ def migrate_port(context, port_id, tenant_info):
         for fixed_ip in port_info['fixed_ips']:
             if 'subnet_id' in fixed_ip:
                 subnetFlow, subnet_info = subnet.migrate_subnet(
-                    context, fixed_ip['subnet_id'], network_info, tenant_info)
+                    context, fixed_ip['subnet_id'], network_info, tenant_binding)
                 if (subnetFlow is not None):
                     f.add(subnetFlow)
 
@@ -173,7 +173,7 @@ def migrate_port(context, port_id, tenant_info):
             network_info,
             subnet_info,
             device_info,
-            tenant_info
+            tenant_binding
         ]))
 
     if (port_info['device_owner'] == 'network:floatingip'):
@@ -183,7 +183,7 @@ def migrate_port(context, port_id, tenant_info):
 
         floatingIpFlow, device_info = floatingip.migrate_floatingip(
             context, port_info['device_id'], floatingIpAddr,
-            network_info, port_ensure, tenant_info)
+            network_info, port_ensure, tenant_binding)
         if (floatingIpFlow is not None):
             f.add(floatingIpFlow)
 
@@ -198,11 +198,12 @@ def migrate_port(context, port_id, tenant_info):
     return f, port_ensure
 
 
-def migrate_nic(context, network_name, address, tenant_id):
+def migrate_nic(context, network_name, address, tenant_id, user_id):
 
     port_info = context.src_cloud.neutron.list_ports(
         fixed_ips=['ip_address=%s' % address['addr']])['ports'][0]
 
     tenant_binding = "tenant-{}-ensure".format(tenant_id)
+    user_binding = "user-{}-ensure".format(user_id)
 
-    return migrate_port(context, port_info['id'], tenant_binding)
+    return migrate_port(context, port_info['id'], tenant_binding, user_binding)

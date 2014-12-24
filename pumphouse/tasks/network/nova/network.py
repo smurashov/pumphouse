@@ -89,7 +89,7 @@ class EnsureNic(task.BaseCloudTask):
         }
 
 
-def migrate_nic(context, network_label, address, tenant_id):
+def migrate_nic(context, network_label, address, tenant_id, user_id):
     if address["OS-EXT-IPS:type"] == 'floating':
         floating_ip = address["addr"]
         floating_ip_retrieve = "floating-ip-{}-retrieve".format(floating_ip)

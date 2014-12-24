@@ -51,7 +51,7 @@ def migrate_server(context, server_id):
     for network_name, addresses in server.addresses.iteritems():
         for address in addresses:
             flow, nic = network_tasks.migrate_nic(
-                context, network_name, address, tenant.id)
+                context, network_name, address, tenant.id, server.user_id)
             if flow is not None:
                 resources.append(flow)
             if nic is not None:
