@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and#
 # limitations under the License.
 
-from .network import migrate_nic  # noqa
+from .port import migrate_nic  # noqa
