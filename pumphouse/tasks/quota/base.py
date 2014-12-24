@@ -34,7 +34,7 @@ class RetrieveTenantQuota(task.BaseCloudTask):
 
     def execute(self, tenant_id):
         quota = self.client.quotas.get(tenant_id)
-        return quota.to_dict()
+        return quota._info
 
 
 class RetrieveDefaultQuota(task.BaseCloudTask):
@@ -42,7 +42,7 @@ class RetrieveDefaultQuota(task.BaseCloudTask):
 
     def execute(self, tenant_id):
         quota = self.client.quotas.defaults(tenant_id)
-        return quota.to_dict()
+        return quota._info
 
 
 class EnsureTenantQuota(task.BaseCloudTask):
@@ -53,7 +53,7 @@ class EnsureTenantQuota(task.BaseCloudTask):
         quota = self.client.quotas.update(tenant_id,
                                           **quota_info)
         LOG.info("Quota updated: %r", quota)
-        return quota.to_dict()
+        return quota._info
 
 
 class EnsureDefaultQuota(task.BaseCloudTask):
@@ -63,7 +63,7 @@ class EnsureDefaultQuota(task.BaseCloudTask):
         quota = self.client.quota_classes.update("default",
                                                  **quota_info)
         LOG.info("Quota updated: %r", quota)
-        return quota.to_dict()
+        return quota._info
 
 
 def migrate_tenant_quota(context, service_name, tenant_id):
