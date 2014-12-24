@@ -73,9 +73,10 @@ def migrate_project_quota(context, flow, tenant_id):
 
 def migrate_project(context, project_id):
     flow = graph_flow.Flow("migrate-project-{}".format(project_id))
+    _, identity_flow = identity_tasks.migrate_identity(context, project_id)
+    flow.add(identity_flow)
     migrate_project_servers(context, flow, project_id)
     migrate_project_images(context, flow, project_id)
     migrate_project_volumes(context, flow, project_id)
-    _, identity_flow = identity_tasks.migrate_identity(context, project_id)
-    flow.add(identity_flow)
+    migrate_project_quota(context, flow, project_id)
     return flow
