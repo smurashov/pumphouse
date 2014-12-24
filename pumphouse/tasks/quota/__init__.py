@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from pumphouse.tasks.quota import nova, cinder, neutron
+from taskflow.patterns import graph_flow
 
 
 SERVICES = {

@@ -14,7 +14,6 @@
 
 import logging
 
-from taskflow.patterns import graph_flow
 from pumphouse import task
 
 
