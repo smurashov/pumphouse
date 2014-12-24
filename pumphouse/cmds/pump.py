@@ -433,10 +433,10 @@ def main():
 
         src_config = clouds_config["source"]
         dst_config = clouds_config["destination"]
-        config = {
+        config = dict(plugins_config, **{
             "source": src_config["environment"],
             "destination": dst_config["environment"],
-        }
+        })
         src = init_client(src_config,
                           "source",
                           Cloud,
