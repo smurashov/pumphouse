@@ -15,18 +15,10 @@
 import logging
 
 from taskflow.patterns import graph_flow
-
 from pumphouse import task
-
-from pumphouse.quota import nova, cinder, neutron
 
 
 LOG = logging.getLogger(__name__)
-SERVICES = {
-    "nova": nova,
-    "cinder": cinder,
-    "neutron": neutron
-}
 
 
 class RetrieveTenantQuota(task.BaseCloudTask):
@@ -64,43 +56,3 @@ class EnsureDefaultQuota(task.BaseCloudTask):
                                                  **quota_info)
         LOG.info("Quota updated: %r", quota)
         return quota._info
-
-
-def migrate_tenant_quota(context, service_name, tenant_id):
-    service = SERVICES[service_name]
-    flow = graph_flow.Flow("migrate-{}-quota-{}".format(service_name,
-                                                        tenant_id))
-    quota_binding = "quota-{}-{}".format(service_name,
-                                         tenant_id)
-    quota_ensure = "{}-ensure".format(quota_binding)
-    tenant_binding = "tenant-{}".format(tenant_id)
-    tenant_ensure = "{}-ensure".format(tenant_binding)
-    flow.add(
-        service.RetrieveTenantQuota(context.src_cloud,
-                                    name=quota_binding,
-                                    provides=quota_binding,
-                                    rebind=[tenant_binding]),
-        service.EnsureTenantQuota(context.dst_cloud,
-                                  name=quota_ensure,
-                                  provides=quota_ensure,
-                                  rebind=[quota_binding,
-                                          tenant_ensure]),
-    )
-    return flow
-
-
-def migrate_default_quota(context, service_name):
-    service = SERVICES[service_name]
-    flow = graph_flow.Flow("migrate-{}-quota-default".format(service_name))
-    quota_binding = "quota-{}-default".format(service_name)
-    quota_ensure = "{}-ensure".format(quota_binding)
-    flow.add(
-        service.RetrieveDefaultQuota(context.src_cloud,
-                                     name=quota_binding,
-                                     provides=quota_binding),
-        service.EnsureTenantQuota(context.dst_cloud,
-                                  name=quota_ensure,
-                                  provides=quota_ensure,
-                                  rebind=[quota_binding]),
-    )
-    return flow
