@@ -14,7 +14,7 @@
 
 import logging
 
-from pumphouse.quota import base
+from pumphouse.tasks.quota import base
 
 
 LOG = logging.getLogger(__name__)
