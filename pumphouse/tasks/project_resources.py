@@ -67,7 +67,7 @@ def migrate_project_quota(context, flow, tenant_id):
     services = endpoints.keys()
     for service in services:
         if service in quota.SERVICES:
-            flow.add(quota.migrate_tenant_quota(service, tenant_id))
+            flow.add(quota.migrate_tenant_quota(context, service, tenant_id))
     return flow
 
 
