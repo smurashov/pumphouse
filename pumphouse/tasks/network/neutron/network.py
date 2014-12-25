@@ -37,7 +37,6 @@ class RetrieveNeutronNetworks(task.BaseCloudTask):
 class RetrieveNetworkById(task.BaseCloudTask):
 
     def execute(self, sourceNeutronNetworks, net_id):
-        import pdb; pdb.set_trace()
         for net in sourceNeutronNetworks:
             if (net['id'] == net_id):
                 LOG.info("Match network %s" % net_id)
