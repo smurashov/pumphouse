@@ -20,6 +20,7 @@ from pumphouse.tasks import server_resources
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import volume as volume_tasks
 from pumphouse.tasks import identity as identity_tasks
+from pumphouse.tasks import quota
 
 
 LOG = logging.getLogger(__name__)
@@ -61,11 +62,21 @@ def migrate_project_volumes(context, flow, tenant_id):
             flow.add(volume_flow)
 
 
+def migrate_project_quota(context, flow, tenant_id):
+    endpoints = context.src_cloud.keystone.service_catalog.get_endpoints()
+    services = endpoints.keys()
+    for service in services:
+        if service in quota.SERVICES:
+            flow.add(quota.migrate_tenant_quota(context, service, tenant_id))
+    return flow
+
+
 def migrate_project(context, project_id):
     flow = graph_flow.Flow("migrate-project-{}".format(project_id))
+    _, identity_flow = identity_tasks.migrate_identity(context, project_id)
+    flow.add(identity_flow)
     migrate_project_servers(context, flow, project_id)
     migrate_project_images(context, flow, project_id)
     migrate_project_volumes(context, flow, project_id)
-    _, identity_flow = identity_tasks.migrate_identity(context, project_id)
-    flow.add(identity_flow)
+    migrate_project_quota(context, flow, project_id)
     return flow
