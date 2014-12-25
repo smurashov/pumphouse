@@ -114,7 +114,8 @@ def migrate_securityGroup(context, securityGroup_id, port_binding):
     f = graph_flow.Flow(
         "neutron-securityGroup-migration-{}".format(securityGroup_id))
 
-    all_dst, all_src, all_src_retrieve, all_dst_retrieve = utils.generate_retrieve_binding("NeutronAllSecurityGroups")
+    all_dst, all_src, all_src_retrieve, all_dst_retrieve = \
+        utils.generate_retrieve_binding("NeutronAllSecurityGroups")
 
     if (all_src not in context.store):
 

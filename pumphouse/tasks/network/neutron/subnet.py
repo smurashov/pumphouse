@@ -94,7 +94,8 @@ def migrate_subnet(context, subnet_id, network_info, tenant_info):
 
     f = graph_flow.Flow("neutron-subnet-migration-{}".format(subnet_id))
 
-    all_dst, all_src, all_src_retrieve, all_dst_retrieve = utils.generate_retrieve_binding("NeutronAllSubnets")
+    all_dst, all_src, all_src_retrieve, all_dst_retrieve = \
+        utils.generate_retrieve_binding("NeutronAllSubnets")
 
     if (all_src not in context.store):
 

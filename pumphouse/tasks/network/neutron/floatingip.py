@@ -100,7 +100,8 @@ def migrate_floatingip(context, floatingip_id, floating_ip_addr,
     f = graph_flow.Flow(
         "neutron-floatingip-migration-{}".format(floatingip_binding))
 
-    all_dst, all_src, all_src_retrieve, all_dst_retrieve = utils.generate_retrieve_binding("NeutronAllFloatingIp")
+    all_dst, all_src, all_src_retrieve, all_dst_retrieve = \
+        utils.generate_retrieve_binding("NeutronAllFloatingIp")
 
     if (all_src not in context.store):
         f.add(RetrieveFloatingIps(

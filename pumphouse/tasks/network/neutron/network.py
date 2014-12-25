@@ -53,7 +53,6 @@ class EnsureNetwork(task.BaseCloudTask):
                          (net_info['id'], net['name']))
                 return net
 
-
         restrict_cloud = self.cloud.restrict(
             tenant_name=tenant_info["name"])
 
@@ -86,7 +85,8 @@ def migrate_network(context, network_id, tenant_info):
 
     f = graph_flow.Flow("neutron-network-migration-{}".format(network_binding))
 
-    all_dst, all_src, all_src_retrieve, all_dst_retrieve = utils.generate_retrieve_binding("NeutronAllNetworks")
+    all_dst, all_src, all_src_retrieve, all_dst_retrieve = \
+        utils.generate_retrieve_binding("NeutronAllNetworks")
 
     if (all_src not in context.store):
         f.add(RetrieveNeutronNetworks(

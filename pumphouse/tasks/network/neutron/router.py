@@ -75,7 +75,8 @@ def migrate_router(context, router_id):
 
     f = graph_flow.Flow("neutron-router-migration-{}".format(router_id))
 
-    all_dst, all_src, all_src_retrieve, all_dst_retrieve = utils.generate_retrieve_binding("NeutronAllRouters")
+    all_dst, all_src, all_src_retrieve, all_dst_retrieve = \
+        utils.generate_retrieve_binding("NeutronAllRouters")
 
     if (all_src not in context.store):
 

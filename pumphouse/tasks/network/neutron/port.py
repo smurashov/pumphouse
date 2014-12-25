@@ -64,7 +64,7 @@ class EnsurePort(task.BaseCloudTask):
                 device_info, tenant_info):
         for port in all_ports:
             if (port['mac_address'] == port_info['mac_address']):
-                return { "port-id": port["id"] }
+                return {"port-id": port["id"]}
 
         SKIP_PROPS = ['device_id', 'id', 'security_groups', 'fixed_ips',
                       'status', 'binding:vif_details', 'binding:vif_type']
@@ -79,7 +79,7 @@ class EnsurePort(task.BaseCloudTask):
 
         port = create_port(self.cloud.neutron, port_info)
 
-        return { "port-id": port["id"] }
+        return {"port-id": port["id"]}
 
 
 def migrate_port(context, port_id, tenant_binding):
@@ -95,7 +95,8 @@ def migrate_port(context, port_id, tenant_binding):
 
     port_info = get_port_by(context.src_cloud.neutron, {'id': port_id})[0]
 
-    all_dst, all_src, all_src_retrieve, all_dst_retrieve = utils.generate_retrieve_binding("NeutronAllPorts")
+    all_dst, all_src, all_src_retrieve, all_dst_retrieve = \
+        utils.generate_retrieve_binding("NeutronAllPorts")
 
     if (all_src not in context.store):
         f.add(RetrieveAllPorts(
@@ -130,7 +131,8 @@ def migrate_port(context, port_id, tenant_binding):
         for fixed_ip in port_info['fixed_ips']:
             if 'subnet_id' in fixed_ip:
                 subnetFlow, subnet_info = subnet.migrate_subnet(
-                    context, fixed_ip['subnet_id'], network_info, tenant_binding)
+                    context, fixed_ip['subnet_id'], network_info,
+                    tenant_binding)
                 if (subnetFlow is not None):
                     f.add(subnetFlow)
         if (port_info['device_owner'] == 'network:floatingip'):
