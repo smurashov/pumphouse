@@ -12,4 +12,10 @@
 # See the License for the specific language governing permissions and#
 # limitations under the License.
 
-from .port import migrate_nic  # noqa
+PREFIX = "neutron-"
+
+
+def generate_binding(uid, label):
+    label.replace("_", "-")
+    return PREFIX + "{}-{}-ensure".format(label, uid), \
+        PREFIX + "{}-{}-retrieve".format(label, uid)
