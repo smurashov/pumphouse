@@ -43,7 +43,7 @@ def create_port(neutron, port_info):
 class RetrieveAllPorts(task.BaseCloudTask):
 
     def execute(self):
-        return self.cloud.neutron.list_ports()['ports']
+        return get_port_by(self.cloud.neutron, {})
 
 
 class RetrievePortById(task.BaseCloudTask):
@@ -97,21 +97,27 @@ def migrate_port(context, port_id, tenant_binding, user_binding):
     all_src_ports_binding = "srcNeutronAllPorts"
     all_dst_ports_binding = "dstNeutronAllPorts"
 
-    if (all_src_ports_binding not in context.store):
+    all_src_ports_retrieve = all_src_ports_binding + "-retrieve"
+    all_dst_ports_retrieve = all_dst_ports_binding + "-retrieve"
+
+    if (all_src_ports_retrieve not in context.store):
         f.add(RetrieveAllPorts(
             context.src_cloud,
-            name="retrieveNeutronAllSrcPorts",
+            #name="retrieveNeutronAllSrcPorts",
+            name=all_src_ports_binding,
             provides=all_src_ports_binding
         ))
-        context.store[all_src_ports_binding] = None
+        context.store[all_src_ports_retrieve] = None
 
-    if (all_dst_ports_binding not in context.store):
+    if (all_dst_ports_retrieve not in context.store):
         f.add(RetrieveAllPorts(
             context.dst_cloud,
-            name="retrieveNeutronAllDstPorts",
+            #name="retrieveNeutronAllDstPorts",
+            name=all_dst_ports_binding,
             provides=all_dst_ports_binding
         ))
-        context.store[all_dst_ports_binding] = None
+        context.store[all_dst_ports_retrieve] = None
+
 
     port_retrieve = "neutron-port-migration-{}-retrieve".format(port_binding)
     port_ensure = "neutron-port-migration-{}-ensure".format(port_binding)
@@ -125,6 +131,7 @@ def migrate_port(context, port_id, tenant_binding, user_binding):
         if (networkFlow is not None):
             f.add(networkFlow)
 
+
     # migrate subnet
     if ('fixed_ips' in port_info and port_info['fixed_ips'] is not None):
         for fixed_ip in port_info['fixed_ips']:
@@ -133,8 +140,6 @@ def migrate_port(context, port_id, tenant_binding, user_binding):
                     context, fixed_ip['subnet_id'], network_info, tenant_binding)
                 if (subnetFlow is not None):
                     f.add(subnetFlow)
-
-    if ("device_owner" in port_info):
         if (port_info['device_owner'] == 'network:floatingip'):
             pass
         elif (port_info["device_owner"] == "network:dhcp"):
