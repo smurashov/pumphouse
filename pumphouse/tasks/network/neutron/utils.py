@@ -19,3 +19,8 @@ def generate_binding(uid, label):
     label.replace("_", "-")
     return PREFIX + "{}-{}-ensure".format(label, uid), \
         PREFIX + "{}-{}-retrieve".format(label, uid)
+
+
+def generate_retrieve_binding(prefix):
+    return prefix + "-src", prefix + "-dst", \
+        prefix + "-src-retrieve", prefix + "-dst-retrieve"
