@@ -16,6 +16,7 @@ import logging
 
 from pumphouse import task
 from taskflow.patterns import graph_flow
+from . import utils
 
 LOG = logging.getLogger(__name__)
 
@@ -113,34 +114,33 @@ def migrate_securityGroup(context, securityGroup_id, port_binding):
     f = graph_flow.Flow(
         "neutron-securityGroup-migration-{}".format(securityGroup_id))
 
-    all_src_securityGroup_binding = "srcNeutronAllSecurityGroups"
-    all_dst_securityGroup_binding = "dstNeutronAllSecurityGroups"
+    all_dst, all_src, all_src_retrieve, all_dst_retrieve = utils.generate_retrieve_binding("NeutronAllSecurityGroups")
 
-    if (all_src_securityGroup_binding not in context.store):
+    if (all_src not in context.store):
 
         f.add(RetrieveSecurityGroups(
             context.src_cloud,
-            name="retrieveAllSrcSecurityGroups",
-            provides=all_src_securityGroup_binding
+            name=all_src,
+            provides=all_src_retrieve
         ))
 
-        context.store[all_src_securityGroup_binding] = None
+        context.store[all_src] = None
 
-    if (all_dst_securityGroup_binding not in context.store):
+    if (all_dst not in context.store):
 
         f.add(RetrieveSecurityGroups(
             context.dst_cloud,
-            name="retrieveAllDstSecurityGroups",
-            provides=all_dst_securityGroup_binding
+            name=all_dst,
+            provides=all_dst_retrieve
         ))
 
-        context.store[all_dst_securityGroup_binding] = None
+        context.store[all_dst] = None
 
     f.add(RetrieveSecurityGroupById(context.src_cloud,
                                     name=securityGroup_retrieve,
                                     provides=securityGroup_retrieve,
                                     rebind=[
-                                        all_src_securityGroup_binding,
+                                        all_src_retrieve,
                                         securityGroup_binding
                                     ]))
 
@@ -148,7 +148,7 @@ def migrate_securityGroup(context, securityGroup_id, port_binding):
                               name=securityGroup_ensure,
                               provides=securityGroup_ensure,
                               rebind=[
-                                  all_dst_securityGroup_binding,
+                                  all_dst_retrieve,
                                   securityGroup_retrieve,
                                   port_binding
                               ]))

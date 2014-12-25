@@ -16,7 +16,7 @@ import logging
 
 from pumphouse import task
 from taskflow.patterns import graph_flow
-
+from . import utils
 
 LOG = logging.getLogger(__name__)
 
@@ -45,18 +45,23 @@ class RetrieveNetworkById(task.BaseCloudTask):
 
 class EnsureNetwork(task.BaseCloudTask):
 
-    def execute(self, networks, net_info, tenant_info, user_info):
+    def execute(self, networks, net_info, tenant_info):
+
         for net in networks:
             if (net['name'] == net_info['name']):
                 LOG.info("Network %s is allready exists, name: %s" %
                          (net_info['id'], net['name']))
                 return net
 
+
+        restrict_cloud = self.cloud.restrict(
+            tenant_name=tenant_info["name"])
+
         LOG.info("Network %s not exists" % net_info['id'])
 
         net_info['tenant_id'] = tenant_info['id']
 
-        network = create_network(self.cloud.neutron, {
+        network = create_network(restrict_cloud.neutron, {
             'name': net_info['name']
         })
 
@@ -65,7 +70,7 @@ class EnsureNetwork(task.BaseCloudTask):
         return network
 
 
-def migrate_network(context, network_id, tenant_info, user_binding):
+def migrate_network(context, network_id, tenant_info):
 
     network_binding = network_id
 
@@ -81,34 +86,29 @@ def migrate_network(context, network_id, tenant_info, user_binding):
 
     f = graph_flow.Flow("neutron-network-migration-{}".format(network_binding))
 
-    all_src_networks_binding = "srcNeutronAllNetworks"
-    all_dst_networks_binding = "dstNeutronAllNetworks"
+    all_dst, all_src, all_src_retrieve, all_dst_retrieve = utils.generate_retrieve_binding("NeutronAllNetworks")
 
-    all_src_networks_retrieve = "srcNeutronAllNetworksRetrieve"
-    all_dst_networks_retrieve = "dstNeutronAllNetworksRetrieve"
-
-    if (all_src_networks_retrieve not in context.store):
+    if (all_src not in context.store):
         f.add(RetrieveNeutronNetworks(
             context.src_cloud,
-            name = all_src_networks_binding,
-            provides=all_src_networks_binding
+            name=all_src,
+            provides=all_src_retrieve
         ))
-        context.store[all_src_networks_retrieve] = None
+        context.store[all_src] = None
 
-    if (all_dst_networks_retrieve not in context.store):
+    if (all_dst not in context.store):
         f.add(RetrieveNeutronNetworks(
             context.dst_cloud,
-            #name="retrieveDstAllNetworks",
-            name = all_dst_networks_binding,
-            provides=all_dst_networks_binding
+            name=all_dst,
+            provides=all_dst_retrieve
         ))
-        context.store[all_dst_networks_retrieve] = None
+        context.store[all_dst] = None
 
     f.add(RetrieveNetworkById(context.src_cloud,
                               name=network_retrieve,
                               provides=network_retrieve,
                               rebind=[
-                                  all_src_networks_binding,
+                                  all_src_retrieve,
                                   network_binding,
                               ]))
 
@@ -116,10 +116,9 @@ def migrate_network(context, network_id, tenant_info, user_binding):
                         name=network_ensure,
                         provides=network_ensure,
                         rebind=[
-                            all_dst_networks_binding,
+                            all_dst_retrieve,
                             network_retrieve,
-                            tenant_info,
-                            user_binding
+                            tenant_info
                         ]))
 
     return f, network_ensure

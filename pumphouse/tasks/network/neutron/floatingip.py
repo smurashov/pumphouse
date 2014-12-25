@@ -73,7 +73,7 @@ class EnsureFloatingIp(task.BaseCloudTask):
                 del floating_info[prop]
 
         floating_info["floating_network_id"] = network_info["id"]
-        floating_info["port_id"] = port_info["id"]
+        floating_info["port_id"] = port_info["port-id"]
         floating_info["tenant_id"] = tenant_info["id"]
 
         return create_floatingip(self.cloud.neutron, floating_info)
@@ -100,30 +100,29 @@ def migrate_floatingip(context, floatingip_id, floating_ip_addr,
     f = graph_flow.Flow(
         "neutron-floatingip-migration-{}".format(floatingip_binding))
 
-    all_src_floatingips_binding = "srcNeutronAllFloatingIps"
-    all_dst_floatingips_binding = "dstNeutronAllFloatingIps"
+    all_dst, all_src, all_src_retrieve, all_dst_retrieve = utils.generate_retrieve_binding("NeutronAllFloatingIp")
 
-    if (all_src_floatingips_binding not in context.store):
+    if (all_src not in context.store):
         f.add(RetrieveFloatingIps(
             context.src_cloud,
-            name="retrieveAllSrcFloatingIps",
-            provides=all_src_floatingips_binding
+            name=all_src,
+            provides=all_src_retrieve
         ))
-        context.store[all_src_floatingips_binding] = None
+        context.store[all_src] = None
 
-    if (all_dst_floatingips_binding not in context.store):
+    if (all_dst not in context.store):
         f.add(RetrieveFloatingIps(
             context.dst_cloud,
-            name="retrieveDstAllFloatingIps",
-            provides=all_dst_floatingips_binding
+            name=all_dst,
+            provides=all_dst_retrieve
         ))
-        context.store[all_dst_floatingips_binding] = None
+        context.store[all_dst] = None
 
     f.add(RetrieveFloatingIpById(context.src_cloud,
                                  name=floatingip_binding,
                                  provides=floatingip_binding,
                                  rebind=[
-                                     all_src_floatingips_binding,
+                                     all_src_retrieve,
                                      floatingip_retrieve,
                                  ]))
 
@@ -131,7 +130,7 @@ def migrate_floatingip(context, floatingip_id, floating_ip_addr,
                            name=floatingip_ensure,
                            provides=floatingip_ensure,
                            rebind=[
-                               all_dst_floatingips_binding,
+                               all_dst_retrieve,
                                floatingip_binding,
                                network_info,
                                port_info,

@@ -75,34 +75,33 @@ def migrate_router(context, router_id):
 
     f = graph_flow.Flow("neutron-router-migration-{}".format(router_id))
 
-    all_src_router_binding = "srcNeutronAllRouters"
-    all_dst_router_binding = "dstNeutronAllRouters"
+    all_dst, all_src, all_src_retrieve, all_dst_retrieve = utils.generate_retrieve_binding("NeutronAllRouters")
 
-    if (all_src_router_binding not in context.store):
+    if (all_src not in context.store):
 
         f.add(RetrieveAllRouters(
             context.src_cloud,
-            name="retrieveAllSrcRouters",
-            provides=all_src_router_binding
+            name=all_src,
+            provides=all_src_retrieve
         ))
 
-        context.store[all_src_router_binding] = None
+        context.store[all_src] = None
 
-    if (all_dst_router_binding not in context.store):
+    if (all_dst not in context.store):
 
         f.add(RetrieveAllRouters(
             context.dst_cloud,
-            name="retrieveAllDstRouters",
-            provides=all_dst_router_binding
+            name=all_dst,
+            provides=all_dst_retrieve
         ))
 
-        context.store[all_dst_router_binding] = None
+        context.store[all_dst] = None
 
     f.add(RetrieveRouterById(context.src_cloud,
                              name=router_retrieve,
                              provides=router_retrieve,
                              rebind=[
-                                 all_src_router_binding,
+                                 all_src_retrieve,
                                  router_binding
                              ]))
 
@@ -110,7 +109,7 @@ def migrate_router(context, router_id):
                        name=router_ensure,
                        provides=router_ensure,
                        rebind=[
-                           all_dst_router_binding,
+                           all_dst_retrieve,
                            router_retrieve
                        ]))
 

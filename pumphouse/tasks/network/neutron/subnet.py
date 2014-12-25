@@ -17,6 +17,8 @@ import logging
 from pumphouse import task
 from taskflow.patterns import graph_flow
 
+from . import utils
+
 
 LOG = logging.getLogger(__name__)
 
@@ -92,34 +94,33 @@ def migrate_subnet(context, subnet_id, network_info, tenant_info):
 
     f = graph_flow.Flow("neutron-subnet-migration-{}".format(subnet_id))
 
-    all_src_subnet_binding = "srcNeutronAllSubnets"
-    all_dst_subnet_binding = "dstNeutronAllSubnets"
+    all_dst, all_src, all_src_retrieve, all_dst_retrieve = utils.generate_retrieve_binding("NeutronAllSubnets")
 
-    if (all_src_subnet_binding not in context.store):
+    if (all_src not in context.store):
 
         f.add(RetrieveAllSubnets(
             context.src_cloud,
-            name="retrieveAllSrcSubnets",
-            provides=all_src_subnet_binding
+            name=all_src,
+            provides=all_src_retrieve
         ))
 
-        context.store[all_src_subnet_binding] = None
+        context.store[all_src] = None
 
-    if (all_dst_subnet_binding not in context.store):
+    if (all_dst not in context.store):
 
         f.add(RetrieveAllSubnets(
             context.dst_cloud,
-            name="retrieveAllDstSubnets",
-            provides=all_dst_subnet_binding
+            name=all_dst,
+            provides=all_dst_retrieve
         ))
 
-        context.store[all_dst_subnet_binding] = None
+        context.store[all_dst] = None
 
     f.add(RetrieveSubnetById(context.src_cloud,
                              name=subnet_retrieve,
                              provides=subnet_retrieve,
                              rebind=[
-                                 all_src_subnet_binding,
+                                 all_src_retrieve,
                                  subnet_binding
                              ]))
 
@@ -127,7 +128,7 @@ def migrate_subnet(context, subnet_id, network_info, tenant_info):
                        name=subnet_ensure,
                        provides=subnet_ensure,
                        rebind=[
-                           all_dst_subnet_binding,
+                           all_dst_retrieve,
                            subnet_retrieve,
                            network_info,
                            tenant_info
