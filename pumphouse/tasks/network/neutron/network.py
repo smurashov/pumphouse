@@ -37,6 +37,7 @@ class RetrieveNeutronNetworks(task.BaseCloudTask):
 class RetrieveNetworkById(task.BaseCloudTask):
 
     def execute(self, sourceNeutronNetworks, net_id):
+        import pdb; pdb.set_trace()
         for net in sourceNeutronNetworks:
             if (net['id'] == net_id):
                 LOG.info("Match network %s" % net_id)
@@ -84,21 +85,25 @@ def migrate_network(context, network_id, tenant_info, user_binding):
     all_src_networks_binding = "srcNeutronAllNetworks"
     all_dst_networks_binding = "dstNeutronAllNetworks"
 
-    if (all_src_networks_binding not in context.store):
+    all_src_networks_retrieve = "srcNeutronAllNetworksRetrieve"
+    all_dst_networks_retrieve = "dstNeutronAllNetworksRetrieve"
+
+    if (all_src_networks_retrieve not in context.store):
         f.add(RetrieveNeutronNetworks(
             context.src_cloud,
-            name="retrieveAllSrcNetworks",
+            name = all_src_networks_binding,
             provides=all_src_networks_binding
         ))
-        context.store[all_src_networks_binding] = None
+        context.store[all_src_networks_retrieve] = None
 
-    if (all_dst_networks_binding not in context.store):
+    if (all_dst_networks_retrieve not in context.store):
         f.add(RetrieveNeutronNetworks(
             context.dst_cloud,
-            name="retrieveDstAllNetworks",
+            #name="retrieveDstAllNetworks",
+            name = all_dst_networks_binding,
             provides=all_dst_networks_binding
         ))
-        context.store[all_dst_networks_binding] = None
+        context.store[all_dst_networks_retrieve] = None
 
     f.add(RetrieveNetworkById(context.src_cloud,
                               name=network_retrieve,
