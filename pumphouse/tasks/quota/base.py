@@ -41,10 +41,14 @@ class EnsureTenantQuota(task.BaseCloudTask):
 
     def execute(self, quota_info, tenant_info):
         tenant_id = tenant_info["id"]
-        quota = self.client.quotas.update(tenant_id,
-                                          **quota_info)
-        LOG.info("Quota updated: %r", quota)
-        return quota._info
+        try:
+            quota = self.client.quotas.update(tenant_id,
+                                              **quota_info)
+        except Exception:
+            LOG.exception("Cannot update quota: %r", quota_info)
+        else:
+            LOG.info("Quota updated: %r", quota)
+            return quota._info
 
 
 class EnsureDefaultQuota(task.BaseCloudTask):

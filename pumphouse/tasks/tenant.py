@@ -69,13 +69,14 @@ class AddTenantAdmin(task.BaseCloudTask):
                                                  admin_role)
         except exceptions.keystone_excs.Conflict:
             LOG.warning("User %s is admin in tenant %r", user, tenant)
+        return tenant_info
 
 
 def migrate_tenant(context, tenant_id):
     tenant_binding = "tenant-{}".format(tenant_id)
     tenant_retrieve = "{}-retrieve".format(tenant_binding)
-    tenant_ensure = "{}-ensure".format(tenant_binding)
-    tenant_addadmin = "{}-addadmin".format(tenant_binding)
+    tenant_ensure = "{}-create".format(tenant_binding)
+    tenant_addadmin = "{}-ensure".format(tenant_binding)
     flow = linear_flow.Flow("migrate-tenant-{}".format(tenant_id)).add(
         RetrieveTenant(context.src_cloud,
                        name=tenant_binding,
@@ -87,6 +88,7 @@ def migrate_tenant(context, tenant_id):
                      rebind=[tenant_binding]),
         AddTenantAdmin(context.dst_cloud,
                        name=tenant_addadmin,
+                       provides=tenant_addadmin,
                        rebind=[tenant_ensure]),
     )
     context.store[tenant_retrieve] = tenant_id

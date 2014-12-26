@@ -22,6 +22,7 @@ from . import subnet
 from . import floatingip
 from . import router
 from . import securitygroup
+from . import utils
 
 LOG = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ def create_port(neutron, port_info):
 class RetrieveAllPorts(task.BaseCloudTask):
 
     def execute(self):
-        return self.cloud.neutron.list_ports()['ports']
+        return get_port_by(self.cloud.neutron, {})
 
 
 class RetrievePortById(task.BaseCloudTask):
@@ -63,7 +64,7 @@ class EnsurePort(task.BaseCloudTask):
                 device_info, tenant_info):
         for port in all_ports:
             if (port['mac_address'] == port_info['mac_address']):
-                return port
+                return {"port-id": port["id"]}
 
         SKIP_PROPS = ['device_id', 'id', 'security_groups', 'fixed_ips',
                       'status', 'binding:vif_details', 'binding:vif_type']
@@ -78,10 +79,10 @@ class EnsurePort(task.BaseCloudTask):
 
         port = create_port(self.cloud.neutron, port_info)
 
-        return port
+        return {"port-id": port["id"]}
 
 
-def migrate_port(context, port_id, tenant_info):
+def migrate_port(context, port_id, tenant_binding):
 
     port_binding = port_id
 
@@ -94,24 +95,24 @@ def migrate_port(context, port_id, tenant_info):
 
     port_info = get_port_by(context.src_cloud.neutron, {'id': port_id})[0]
 
-    all_src_ports_binding = "srcNeutronAllPorts"
-    all_dst_ports_binding = "dstNeutronAllPorts"
+    all_dst, all_src, all_src_retrieve, all_dst_retrieve = \
+        utils.generate_retrieve_binding("NeutronAllPorts")
 
-    if (all_src_ports_binding not in context.store):
+    if (all_src not in context.store):
         f.add(RetrieveAllPorts(
             context.src_cloud,
-            name="retrieveNeutronAllSrcPorts",
-            provides=all_src_ports_binding
+            name=all_src,
+            provides=all_src_retrieve
         ))
-        context.store[all_src_ports_binding] = None
+        context.store[all_src] = None
 
-    if (all_dst_ports_binding not in context.store):
+    if (all_dst not in context.store):
         f.add(RetrieveAllPorts(
             context.dst_cloud,
-            name="retrieveNeutronAllDstPorts",
-            provides=all_dst_ports_binding
+            name=all_dst,
+            provides=all_dst_retrieve
         ))
-        context.store[all_dst_ports_binding] = None
+        context.store[all_dst] = None
 
     port_retrieve = "neutron-port-migration-{}-retrieve".format(port_binding)
     port_ensure = "neutron-port-migration-{}-ensure".format(port_binding)
@@ -121,7 +122,7 @@ def migrate_port(context, port_id, tenant_info):
 
     if ('network_id' in port_info and port_info['network_id'] is not None):
         networkFlow, network_info = network.migrate_network(
-            context, port_info['network_id'], tenant_info)
+            context, port_info['network_id'], tenant_binding)
         if (networkFlow is not None):
             f.add(networkFlow)
 
@@ -130,11 +131,10 @@ def migrate_port(context, port_id, tenant_info):
         for fixed_ip in port_info['fixed_ips']:
             if 'subnet_id' in fixed_ip:
                 subnetFlow, subnet_info = subnet.migrate_subnet(
-                    context, fixed_ip['subnet_id'], network_info, tenant_info)
+                    context, fixed_ip['subnet_id'], network_info,
+                    tenant_binding)
                 if (subnetFlow is not None):
                     f.add(subnetFlow)
-
-    if ("device_owner" in port_info):
         if (port_info['device_owner'] == 'network:floatingip'):
             pass
         elif (port_info["device_owner"] == "network:dhcp"):
@@ -158,7 +158,7 @@ def migrate_port(context, port_id, tenant_info):
         context.src_cloud,
         name=port_retrieve,
         provides=port_retrieve,
-        rebind=[all_src_ports_binding, port_binding]
+        rebind=[all_src_retrieve, port_binding]
     ))
 
     context.store[device_info] = None
@@ -168,12 +168,12 @@ def migrate_port(context, port_id, tenant_info):
         name=port_ensure,
         provides=port_ensure,
         rebind=[
-            all_dst_ports_binding,
+            all_dst_retrieve,
             port_retrieve,
             network_info,
             subnet_info,
             device_info,
-            tenant_info
+            tenant_binding
         ]))
 
     if (port_info['device_owner'] == 'network:floatingip'):
@@ -183,7 +183,7 @@ def migrate_port(context, port_id, tenant_info):
 
         floatingIpFlow, device_info = floatingip.migrate_floatingip(
             context, port_info['device_id'], floatingIpAddr,
-            network_info, port_ensure, tenant_info)
+            network_info, port_ensure, tenant_binding)
         if (floatingIpFlow is not None):
             f.add(floatingIpFlow)
 
@@ -199,6 +199,10 @@ def migrate_port(context, port_id, tenant_info):
 
 
 def migrate_nic(context, network_name, address, tenant_id):
+
+    # XXX floating ip ignored in this flow
+    if (address["OS-EXT-IPS:type"] != "fixed"):
+        return None, None
 
     port_info = context.src_cloud.neutron.list_ports(
         fixed_ips=['ip_address=%s' % address['addr']])['ports'][0]
