@@ -151,15 +151,17 @@ class SuspendServer(task.BaseCloudTask):
 
 
 class BootServerFromImage(task.BaseCloudTask):
-    def execute(self, server_info, image_info, flavor_info, user_info,
-                tenant_info, server_nics, server_dm):
+    def execute(self, server_info, image_info, flavor_info, keypair_info,
+                user_info, tenant_info, server_nics, server_dm):
         restrict_cloud = self.cloud.restrict(
             username=user_info["name"],
             tenant_name=tenant_info["name"],
             password="default")
         server = restrict_cloud.nova.servers.create(
             server_info["name"], image_info["id"], flavor_info["id"],
-            block_device_mapping=dict(server_dm), nics=server_nics)
+            block_device_mapping=dict(server_dm),
+            nics=server_nics,
+            key_name=keypair_info["name"])
         server = utils.wait_for(server, self.cloud.nova.servers.get,
                                 value="ACTIVE")
         spawn_server_info = server.to_dict()
@@ -233,6 +235,7 @@ def reprovision_server(context, server, server_nics):
     flavor_ensure = "flavor-{}-ensure".format(server.flavor["id"])
     user_ensure = "user-{}-ensure".format(server.user_id)
     tenant_ensure = "tenant-{}-ensure".format(server.tenant_id)
+    keypair_ensure = "keypair-{}-ensure".format(server.key_name)
 
     server_id = server.id
     server_start_event = "server-{}-start-event".format(server_id)
@@ -282,9 +285,9 @@ def reprovision_server(context, server, server_nics):
                             name=server_boot,
                             provides=server_boot,
                             rebind=[server_suspend, image_ensure,
-                                    flavor_ensure, user_ensure,
-                                    tenant_ensure, server_nics,
-                                    server_dm]),
+                                    flavor_ensure, keypair_ensure,
+                                    user_ensure, tenant_ensure,
+                                    server_nics, server_dm]),
     )
     subflow = restore_floating_ips(context, server.to_dict())
     if subflow:
