@@ -17,6 +17,7 @@ import logging
 from pumphouse import flows
 from pumphouse.tasks import server as server_tasks
 from pumphouse.tasks import flavor as flavor_tasks
+from pumphouse.tasks import keypair as keypair_tasks
 from pumphouse.tasks import secgroup as secgroup_tasks
 from pumphouse.tasks import network as network_tasks
 from pumphouse.tasks import identity as identity_tasks
@@ -62,6 +63,12 @@ def migrate_server(context, server_id):
     if flavor_retrieve not in context.store:
         flavor_flow = flavor_tasks.migrate_flavor(context, flavor_id)
         resources.append(flavor_flow)
+    if server.key_name:
+        keypair_flow = keypair_tasks.migrate_keypair(context, None,
+                                                     server.tenant_id,
+                                                     server.user_id,
+                                                     server.key_name)
+        resources.append(keypair_flow)
     add_resources, server_flow = server_tasks.reprovision_server(
         context, server, server_nics)
     resources += add_resources

@@ -28,6 +28,7 @@ from neutronclient.common import exceptions as neutron_excs
 from novaclient import exceptions as nova_excs
 
 from pumphouse import events
+from pumphouse import exceptions
 from pumphouse.tasks import base
 from pumphouse import utils
 
@@ -185,6 +186,56 @@ class User(EventResource):
     @task(before=[create])
     def delete(self):
         self.env.cloud.keystone.users.delete(self.data["id"])
+
+
+def any_tenant(cloud, user):
+    tenants = filter_prefixed(cloud.keystone.tenants.list())
+    for tenant in tenants:
+        user_roles = cloud.keystone.roles.roles_for_user(user["id"],
+                                                         tenant["id"])
+        if user_roles:
+            return tenant
+    raise exceptions.Conflict("User {} has no any role at least in one tenant."
+                              .format(user["name"]))
+
+
+class KeyPair(EventResource):
+    data_id_key = "name"
+    event_id_key = "name"
+
+    def event_data(self):
+        return {
+            "name": self.data["name"],
+            "fingerprint": self.data["fingerprint"],
+            "user_id": self.data["user_id"],
+        }
+
+    @Tenant()
+    def tenant(self):
+        if "tenant" in self.data:
+            return self.data["tenant"]
+        return any_tenant(self.env.cloud, self.user)
+
+    @User()
+    def user(self):
+        return self.data["user"]
+
+    @task(requires=[tenant.create, user.create])
+    def create(self):
+        cloud = self.env.cloud.restrict(username=self.user["name"],
+                                        password="default",
+                                        tenant_name=self.tenant["name"])
+        self.data = cloud.nova.keypairs.create(
+            name=self.data["name"],
+            public_key=self.data.get("public_key"),
+        ).to_dict()
+
+    @task(before=[create, tenant.delete, user.delete])
+    def delete(self):
+        cloud = self.env.cloud.restrict(username=self.user["name"],
+                                        password="default",
+                                        tenant_name=self.tenant["name"])
+        cloud.nova.keypairs.delete(self.data["name"])
 
 
 class Flavor(EventResource):
@@ -867,6 +918,10 @@ class Server(EventResource):
     def user(self):
         return self.data["user"]
 
+    @KeyPair()
+    def keypair(self):
+        return {"name": self.data["key_name"]}
+
     @Image()
     def image(self):
         return self.data["image"]
@@ -898,7 +953,8 @@ class Server(EventResource):
     mute_events = True  # Events will be handled manualy here
 
     @task(requires=[image.upload, tenant.create, flavor.create, user.create,
-                    nics.each().create, floating_ips.each().create],
+                    nics.each().create, floating_ips.each().create,
+                    keypair.create],
           includes=[floating_ips.each().associate, volumes.each().attach])
     def create(self):
         cloud = self.env.cloud.restrict(
@@ -911,6 +967,7 @@ class Server(EventResource):
             self.image["id"],
             self.flavor["id"],
             nics=[nic["nic"] for nic in self.nics],
+            key_name=self.keypair["name"],
         )
 
         def _do_get(id_):
@@ -938,6 +995,7 @@ class Server(EventResource):
             volume["server"] = server
 
     @task(before=[tenant.delete],
+          after=[keypair.delete],
           requires=[floating_ips.each().disassociate, volumes.each().detach],
           includes=[nics.each().delete])
     def delete(self):
@@ -1002,6 +1060,20 @@ class CleanupWorkload(EventResource):
     def users(self):
         users = self.env.cloud.keystone.users.list()
         return filter_prefixed(users)
+
+    @base.Collection(KeyPair)
+    def keypairs(self):
+        for user in self.users:
+            tenant = any_tenant(self.env.cloud, user)
+            cloud = self.env.cloud.restrict(username=user["name"],
+                                            password="default",
+                                            tenant_name=tenant["name"])
+            keypairs = cloud.nova.keypairs.list()
+            for keypair in keypairs:
+                # NOTE(akscram): get gets additional fields including user_id.
+                keypair = cloud.nova.keypairs.get(keypair)
+                user = self.env.cloud.keystone.users.get(keypair.user_id)
+                yield dict(keypair.to_dict(), user=user.to_dict())
 
     @base.Collection(Server)
     def servers(self):
@@ -1132,6 +1204,7 @@ class CleanupWorkload(EventResource):
         users.each().delete,
         volumes.each().delete,
         servers.each().delete,
+        keypairs.each().delete,
         flavors.each().delete,
         security_groups.each().delete,
         networks.each().delete,
@@ -1150,11 +1223,14 @@ class SetupWorkload(EventResource):
             return
         for i in xrange(self.data["populate"].get("num_tenants", 2)):
             tenant_ref = str(random.randint(1, 0x7fffffff))
+            keypair_ref = str(random.randint(1, 0x7fffffff))
             yield {
                 "name": "{}-{}".format(TEST_RESOURCE_PREFIX, tenant_ref),
                 "description": "pumphouse test tenant {}".format(tenant_ref),
                 "username": "{}-user-{}"
                             .format(TEST_RESOURCE_PREFIX, tenant_ref),
+                "key_name": "{}-keypair-{}"
+                            .format(TEST_RESOURCE_PREFIX, keypair_ref),
             }
 
     @base.Collection(User)
@@ -1168,6 +1244,17 @@ class SetupWorkload(EventResource):
             yield {
                 "name": tenant["username"],
                 "tenant": tenant,
+            }
+
+    @base.Collection(KeyPair)
+    def keypairs(self):
+        for tenant in self.tenants:
+            yield {
+                "name": tenant["key_name"],
+                "tenant": tenant,
+                "user": {
+                    "name": tenant["username"],
+                },
             }
 
     @base.Collection(Image)
@@ -1315,6 +1402,7 @@ class SetupWorkload(EventResource):
                         "name": tenant["username"],
                         "tenant": tenant,
                     },
+                    "key_name": tenant["key_name"],
                     "floating_ips": [],
                     "fixed_ips": [],
                     "os-extended-volumes:volumes_attached": volumes,
@@ -1353,6 +1441,7 @@ class SetupWorkload(EventResource):
     create = base.task(name="create", requires=[
         tenants.each().create,
         users.each().create,
+        keypairs.each().create,
         images.each().upload,
         flavors.each().create,
         security_groups.each().create,
