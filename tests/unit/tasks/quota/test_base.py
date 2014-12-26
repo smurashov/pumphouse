@@ -6,8 +6,8 @@ from pumphouse.tasks.quota import base
 
 class TestBaseQuota(unittest.TestCase):
     def setUp(self):
-        self.tenant_id = Mock("tenant_id")
-        self.cloud = Mock("cloud")
+        self.tenant_id = Mock(name="tenant_id")
+        self.cloud = Mock(name="cloud")
         self.tenant_info = {
             "id": self.tenant_id
         }
