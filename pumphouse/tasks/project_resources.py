@@ -17,6 +17,7 @@ import logging
 from taskflow.patterns import graph_flow
 
 from pumphouse.tasks import server_resources
+from pumphouse.tasks import keypair as keypair_tasks
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import volume as volume_tasks
 from pumphouse.tasks import identity as identity_tasks
@@ -36,6 +37,23 @@ def migrate_project_servers(context, flow, tenant_id):
             resources, server_flow = migrate_server(context, server.id)
             flow.add(*resources)
             flow.add(server_flow)
+
+
+def migrate_project_keypairs(context, flow, tenant_id):
+    tenant = context.src_cloud.keystone.tenants.get(tenant_id)
+    users = context.src_cloud.keystone.users.list(tenant_id)
+    for user in users:
+        if user.id == context.src_cloud.keystone.auth_ref.user_id:
+            continue
+        # XXX(akscram): Works only for users' passowrd which are equal
+        #               to "default".
+        cloud = context.src_cloud.restrict(username=user.name,
+                                           password="default",
+                                           tenant_name=tenant.name)
+        keypairs = cloud.nova.keypairs.list()
+        for keypair in keypairs:
+            keypair_tasks.migrate_keypair(context, flow, tenant_id, user.id,
+                                          keypair.name)
 
 
 def migrate_project_images(context, flow, tenant_id):
@@ -76,6 +94,7 @@ def migrate_project(context, project_id):
     _, identity_flow = identity_tasks.migrate_identity(context, project_id)
     flow.add(identity_flow)
     migrate_project_servers(context, flow, project_id)
+    migrate_project_keypairs(context, flow, project_id)
     migrate_project_images(context, flow, project_id)
     migrate_project_volumes(context, flow, project_id)
     migrate_project_quota(context, flow, project_id)
