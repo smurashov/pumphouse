@@ -71,7 +71,7 @@ class EnsureKeyPair(task.BaseCloudTask):
                 msg = ("There is keypair with the same name {!r} but with the"
                        " different fingerprint.".format(keypair_info["name"]))
                 raise exceptions.Conflict(msg)
-            return keypair.to_dict()
+        return keypair.to_dict()
 
     def create_event(self, keypair):
         LOG.info("Created keypair: %s", keypair.name)
