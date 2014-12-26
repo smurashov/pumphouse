@@ -71,6 +71,18 @@ def migrate_project_quota(context, flow, tenant_id):
     return flow
 
 
+def migrate_project_networks(context, flow, tenant_id):
+    networks = context.src_cloud.neutron.list_networks(
+        tenant_id=tenant_id)["networks"]
+    for network in networks:
+        network_id = network.id
+        network_binding = network_id
+        if network_binding not in context.store:
+            net_flow, _ = migrate_network(network_id, tenant_id)
+            flow.add(net_flow)
+    return flow
+
+
 def migrate_project(context, project_id):
     flow = graph_flow.Flow("migrate-project-{}".format(project_id))
     _, identity_flow = identity_tasks.migrate_identity(context, project_id)
