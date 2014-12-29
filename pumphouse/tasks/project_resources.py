@@ -23,9 +23,12 @@ from pumphouse.tasks import volume as volume_tasks
 from pumphouse.tasks import identity as identity_tasks
 from pumphouse.tasks import network as network_tasks
 from pumphouse.tasks import quota
+from pumphouse import plugin
 
 
 LOG = logging.getLogger(__name__)
+
+network_manager = plugin.Plugin("network")
 
 
 def migrate_project_servers(context, flow, tenant_id):
@@ -90,7 +93,21 @@ def migrate_project_quota(context, flow, tenant_id):
     return flow
 
 
-def migrate_project_networks(context, flow, tenant_id):
+@network_manager.add("nova")
+def migrate_nova_networks(context, flow, tenant_id):
+    networks = context.src_cloud.nova.networks.list()
+    for network in networks:
+        network_binding = "network-{}".format(network.id)
+        if network_binding not in context.store and \
+                network.project_id == tenant_id:
+            net_flow, _ = network_tasks.nova.network.migrate_network(
+                context, network.id, network.label, tenant_id)
+            flow.add(net_flow)
+    return flow
+
+
+@network_manager.add("neutron")
+def migrate_neutron_networks(context, flow, tenant_id):
     networks = context.src_cloud.neutron.list_networks(
         tenant_id=tenant_id)["networks"]
     for network in networks:
@@ -131,6 +148,7 @@ def migrate_project(context, project_id):
     migrate_project_images(context, flow, project_id)
     migrate_project_volumes(context, flow, project_id)
     migrate_project_quota(context, flow, project_id)
-    if context.config["network"] == "neutron":
-        migrate_project_networks(context, flow, project_id)
+    migrate_project_networks = network_manager.select_from_config(
+        context.config)
+    migrate_project_networks(context, flow, project_id)
     return flow
