@@ -96,9 +96,10 @@ def migrate_project_networks(context, flow, tenant_id):
     for network in networks:
         network_id = network["id"]
         network_binding = network_id
+        tenant_ensure = "tenant-{}-ensure".format(tenant_id)
         if network_binding not in context.store:
             net_flow, _ = network_tasks.neutron.network.migrate_network(
-                network_id, tenant_id)
+                context, network_id, tenant_ensure)
             flow.add(net_flow)
             _migrate_project_subnets(context, flow,
                                      network_id,
@@ -130,4 +131,6 @@ def migrate_project(context, project_id):
     migrate_project_images(context, flow, project_id)
     migrate_project_volumes(context, flow, project_id)
     migrate_project_quota(context, flow, project_id)
+    if context.config["network"] == "neutron":
+        migrate_project_networks(context, flow, project_id)
     return flow
