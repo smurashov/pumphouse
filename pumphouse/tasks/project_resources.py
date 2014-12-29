@@ -20,6 +20,7 @@ from pumphouse.tasks import server_resources
 from pumphouse.tasks import image as image_tasks
 from pumphouse.tasks import volume as volume_tasks
 from pumphouse.tasks import identity as identity_tasks
+from pumphouse.tasks import network as network_tasks
 from pumphouse.tasks import quota
 
 
@@ -75,11 +76,30 @@ def migrate_project_networks(context, flow, tenant_id):
     networks = context.src_cloud.neutron.list_networks(
         tenant_id=tenant_id)["networks"]
     for network in networks:
-        network_id = network.id
+        network_id = network["id"]
         network_binding = network_id
         if network_binding not in context.store:
-            net_flow, _ = migrate_network(network_id, tenant_id)
+            net_flow, _ = network_tasks.neutron.network.migrate_network(
+                network_id, tenant_id)
             flow.add(net_flow)
+            _migrate_project_subnets(context, flow,
+                                     network_id,
+                                     tenant_id)
+    return flow
+
+
+def _migrate_project_subnets(context, flow, network_id, tenant_id):
+    subnets = context.src_cloud.neutron.list_subnets(
+        network_id=network_id)["subnets"]
+    for subnet in subnets:
+        subnet_id = subnet["id"]
+        subnet_binding = subnet_id
+        tenant_ensure = "tenant-{}-ensure".format(tenant_id)
+        network_ensure = "network-{}-ensure".format(network_id)
+        if subnet_binding not in context.store:
+            subnet_flow, _ = network_tasks.neutron.network.migrate_subnet(
+                subnet_id, network_ensure, tenant_ensure)
+            flow.add(subnet_flow)
     return flow
 
 
