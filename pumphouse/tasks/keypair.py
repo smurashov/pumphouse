@@ -86,35 +86,37 @@ class EnsureKeyPair(task.BaseCloudTask):
 def migrate_keypair(context, flow, tenant_id, user_id, key_name):
     keypair_retrieve = "keypair-{}-retrieve".format(key_name)
 
-    if keypair_retrieve not in context.store:
-        user_binding = "user-{}".format(user_id)
-        user_ensure = "user-{}-ensure".format(user_id)
-        tenant_binding = "tenant-{}".format(tenant_id)
-        tenant_ensure = "tenant-{}-ensure".format(tenant_id)
+    if keypair_retrieve in context.store:
+        return None
 
-        keypair_binding = "keypair-{}".format(key_name)
-        keypair_ensure = "keypair-{}-ensure".format(key_name)
+    user_binding = "user-{}".format(user_id)
+    user_ensure = "user-{}-ensure".format(user_id)
+    tenant_binding = "tenant-{}".format(tenant_id)
+    tenant_ensure = "tenant-{}-ensure".format(tenant_id)
 
-        if flow is None:
-            flow = graph_flow.Flow(name=user_binding)
+    keypair_binding = "keypair-{}".format(key_name)
+    keypair_ensure = "keypair-{}-ensure".format(key_name)
 
-        flow.add(
-            RetrieveKeyPair(context.src_cloud,
-                            name=keypair_binding,
-                            provides=keypair_binding,
-                            rebind=[
-                                keypair_retrieve,
-                                tenant_binding,
-                                user_binding,
-                            ]),
-            EnsureKeyPair(context.dst_cloud,
-                          name=keypair_ensure,
-                          provides=keypair_ensure,
-                          rebind=[
-                              keypair_binding,
-                              tenant_ensure,
-                              user_ensure,
-                          ]),
-        )
-        context.store[keypair_retrieve] = key_name
-        return flow
+    if flow is None:
+        flow = graph_flow.Flow(name=user_binding)
+
+    flow.add(
+        RetrieveKeyPair(context.src_cloud,
+                        name=keypair_binding,
+                        provides=keypair_binding,
+                        rebind=[
+                            keypair_retrieve,
+                            tenant_binding,
+                            user_binding,
+                        ]),
+        EnsureKeyPair(context.dst_cloud,
+                      name=keypair_ensure,
+                      provides=keypair_ensure,
+                      rebind=[
+                          keypair_binding,
+                          tenant_ensure,
+                          user_ensure,
+                      ]),
+    )
+    context.store[keypair_retrieve] = key_name
+    return flow

@@ -68,7 +68,8 @@ def migrate_server(context, server_id):
                                                      server.tenant_id,
                                                      server.user_id,
                                                      server.key_name)
-        resources.append(keypair_flow)
+        if keypair_flow is not None:
+            resources.append(keypair_flow)
     add_resources, server_flow = server_tasks.reprovision_server(
         context, server, server_nics)
     resources += add_resources
