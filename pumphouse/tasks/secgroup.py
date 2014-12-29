@@ -72,6 +72,9 @@ class EnsureSecGroup(task.BaseCloudTask):
             except exceptions.nova_excs.BadRequest:
                 LOG.warn("Duplicate rule: %s", rule)
                 pass
+            except KeyError:
+                LOG.warn("Broken rule: %s", rule)
+                pass
             except exceptions.nova_excs.NotFound:
                 LOG.exception("No such security group exist: %s",
                               secgroup_info)

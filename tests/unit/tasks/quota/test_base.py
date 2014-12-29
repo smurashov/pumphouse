@@ -3,10 +3,11 @@ import unittest
 
 from pumphouse.tasks.quota import base
 
+
 class TestBaseQuota(unittest.TestCase):
     def setUp(self):
-        self.tenant_id = Mock("tenant_id")
-        self.cloud = Mock("cloud")
+        self.tenant_id = Mock(name="tenant_id")
+        self.cloud = Mock(name="cloud")
         self.tenant_info = {
             "id": self.tenant_id
         }
@@ -22,11 +23,10 @@ class TestBaseQuota(unittest.TestCase):
     def assertEnsureQuota(self, mock_called, id, info):
         mock_called.assert_called_once_with(
             id,
-            a = "1",
-            b = "2"
+            a="1",
+            b="2"
         )
         self.assertEqual(info, mock_called.return_value._info)
-
 
 
 class TestRetrieveTenantQuota(TestBaseQuota):
@@ -37,13 +37,14 @@ class TestRetrieveTenantQuota(TestBaseQuota):
                                  retrieve_tenant_quota.execute(self.tenant_id))
 
 
-
 class TestRetrieveDefaultQuota(TestBaseQuota):
     @patch.object(base.RetrieveDefaultQuota, "client")
     def test_execute(self, mock_client):
         retrieve_default_quota = base.RetrieveDefaultQuota(self.cloud)
-        self.assertRetrieveQuota(mock_client.quotas.defaults,
-                                 retrieve_default_quota.execute(self.tenant_id))
+        self.assertRetrieveQuota(
+            mock_client.quotas.defaults,
+            retrieve_default_quota.execute(self.tenant_id)
+        )
 
 
 class TestEnsureTenantQuota(TestBaseQuota):
