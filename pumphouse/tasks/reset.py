@@ -229,6 +229,8 @@ class KeyPair(EventResource):
             name=self.data["name"],
             public_key=self.data.get("public_key"),
         ).to_dict()
+        LOG.debug("Added keypair(%s): private_key='%s'",
+                  self.data["name"], self.data.get("private_key", ""))
 
     @task(before=[create, tenant.delete, user.delete])
     def delete(self):
