@@ -27,6 +27,7 @@ from pumphouse.tasks import snapshot as snapshot_tasks
 from pumphouse.tasks import volume as volume_tasks
 from pumphouse.tasks import utils as task_utils
 from pumphouse import utils
+from pumphouse import plugin
 
 
 LOG = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ LOG = logging.getLogger(__name__)
 HYPERVISOR_HOSTNAME_ATTR = "OS-EXT-SRV-ATTR:hypervisor_hostname"
 
 provision_server = flows.register("provision_server", default="image")
-restore_floating_ips = flows.register("floating_ips", default="nova")
+network_manager = plugin.Plugin("network", default="nova")
 
 
 class EvacuateServer(task.BaseCloudTask):
@@ -289,6 +290,8 @@ def reprovision_server(context, server, server_nics):
                                     user_ensure, tenant_ensure,
                                     server_nics, server_dm]),
     )
+    restore_floating_ips = network_manager.select_from_config(
+        context.config)
     subflow = restore_floating_ips(context, server.to_dict())
     if subflow:
         flow.add(subflow)
@@ -325,7 +328,7 @@ def rebuild_by_snapshot(context, server):
     return [], [], [snapshot_flow], snapshot_ensure
 
 
-@restore_floating_ips.add("nova")
+@network_manager.add("nova")
 def restore_floating_ips_nova(context, server_info):
     flow = unordered_flow.Flow("post-migration-{}".format(server_info["id"]))
     addresses = server_info["addresses"]
@@ -348,7 +351,7 @@ def restore_floating_ips_nova(context, server_info):
     return flow
 
 
-@restore_floating_ips.add("neutron")
+@network_manager.add("neutron")
 def restore_floating_ips_neutron(context, server_info):
     return None
 
