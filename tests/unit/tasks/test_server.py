@@ -26,6 +26,7 @@ class TestServer(unittest.TestCase):
             "id": self.test_server_id,
             "state": "ACTIVE",
             "name": "test-server-name",
+            "key_name": None,
         }
 
         self.image_info = {
@@ -45,10 +46,12 @@ class TestServer(unittest.TestCase):
             "v4-fixed-ip": "1.2.3.4",
         }]
         self.server_dm = [("/dev/vda", "567")]
+        self.keypair_info = None
 
         self.server = Mock()
         self.server.id = self.test_server_id
         self.server.status = "ACTIVE"
+        self.server.key_name = None
         self.server.image = self.image_info
         self.server.flavor = self.flavor_info
         self.server.to_dict.return_value = self.server_info
@@ -135,6 +138,7 @@ class TestBootServer(TestServer):
         server_info = boot_server.execute(self.server_info,
                                           self.image_info,
                                           self.flavor_info,
+                                          self.keypair_info,
                                           self.user_info,
                                           self.tenant_info,
                                           self.server_nics,
@@ -147,6 +151,7 @@ class TestBootServer(TestServer):
             self.server_info["name"],
             self.image_info["id"],
             self.flavor_info["id"],
+            key_name=None,
             nics=self.server_nics,
             block_device_mapping=dict(self.server_dm))
         self.assertEqual(self.server_info, server_info)
@@ -196,7 +201,11 @@ class TestReprovisionServer(TestServer):
         server_volumes_flow = Mock(name="volumes-flow")
         mock_migrate_server_volumes.return_value = server_volumes_flow()
         server_retrieve = "server-{}-retrieve".format(self.test_server_id)
-        expected_store_dict = {server_retrieve: self.test_server_id}
+        keypair_ensure = "keypair-server-{}-ensure".format(self.test_server_id)
+        expected_store_dict = {
+            server_retrieve: self.test_server_id,
+            keypair_ensure: None,
+        }
         add_res, flow = server.reprovision_server(
             self.context, self.server, "nics")
 

@@ -23,6 +23,7 @@ from pumphouse import exceptions
 # from pumphouse.tasks import floating_ip as fip_tasks
 from pumphouse.tasks.network.nova import floating_ip as fip_tasks
 from pumphouse.tasks import image as image_tasks
+from pumphouse.tasks import keypair as keypair_tasks
 from pumphouse.tasks import snapshot as snapshot_tasks
 from pumphouse.tasks import volume as volume_tasks
 from pumphouse.tasks import utils as task_utils
@@ -158,11 +159,15 @@ class BootServerFromImage(task.BaseCloudTask):
             username=user_info["name"],
             tenant_name=tenant_info["name"],
             password="default")
+        if keypair_info is not None:
+            key_name = keypair_info["name"]
+        else:
+            key_name = None
         server = restrict_cloud.nova.servers.create(
             server_info["name"], image_info["id"], flavor_info["id"],
             block_device_mapping=dict(server_dm),
             nics=server_nics,
-            key_name=keypair_info["name"])
+            key_name=key_name)
         server = utils.wait_for(server, self.cloud.nova.servers.get,
                                 value="ACTIVE")
         spawn_server_info = server.to_dict()
@@ -236,7 +241,6 @@ def reprovision_server(context, server, server_nics):
     flavor_ensure = "flavor-{}-ensure".format(server.flavor["id"])
     user_ensure = "user-{}-ensure".format(server.user_id)
     tenant_ensure = "tenant-{}-ensure".format(server.tenant_id)
-    keypair_ensure = "keypair-{}-ensure".format(server.key_name)
 
     server_id = server.id
     server_start_event = "server-{}-start-event".format(server_id)
@@ -251,6 +255,18 @@ def reprovision_server(context, server, server_nics):
 
     pre_suspend_tasks, pre_suspend_sync, pre_boot_tasks, image_ensure = \
         provision_server(context, server)
+
+    if server.key_name:
+        keypair_ensure = "keypair-{}-ensure".format(server.key_name)
+        keypair_flow = keypair_tasks.migrate_keypair(context, None,
+                                                     server.tenant_id,
+                                                     server.user_id,
+                                                     server.key_name)
+        if keypair_flow is not None:
+            pre_suspend_tasks += [keypair_flow]
+    else:
+        keypair_ensure = "keypair-server-{}-ensure".format(server_id)
+        context.store[keypair_ensure] = None
 
     migrate_server_volumes = volume_tasks.migrate_server_volumes(
         context,
