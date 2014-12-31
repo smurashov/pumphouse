@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import operator
 
 from taskflow.patterns import graph_flow
 from taskflow.task import Task
@@ -208,6 +209,54 @@ class BlockDeviceMapping(Task):
             if attachment["server_id"] == server_id:
                 dev_name = attachment["device"]
         return (str(dev_name), str(dev_mapping))
+
+
+class DetachVolume(task.BaseCloudTask):
+    def execute(self, attachment):
+        LOG.info("Detaching volume %(volume_id)s from server %(server_id)s...",
+                 attachment)
+        self.cloud.nova.volumes.delete_server_volume(
+            attachment["server_id"],
+            attachment["id"],
+        )
+        utils.wait_for(
+            attachment["volume_id"],
+            self.cloud.cinder.volumes.get,
+            value="available",
+        )
+        LOG.info("Detached volume %(volume_id)s from server %(server_id)s",
+                 attachment)
+
+    def revert(self, attachment, result, flow_failures):
+        self.cloud.nova.volumes.create_server_volume(
+            attachment["server_id"],
+            attachment["volume_id"],
+            attachment["device"],
+        )
+        LOG.info("Reattached volume %(volume_id)s from server %(server_id)s"
+                 "(revert)", attachment)
+
+
+class RestoreAttachment(task.BaseCloudTask):
+    def execute(self, attachment):
+        self.cloud.nova.volumes.create_server_volume(
+            attachment["server_id"],
+            attachment["volume_id"],
+            attachment["device"],
+        )
+        LOG.info("Reattached volume %(volume_id)s from server %(server_id)s",
+                 attachment)
+
+get_volume_host = operator.attrgetter("os-vol-host-attr:host")
+
+
+class EvacuateVolume(task.BaseCloudTask):
+    def execute(self, volume, target_host):
+        LOG.info("Evacuating volume %s to host %s...", volume.id, target_host)
+        self.cloud.cinder.volumes.migrate_volume(volume, target_host, False)
+        utils.wait_for(volume.id, self.cloud.cinder.volumes.get,
+                       get_volume_host, target_host)
+        LOG.info("Evacuated volume %s to host %s", volume.id, target_host)
 
 
 def migrate_detached_volume(context, volume_id, user_id, tenant_id):
