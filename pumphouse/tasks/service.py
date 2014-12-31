@@ -24,20 +24,32 @@ from pumphouse import utils
 LOG = logging.getLogger(__name__)
 
 
-class RetrieveServices(task.BaseCloudTask):
+class ServiceTask(task.BaseCloudTask):
+    def __init__(self, *args, **kwargs):
+        self.client = kwargs.pop("client", "nova")
+        super(ServiceTask, self).__init__(*args, **kwargs)
+
+    def get_client(self):
+        if self.client == "nova":
+            return self.cloud.nova
+        elif self.client == "cinder":
+            return self.cloud.cinder
+
+
+class RetrieveServices(ServiceTask):
     def execute(self):
         services = dict((s.id, s.to_dict())
-                        for s in self.cloud.nova.services.list())
+                        for s in self.get_client().services.list())
         return services
 
 
-class DisableService(task.BaseCloudTask):
+class DisableService(ServiceTask):
     def __init__(self, binary, *args, **kwargs):
         super(DisableService, self).__init__(*args, **kwargs)
         self.binary = binary
 
     def execute(self, hostname):
-        self.cloud.nova.services.disable(hostname, self.binary)
+        self.get_client().services.disable(hostname, self.binary)
         self.block_event(hostname)
 
     def block_event(self, hostname):
@@ -54,7 +66,7 @@ class DisableService(task.BaseCloudTask):
 
 class DiableServiceWithRollback(DisableService):
     def revert(self, hostname, result, flow_failures):
-        self.cloud.nova.services.enable(hostname, self.binary)
+        self.get_client().services.enable(hostname, self.binary)
         self.unblock_event(hostname)
 
     def unblock_event(self, hostname):
@@ -70,12 +82,12 @@ class DiableServiceWithRollback(DisableService):
         }, namespace="/events")
 
 
-class DeleteServicesSilently(task.BaseCloudTask):
+class DeleteServicesSilently(ServiceTask):
     def execute(self, hostname):
         services = []
-        for service in self.cloud.nova.services.list(host=hostname):
+        for service in self.get_client().services.list(host=hostname):
             try:
-                self.cloud.nova.services.delete(service.id)
+                self.get_client().services.delete(service.id)
             except Exception:
                 LOG.exception("Error occurred during deleting of the service "
                               "%s/%s", service.host, service.binary)
@@ -84,7 +96,7 @@ class DeleteServicesSilently(task.BaseCloudTask):
         return services
 
 
-class WaitComputesServices(task.BaseCloudTask):
+class WaitComputesServices(ServiceTask):
     def execute(self, hostname, **requires):
         hypervisors = utils.wait_for(hostname,
                                      self.get_hypervisors,
@@ -94,7 +106,7 @@ class WaitComputesServices(task.BaseCloudTask):
 
     def get_hypervisors(self, hostname):
         hypervisors = []
-        services = self.cloud.nova.services.list(host=hostname,
+        services = self.get_client().services.list(host=hostname,
                                                  binary="nova-compute")
         for s in services:
             if s.state == "up" and s.status == "enabled":
