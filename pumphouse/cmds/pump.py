@@ -405,7 +405,7 @@ def main():
                           Cloud,
                           Identity)
         ctx = context.Context(plugins_config, src, dst)
-        flow = evacuation_tasks.evacuate_servers(ctx, args.hostname)
+        flow = evacuation_tasks.evacuate_host(ctx, args.hostname)
         if (args.dump):
             with open(args.dump, "w") as f:
                 utils.dump_flow(flow, f, True)

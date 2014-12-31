@@ -292,7 +292,7 @@ def evacuate_host(host_id):
         }, namespace="/events")
 
         try:
-            flow = evacuation.evacuate_servers(ctx, host_id)
+            flow = evacuation.evacuate_host(ctx, host_id)
             LOG.debug("Evacuation flow: %s", flow)
             result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of evacuation: %s", result)
