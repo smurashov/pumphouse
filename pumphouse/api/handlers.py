@@ -14,11 +14,11 @@
 
 import datetime
 import functools
-import gevent
 import os
 import logging
 
 import flask
+import gevent
 from taskflow import exceptions as taskflow_excs
 
 from . import hooks
@@ -80,6 +80,25 @@ def crossdomain(origin='*', methods=None, headers=('Accept', 'Content-Type'),
 
 
 def cloud_resources(conf, cloud):
+    group = gevent.pool.Group()
+    iter_resources = (fn(conf, cloud) for fn in cloud_resources.fns)
+    results = group.imap_unordered(list, iter_resources)
+    res = []
+    for res_list in results:
+        res += res_list
+    return res
+cloud_resources.fns = []
+
+
+def register(fn):
+    cloud_resources.fns.append(fn)
+    return fn
+cloud_resources.register = register
+del register
+
+
+@cloud_resources.register
+def cloud_tenants(conf, cloud):
     for tenant in cloud.keystone.tenants.list():
         yield {
             "id": tenant.id,
@@ -91,6 +110,10 @@ def cloud_resources(conf, cloud):
                 "description": tenant.description,
             },
         }
+
+
+@cloud_resources.register
+def cloud_servers(conf, cloud):
     for server in cloud.nova.servers.list(search_opts={"all_tenants": 1}):
         yield {
             "id": server.id,
@@ -108,6 +131,10 @@ def cloud_resources(conf, cloud):
                                    "OS-EXT-SRV-ATTR:hypervisor_hostname"),
             },
         }
+
+
+@cloud_resources.register
+def cloud_volumes(conf, cloud):
     for volume in cloud.cinder.volumes.list(search_opts={"all_tenants": 1}):
         attachments = [attachment["server_id"]
                        for attachment in volume.attachments]
@@ -127,6 +154,10 @@ def cloud_resources(conf, cloud):
                 "server_ids": attachments,
             },
         }
+
+
+@cloud_resources.register
+def cloud_images(conf, cloud):
     for image in cloud.glance.images.list():
         yield {
             "id": image["id"],
@@ -138,6 +169,10 @@ def cloud_resources(conf, cloud):
                 "name": image["name"],
             },
         }
+
+
+@cloud_resources.register
+def cloud_floating_ips(conf, cloud):
     for floating_ip in cloud.nova.floating_ips_bulk.list():
         yield {
             "id": floating_ip.address,
@@ -148,6 +183,10 @@ def cloud_resources(conf, cloud):
                 "server_id": floating_ip.instance_uuid,
             }
         }
+
+
+@cloud_resources.register
+def cloud_hypervisors(conf, cloud):
     for hyperv in cloud.nova.hypervisors.list():
         services = cloud.nova.services.list(host=hyperv.service["host"],
                                             binary="nova-compute")
@@ -168,6 +207,10 @@ def cloud_resources(conf, cloud):
                 "status": status,
             },
         }
+
+
+@cloud_resources.register
+def cloud_secgroups(conf, cloud):
     for secgroup in cloud.nova.security_groups.list(
             search_opts={"all_tenants": 1}):
         yield {
@@ -182,6 +225,10 @@ def cloud_resources(conf, cloud):
                 "rules": secgroup.rules
             }
         }
+
+
+@cloud_resources.register
+def cloud_networks(conf, cloud):
     if conf["PLUGINS"].get("network", "nova") == "nova":
         for network in cloud.nova.networks.list():
             yield {
@@ -242,8 +289,8 @@ def cloud_resources(conf, cloud):
 def cloud_view(client):
     return {
         "urls": client.cloud_urls,
-        "resources": list(cloud_resources(flask.current_app.config,
-                                          client.connect())),
+        "resources": cloud_resources(flask.current_app.config,
+                                     client.connect()),
     }
 
 
@@ -281,10 +328,20 @@ def reset():
 @pump.route("/resources")
 @crossdomain()
 def resources():
+    group = gevent.pool.Group()
+    source_view = gevent.spawn(
+        flask.copy_current_request_context(cloud_view),
+        hooks.source,
+    )
+    destination_view = gevent.spawn(
+        flask.copy_current_request_context(cloud_view),
+        hooks.destination,
+    )
+    gevent.wait([source_view, destination_view])
     return flask.jsonify(
         reset=flask.current_app.config["CLOUDS_RESET"],
-        source=cloud_view(hooks.source),
-        destination=cloud_view(hooks.destination),
+        source=source_view.value,
+        destination=destination_view.value,
         # TODO(akscram): A set of hosts that don't belong to any cloud.
         hosts=[],
         # TODO(akscram): A set of current events.
