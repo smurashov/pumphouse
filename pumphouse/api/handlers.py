@@ -20,6 +20,7 @@ import logging
 import flask
 import gevent
 from taskflow import exceptions as taskflow_excs
+from taskflow.patterns import graph_flow
 
 from . import hooks
 
@@ -29,6 +30,7 @@ from pumphouse import flows
 from pumphouse.tasks import evacuation
 from pumphouse.tasks import resources as resource_tasks
 from pumphouse.tasks import node as node_tasks
+from pumphouse.tasks import server_resources as server_tasks
 
 
 LOG = logging.getLogger(__name__)
@@ -347,6 +349,53 @@ def resources():
         # TODO(akscram): A set of current events.
         events=[],
     )
+
+
+@pump.route("/servers/<server_id>", methods=["POST"])
+@crossdomain()
+def migrate_server(server_id):
+    @flask.copy_current_request_context
+    def migrate():
+        config = flask.current_app.config.get("PLUGINS") or {}
+        config.update(flask.current_app.config.get("PARAMETERS", {}))
+        src = hooks.source.connect()
+        dst = hooks.destination.connect()
+        ctx = context.Context(config, src, dst)
+        events.emit("update", {
+            "id": server_id,
+            "cloud": src.name,
+            "type": "server",
+            "progress": None,
+            "action": "migration",
+        }, namespace="/events")
+
+        try:
+            flow = graph_flow.Flow("migrate-server-{}".format(server_id))
+            LOG.debug("Migration flow: %s", flow)
+            res, server_flow = server_tasks.migrate_server(ctx, server_id)
+            flow.add(*res)
+            flow.add(server_flow)
+            result = flows.run_flow(flow, ctx.store)
+            LOG.debug("Result of migration: %s", result)
+        except Exception:
+            msg = ("Error occured during migration of server: {}"
+                   .format(server_id))
+            LOG.exception(msg)
+            events.emit("log", {
+                "level": "error",
+                "message": msg,
+            }, namespace="/events")
+
+        events.emit("update", {
+            "id": server_id,
+            "cloud": src.name,
+            "type": "server",
+            "progress": None,
+            "action": None,
+        }, namespace="/events")
+
+    gevent.spawn(migrate)
+    return flask.make_response()
 
 
 @pump.route("/tenants/<tenant_id>", methods=["POST"])
