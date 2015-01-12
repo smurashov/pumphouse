@@ -172,7 +172,7 @@ class TestTerminateServer(TestServer):
 class TestReprovisionServer(TestServer):
 
     @patch("pumphouse.tasks.volume.migrate_server_volumes")
-    @patch("pumphouse.tasks.server.restore_floating_ips")
+    @patch("pumphouse.tasks.server.network_manager")
     @patch("pumphouse.tasks.utils.SyncPoint")
     @patch.object(server, "ServerStartMigrationEvent")
     @patch.object(server, "TerminateServer")
@@ -190,14 +190,14 @@ class TestReprovisionServer(TestServer):
                                 terminate_server_mock,
                                 start_event_mock,
                                 mock_sync_point,
-                                mock_restore_floating_ips,
+                                mock_network_manager,
                                 mock_migrate_server_volumes):
-        floating_ips_flow = Mock()
+        floating_ips_flow = Mock(name="network-flows")
         mock_image_flow = Mock(name="image-flow")
         image_ensure = "image-{}-ensure".format(self.image_info["id"])
         provision_server_mock.return_value = (
             [mock_image_flow], [image_ensure], [], image_ensure)
-        mock_restore_floating_ips.return_value = floating_ips_flow()
+        mock_network_manager.return_value = floating_ips_flow()
         server_volumes_flow = Mock(name="volumes-flow")
         mock_migrate_server_volumes.return_value = server_volumes_flow()
         server_retrieve = "server-{}-retrieve".format(self.test_server_id)

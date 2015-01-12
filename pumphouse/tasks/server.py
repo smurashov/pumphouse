@@ -306,11 +306,9 @@ def reprovision_server(context, server, server_nics):
                                     user_ensure, tenant_ensure,
                                     server_nics, server_dm]),
     )
-    restore_floating_ips = network_manager.select_from_config(
-        context.config)
-    subflow = restore_floating_ips(context, server.to_dict())
-    if subflow:
-        flow.add(subflow)
+    restore_floating_ips = network_manager(context, server.to_dict())
+    if restore_floating_ips:
+        flow.add(restore_floating_ips)
     flow.add(
         TerminateServer(context.src_cloud,
                         name=server_terminate,
