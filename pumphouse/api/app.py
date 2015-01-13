@@ -58,7 +58,8 @@ def start_app(config=None, **kwargs):
         app.config.update(config)
     events.init_app(app)
     hooks.source.init_app(app)
-    hooks.destination.init_app(app)
+    if "destination" in app.config["CLOUDS"]:
+        hooks.destination.init_app(app)
     host, port = get_bind_host()
     events.run(app, policy_server=False, host=host, port=port)
 

@@ -318,7 +318,8 @@ def reset():
     def reset_destination():
         hooks.destination.reset(events)
 
-    gevent.spawn(reset_destination)
+    if "destination" in flask.current_app.config["CLOUDS"]:
+        gevent.spawn(reset_destination)
     gevent.spawn(reset_source)
 
     events.emit("reset start", {
@@ -335,6 +336,16 @@ def resources():
         flask.copy_current_request_context(cloud_view),
         hooks.source,
     )
+    if "destination" not in flask.current_app.config["CLOUDS"]:
+        gevent.wait([source_view])
+        return flask.jsonify(
+            reset=flask.current_app.config["CLOUDS_RESET"],
+            source=source_view.value,
+            # TODO(akscram): A set of hosts that don't belong to any cloud.
+            hosts=[],
+            # TODO(akscram): A set of current events.
+            events=[],
+        )
     destination_view = gevent.spawn(
         flask.copy_current_request_context(cloud_view),
         hooks.destination,
@@ -394,6 +405,9 @@ def migrate_server(server_id):
             "action": None,
         }, namespace="/events")
 
+    if "destination" not in flask.current_app.config["CLOUDS"]:
+        return flask.make_response(
+            "destination cloud is not specified in config", 403)
     gevent.spawn(migrate)
     return flask.make_response()
 
@@ -446,6 +460,9 @@ def migrate_tenant(tenant_id):
             "action": None,
         }, namespace="/events")
 
+    if "destination" not in flask.current_app.config["CLOUDS"]:
+        return flask.make_response(
+            "destination cloud is not specified in config", 403)
     gevent.spawn(migrate)
     return flask.make_response()
 
@@ -457,7 +474,10 @@ def evacuate_host(host_id):
     def evacuate():
         config = flask.current_app.config.get("PLUGINS") or {}
         src = hooks.source.connect()
-        dst = hooks.destination.connect()
+        if "destination" not in flask.current_app.config["CLOUDS"]:
+            dst = None
+        else:
+            dst = hooks.destination.connect()
         ctx = context.Context(config, src, dst)
         events.emit("update", {
             "id": host_id,
@@ -468,7 +488,7 @@ def evacuate_host(host_id):
         }, namespace="/events")
 
         try:
-            flow = evacuation.evacuate_servers(ctx, host_id)
+            flow = evacuation.evacuate_host(ctx, host_id)
             LOG.debug("Evacuation flow: %s", flow)
             result = flows.run_flow(flow, ctx.store)
             LOG.debug("Result of evacuation: %s", result)
@@ -531,6 +551,9 @@ def reassign_host(host_id):
                 "message": msg,
             }, namespace="/events")
 
+    if "destination" not in flask.current_app.config["CLOUDS"]:
+        return flask.make_response(
+            "destination cloud is not specified in config", 403)
     gevent.spawn(reassign)
     return flask.make_response()
 
